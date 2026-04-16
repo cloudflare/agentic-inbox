@@ -869,4 +869,46 @@ export class MailboxDO extends DurableObject<Env> {
 			this.db.insert(schema.attachments).values(attachments).run();
 		}
 	}
+
+	// ── Teardown ───────────────────────────────────────────────────────
+
+	/**
+	 * Tear down this mailbox: enumerate attachments, delete their R2 blobs,
+	 * wipe SQLite storage, and abort the DO so the next access gets a fresh
+	 * instance (which re-runs migrations on an empty DB).
+	 *
+	 * Attachment blob deletion happens here so the whole operation is atomic
+	 * from the caller's perspective and avoids shipping a potentially large
+	 * string[] back over RPC.
+	 */
+	async destroyMailbox(): Promise<void> {
+		const rows = [
+			...this.ctx.storage.sql.exec<{
+				email_id: string;
+				id: string;
+				filename: string;
+			}>(`SELECT email_id, id, filename FROM attachments`),
+		];
+		const keys = rows.map(
+			(r) => `attachments/${r.email_id}/${r.id}/${r.filename}`,
+		);
+
+		// R2 batch delete cap is 1000 keys per call.
+		for (let i = 0; i < keys.length; i += 1000) {
+			const chunk = keys.slice(i, i + 1000);
+			if (chunk.length > 0) await this.env.BUCKET.delete(chunk);
+		}
+
+		await this.ctx.storage.deleteAll();
+
+		// Abort so the next request against this mailbox-id gets a fresh DO
+		// instance and its constructor re-runs migrations on a new SQLite DB.
+		// Without this the live instance retains an empty DB without the
+		// d1_migrations tracker and schema-dependent methods would fail.
+		// `ctx.abort()` throws an uncatchable error, so defer to the event
+		// loop to let the RPC response flush first.
+		setTimeout(() => {
+			this.ctx.abort("destroyed");
+		}, 0);
+	}
 }
