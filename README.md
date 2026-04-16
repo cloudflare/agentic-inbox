@@ -27,7 +27,7 @@ Click the button above to deploy to your Cloudflare account. The deploy flow wil
 1. **Set up Email Routing** -- In the Cloudflare dashboard, go to your domain > Email Routing and create a catch-all rule that forwards to this Worker
 2. **Enable Email Service** -- The worker needs the `send_email` binding to send outbound emails. See [Email Service docs](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/)
 3. **Create a mailbox** -- Visit your deployed app and create a mailbox for any address on your domain (e.g. `hello@example.com`)
-4. **Configure Cloudflare Access** -- Create an Access Application for your Worker URL under Zero Trust > Access > Applications. Copy the Audience tag to `POLICY_AUD` and your team domain to `TEAM_DOMAIN`
+4. **Configure Cloudflare Access** -- Enable [one-click Cloudflare Access](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/) on your Worker under Settings > Domains & Routes. The modal will show your `POLICY_AUD` and `TEAM_DOMAIN` values
 
 ## Features
 

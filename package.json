@@ -11,10 +11,10 @@
 				"description": "Your domain with [Email Routing](https://developers.cloudflare.com/email-routing/) enabled (e.g. `example.com`). After deploying, create a catch-all Email Routing rule pointing to this Worker."
 			},
 			"POLICY_AUD": {
-				"description": "Your [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) Application Audience (AUD) tag. Find it under **Zero Trust > Access > Applications > your app > Overview**."
+				"description": "Enable [one-click Cloudflare Access](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/) on your Worker under **Settings > Domains & Routes > Enable Cloudflare Access**. Both `POLICY_AUD` and `TEAM_DOMAIN` appear in the modal."
 			},
 			"TEAM_DOMAIN": {
-				"description": "Your Cloudflare Access team domain, e.g. `https://your-team.cloudflareaccess.com`. Find it under **Zero Trust > Settings > Custom Pages**."
+				"description": "Your Cloudflare Access team domain, e.g. `https://your-team.cloudflareaccess.com`. Shown in the modal when you [enable Cloudflare Access](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/) on your Worker."
 			}
 		}
 	},
