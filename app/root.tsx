@@ -117,7 +117,7 @@ function SetupBanner() {
 
 	if (!data || data.isComplete || location.pathname === "/setup") return null;
 
-	const requiredIncomplete = data.steps.filter((s) => s.required && s.status !== "complete");
+	const requiredIncomplete = data.steps.filter((s) => s.required && s.status !== "complete" && s.status !== "info");
 	if (requiredIncomplete.length === 0) return null;
 
 	return (

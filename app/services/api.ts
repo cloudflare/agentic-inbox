@@ -97,8 +97,9 @@ interface EmailListResponse {
 export interface SetupStep {
 	id: string;
 	label: string;
-	status: "complete" | "incomplete" | "error";
+	status: "complete" | "incomplete" | "error" | "info";
 	detail?: string;
+	docsUrl?: string;
 	required: boolean;
 }
 

@@ -8,7 +8,7 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
-import { renderAccessNotConfiguredPage, renderAccessDeniedPage } from "./lib/setup-page";
+import { renderAccessNotConfiguredPage } from "./lib/setup-page";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
@@ -46,6 +46,9 @@ const app = new Hono<{ Bindings: Env }>();
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
 	if (import.meta.env.DEV) {
+		// TODO: remove this preview flag after testing the Access setup page
+		const preview = c.req.query("__access_error");
+		if (preview === "not-configured") return c.html(renderAccessNotConfiguredPage(), 500);
 		return next();
 	}
 
@@ -56,22 +59,9 @@ app.use("*", async (c, next) => {
 		return c.html(renderAccessNotConfiguredPage(), 500);
 	}
 
-	const isApiRequest = c.req.path.startsWith("/api/");
-	const isBrowserRequest = !isApiRequest && (
-		c.req.header("sec-fetch-mode") === "navigate" ||
-		c.req.header("accept")?.includes("text/html") === true
-	);
-
 	const token = c.req.header("cf-access-jwt-assertion");
 	if (!token) {
-		if (isBrowserRequest) {
-			const returnUrl = c.req.url;
-			const { issuer } = getAccessUrls(TEAM_DOMAIN);
-			return c.html(renderAccessDeniedPage(issuer, returnUrl), 401);
-		}
-		return c.json({ error: "Missing required CF Access JWT", code: "ACCESS_TOKEN_MISSING" }, 401, {
-			"WWW-Authenticate": `Bearer realm="Cloudflare Access", resource="${c.req.url}"`,
-		});
+		return c.text("Missing required CF Access JWT", 403);
 	}
 
 	try {
@@ -79,16 +69,11 @@ app.use("*", async (c, next) => {
 		const JWKS = createRemoteJWKSet(certsUrl);
 		await jwtVerify(token, JWKS, { issuer, audience: POLICY_AUD });
 	} catch {
-		if (isBrowserRequest) {
-			const returnUrl = c.req.url;
-			const { issuer } = getAccessUrls(TEAM_DOMAIN);
-			return c.html(renderAccessDeniedPage(issuer, returnUrl), 401);
-		}
-		return c.json({ error: "Invalid or expired Access token", code: "ACCESS_TOKEN_INVALID" }, 401, {
-			"WWW-Authenticate": `Bearer realm="Cloudflare Access", resource="${c.req.url}"`,
-		});
+		return c.text("Invalid or expired Access token", 403);
 	}
 
+	// Authorization model note: once a teammate passes the shared Cloudflare
+	// Access policy, they can access all mailboxes in this app by design.
 	return next();
 });
 

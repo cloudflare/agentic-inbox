@@ -53,12 +53,7 @@ export function renderAccessNotConfiguredPage(): string {
 			line-height: 1.5;
 			margin-bottom: 1.5rem;
 		}
-		.steps {
-			list-style: none;
-			counter-reset: step;
-		}
 		.steps li {
-			counter-increment: step;
 			padding: 0.875rem 0;
 			border-top: 1px solid #f0f0f0;
 			font-size: 0.875rem;
@@ -70,7 +65,6 @@ export function renderAccessNotConfiguredPage(): string {
 			padding-top: 0;
 		}
 		.steps li::before {
-			content: counter(step);
 			display: inline-flex;
 			align-items: center;
 			justify-content: center;
@@ -116,6 +110,7 @@ export function renderAccessNotConfiguredPage(): string {
 			display: flex;
 			align-items: center;
 			gap: 0.75rem;
+			justify-content: center;
 		}
 		.brand {
 			text-align: center;
@@ -128,20 +123,22 @@ export function renderAccessNotConfiguredPage(): string {
 <body>
 	<div class="container">
 		<div class="card">
+		<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
 			<div class="icon-wrap">
 				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
 					<circle cx="128" cy="128" r="96"/>
 					<line x1="128" y1="136" x2="128" y2="88"/>
 					<circle cx="128" cy="168" r="4" fill="currentColor"/>
 				</svg>
+				</div>
 				<h1>Cloudflare Access is not configured</h1>
-			</div>
+				</div>
 			<p class="subtitle">
 				This app requires Cloudflare Access for authentication in production.
 				Follow the steps below to complete setup.
 			</p>
 			<ol class="steps">
-				<li>
+				<li class="step">
 					<strong>Enable Cloudflare Access</strong> — go to the <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages" style="color:#0052d4">Workers &amp; Pages</a> dashboard, select your Worker, then navigate to <strong>Settings &rarr; Domains &amp; Routes</strong> and click <strong>Enable Cloudflare Access</strong>.
 				</li>
 				<li>
@@ -161,116 +158,9 @@ export function renderAccessNotConfiguredPage(): string {
 					Reload
 				</a>
 			</div>
-		</div>
-		<p class="brand">Agentic Inbox</p>
-	</div>
-</body>
-</html>`;
-}
-
-export function renderAccessDeniedPage(
-  teamDomain: string,
-  returnUrl: string,
-): string {
-  const loginUrl = `${teamDomain}/cdn-cgi/access/login?${encodeURIComponent(returnUrl)}`;
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Authentication Required — Agentic Inbox</title>
-	<style>
-		* { margin: 0; padding: 0; box-sizing: border-box; }
-		body {
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-			background: #f4f4f5;
-			color: #1e1e1e;
-			min-height: 100vh;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			padding: 2rem 1rem;
-		}
-		.container {
-			max-width: 440px;
-			width: 100%;
-		}
-		.card {
-			background: #ffffff;
-			border: 1px solid #e5e5e5;
-			border-radius: 12px;
-			padding: 2rem;
-			text-align: center;
-		}
-		.icon-wrap {
-			width: 48px;
-			height: 48px;
-			border-radius: 50%;
-			background: #dbeafe;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			margin: 0 auto 1.25rem;
-		}
-		.icon-wrap svg {
-			width: 24px;
-			height: 24px;
-			color: #2563eb;
-		}
-		h1 {
-			font-size: 1.25rem;
-			font-weight: 600;
-			margin-bottom: 0.5rem;
-		}
-		.subtitle {
-			font-size: 0.875rem;
-			color: #737373;
-			line-height: 1.5;
-			margin-bottom: 1.5rem;
-		}
-		.btn {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.375rem;
-			padding: 0.5rem 1.25rem;
-			border: none;
-			border-radius: 6px;
-			font-size: 0.875rem;
-			font-weight: 500;
-			cursor: pointer;
-			text-decoration: none;
-			transition: background 0.15s;
-		}
-		.btn-primary {
-			background: #0052d4;
-			color: #ffffff;
-		}
-		.btn-primary:hover { background: #0044b0; }
-		.brand {
-			text-align: center;
-			margin-top: 1.5rem;
-			font-size: 0.8125rem;
-			color: #a3a3a3;
-		}
-	</style>
-</head>
-<body>
-	<div class="container">
-		<div class="card">
-			<div class="icon-wrap">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
-					<rect x="40" y="88" width="176" height="112" rx="8"/>
-					<path d="M40 152h176"/>
-					<path d="M112 152v48"/>
-				</svg>
-			</div>
-			<h1>Authentication required</h1>
-			<p class="subtitle">
-				You need to sign in with Cloudflare Access to use this app.
+			<p style="font-size:0.8125rem;color:#737373;margin-top:1.25rem;text-align:center;">
+				For more help, see the <a href="https://developers.cloudflare.com/workers/configuration/routing/workers-dev/#manage-access-to-workersdev" style="color:#0052d4;text-decoration:underline;">Cloudflare Access documentation</a>.
 			</p>
-			<a href="${loginUrl}" class="btn btn-primary">
-				Sign in
-			</a>
 		</div>
 		<p class="brand">Agentic Inbox</p>
 	</div>

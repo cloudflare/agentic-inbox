@@ -4,8 +4,10 @@ import {
 	Loader,
 } from "@cloudflare/kumo";
 import {
+	ArrowSquareOutIcon,
 	CheckCircleIcon,
 	GearIcon,
+	InfoIcon,
 	WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,12 +19,15 @@ export function meta() {
 	return [{ title: "Setup — Agentic Inbox" }];
 }
 
-function StepIcon({ status }: { status: "complete" | "incomplete" | "error" }) {
+function StepIcon({ status }: { status: "complete" | "incomplete" | "error" | "info" }) {
 	if (status === "complete") {
 		return <CheckCircleIcon size={24} weight="fill" className="text-kumo-success shrink-0" />;
 	}
 	if (status === "error") {
 		return <WarningCircleIcon size={24} weight="fill" className="text-kumo-danger shrink-0" />;
+	}
+	if (status === "info") {
+		return <InfoIcon size={24} weight="fill" className="text-blue-500 shrink-0" />;
 	}
 	return <WarningCircleIcon size={24} weight="fill" className="text-kumo-warning shrink-0" />;
 }
@@ -47,7 +52,7 @@ export default function SetupRoute() {
 
 	const steps = data?.steps ?? [];
 	const isComplete = data?.isComplete ?? false;
-	const requiredIncomplete = steps.filter((s) => s.required && s.status !== "complete");
+	const requiredIncomplete = steps.filter((s) => s.required && s.status !== "complete" && s.status !== "info");
 	const optionalIncomplete = steps.filter((s) => !s.required && s.status !== "complete");
 
 	return (
@@ -97,7 +102,11 @@ export default function SetupRoute() {
 											<span className="text-sm font-medium text-kumo-default">
 												{step.label}
 											</span>
-											{step.required ? (
+											{step.status === "info" ? (
+												<span className="text-[10px] font-medium uppercase tracking-wider text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded">
+													Action needed
+												</span>
+											) : step.required ? (
 												<span className="text-[10px] font-medium uppercase tracking-wider text-kumo-warning bg-kumo-warning/10 px-1.5 py-0.5 rounded">
 													Required
 												</span>
@@ -111,6 +120,17 @@ export default function SetupRoute() {
 											<p className="text-sm text-kumo-subtle mt-1 whitespace-pre-wrap">
 												{step.detail}
 											</p>
+										)}
+										{step.docsUrl && (
+											<a
+												href={step.docsUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-xs text-blue-600 hover:text-blue-800 mt-1.5 inline-flex items-center gap-1"
+											>
+												View docs
+												<ArrowSquareOutIcon size={12} />
+											</a>
 										)}
 									</div>
 								</div>
