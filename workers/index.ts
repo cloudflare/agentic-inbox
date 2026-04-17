@@ -136,7 +136,26 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const key = `mailboxes/${mailboxId}.json`;
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
-	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
+
+	// Drain the mailbox DO: delete R2 attachment blobs, wipe SQLite storage,
+	// and abort so the next access gets a fresh instance.
+	const mailboxStub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+	await (mailboxStub as any).destroyMailbox();
+
+	// Drain the EmailAgent DO via the inherited AIChatAgent.destroy() RPC.
+	// Upstream `Agent.destroy()` drops cf_agents_* tables, deletes the chat
+	// history (`cf_ai_chat_agent_messages`), deletes alarms, runs dispose
+	// hooks, wipes storage, and aborts the DO.
+	const agentStub = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId));
+	await (agentStub as any).destroy()
+		.catch((e: Error) => console.error("EmailAgent destroy failed:", e.message));
+
+	// Delete settings JSON last. A partial failure leaves the HEAD check
+	// passing so the operation can be retried. This is best-effort cleanup
+	// — a concurrent receiveEmail() that passed its HEAD check before this
+	// delete can still repopulate the mailbox; closing that race needs a
+	// deleting-flag coordination protocol and is out of scope here.
+	await c.env.BUCKET.delete(key);
 	return c.body(null, 204);
 });
 
