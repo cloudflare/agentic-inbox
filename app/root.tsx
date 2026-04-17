@@ -21,8 +21,10 @@ import {
 	Link as RouterLink,
 	Scripts,
 	ScrollRestoration,
+	useLocation,
 } from "react-router";
 import { ApiError } from "~/services/api";
+import { useSetupStatus } from "~/queries/setup";
 import "./index.css";
 
 function makeQueryClient() {
@@ -109,6 +111,30 @@ export function HydrateFallback() {
 	);
 }
 
+function SetupBanner() {
+	const location = useLocation();
+	const { data } = useSetupStatus();
+
+	if (!data || data.isComplete || location.pathname === "/setup") return null;
+
+	const requiredIncomplete = data.steps.filter((s) => s.required && s.status !== "complete");
+	if (requiredIncomplete.length === 0) return null;
+
+	return (
+		<div className="bg-kumo-warning/10 border-b border-kumo-warning/20 px-4 py-2.5">
+			<div className="mx-auto max-w-7xl flex items-center gap-2">
+				<WarningIcon size={16} weight="fill" className="text-kumo-warning shrink-0" />
+				<span className="text-sm text-kumo-default">
+					Setup incomplete — {requiredIncomplete.length} required step{requiredIncomplete.length > 1 ? "s" : ""} remaining
+				</span>
+				<RouterLink to="/setup" className="text-sm font-medium text-kumo-default underline underline-offset-2 hover:text-kumo-subtle ml-1">
+					Finish setup
+				</RouterLink>
+			</div>
+		</div>
+	);
+}
+
 export default function App() {
 	// Use useState to ensure each SSR request gets a fresh client while the
 	// browser reuses the same singleton across navigations.
@@ -118,6 +144,7 @@ export default function App() {
 			<LinkProvider component={KumoLink}>
 				<TooltipProvider>
 					<Toasty>
+						<SetupBanner />
 						<Outlet />
 					</Toasty>
 				</TooltipProvider>
@@ -130,6 +157,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 	let title = "Something went wrong";
 	let description = "An unexpected error occurred. Please try again.";
 	let status: number | null = null;
+	let isSetupError = false;
 
 	if (isRouteErrorResponse(error)) {
 		status = error.status;
@@ -140,6 +168,15 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 		} else {
 			title = `Error ${error.status}`;
 			description = error.statusText || description;
+		}
+	} else if (error instanceof ApiError) {
+		status = error.status;
+		title = `Error ${error.status}`;
+		description = error.message;
+		if (error.body?.code === "ACCESS_NOT_CONFIGURED" || error.body?.code === "ACCESS_TOKEN_MISSING" || error.body?.code === "ACCESS_TOKEN_INVALID") {
+			isSetupError = true;
+			title = "Configuration required";
+			description = error.body.error as string || "Cloudflare Access is not configured.";
 		}
 	} else if (error instanceof Error && import.meta.env.DEV) {
 		description = error.message;
@@ -152,14 +189,23 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 				title={status === 404 ? "404 — Page not found" : title}
 				description={description}
 				contents={
-					<Button
-						variant="primary"
-						onClick={() => {
-							window.location.href = "/";
-						}}
-					>
-						Go Home
-					</Button>
+					<div className="flex items-center gap-2">
+						{isSetupError && (
+							<RouterLink to="/setup">
+								<Button variant="primary">
+									Go to Setup
+								</Button>
+							</RouterLink>
+						)}
+						<Button
+							variant={isSetupError ? "secondary" : "primary"}
+							onClick={() => {
+								window.location.href = "/";
+							}}
+						>
+							Go Home
+						</Button>
+					</div>
 				}
 			/>
 		</div>

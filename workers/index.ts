@@ -83,6 +83,84 @@ app.use("/api/*", cors({
 }));
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
+// -- Setup Status ---------------------------------------------------
+
+app.get("/api/v1/setup-status", async (c) => {
+	const isDev = import.meta.env.DEV;
+	const steps: Array<{
+		id: string;
+		label: string;
+		status: "complete" | "incomplete" | "error";
+		detail?: string;
+		required: boolean;
+	}> = [];
+
+	// 1. R2 Bucket
+	try {
+		await c.env.BUCKET.list({ prefix: "mailboxes/", limit: 1 });
+		steps.push({ id: "r2", label: "R2 Bucket", status: "complete", required: true });
+	} catch (e) {
+		steps.push({
+			id: "r2", label: "R2 Bucket", status: "error",
+			detail: "R2 bucket is not accessible. Create it with: wrangler r2 bucket create agentic-inbox",
+			required: true,
+		});
+	}
+
+	// 2. Domains
+	const domainsRaw = c.env.DOMAINS || "";
+	const domains = domainsRaw.split(",").map((d) => d.trim()).filter(Boolean);
+	if (domains.length > 0 && !domains.includes("example.com")) {
+		steps.push({ id: "domains", label: "Domain Configuration", status: "complete", required: true });
+	} else {
+		steps.push({
+			id: "domains", label: "Domain Configuration", status: "incomplete",
+			detail: 'Set DOMAINS in wrangler.jsonc to your domain (e.g. "mydomain.com"). Currently set to: ' + (domainsRaw || "(empty)"),
+			required: true,
+		});
+	}
+
+	// 3. Cloudflare Access (production only)
+	if (isDev) {
+		steps.push({ id: "access", label: "Cloudflare Access", status: "complete", detail: "Skipped in development mode", required: false });
+	} else if (c.env.POLICY_AUD && c.env.TEAM_DOMAIN) {
+		steps.push({ id: "access", label: "Cloudflare Access", status: "complete", required: true });
+	} else {
+		steps.push({
+			id: "access", label: "Cloudflare Access", status: "incomplete",
+			detail: "Set POLICY_AUD and TEAM_DOMAIN as worker secrets: wrangler secret put POLICY_AUD && wrangler secret put TEAM_DOMAIN",
+			required: true,
+		});
+	}
+
+	// 4. Email Routing (manual — cannot check programmatically)
+	const emailAddresses = (c.env.EMAIL_ADDRESSES ?? []) as string[];
+	if (emailAddresses.length > 0) {
+		steps.push({ id: "emailRouting", label: "Email Routing", status: "complete", detail: "EMAIL_ADDRESSES is configured, email routing should be active", required: false });
+	} else {
+		steps.push({
+			id: "emailRouting", label: "Email Routing", status: "incomplete",
+			detail: "In the Cloudflare dashboard, go to your domain > Email Routing and create a catch-all rule that forwards to this Worker. Optionally set EMAIL_ADDRESSES in wrangler.jsonc.",
+			required: false,
+		});
+	}
+
+	// 5. Mailbox exists
+	const allMailboxes = await listMailboxes(c.env.BUCKET);
+	if (allMailboxes.length > 0) {
+		steps.push({ id: "mailbox", label: "First Mailbox", status: "complete", required: false });
+	} else {
+		steps.push({
+			id: "mailbox", label: "First Mailbox", status: "incomplete",
+			detail: "Create a mailbox from the app home page or set EMAIL_ADDRESSES in wrangler.jsonc to auto-create one.",
+			required: false,
+		});
+	}
+
+	const isComplete = steps.every((s) => s.status === "complete" || !s.required);
+	return c.json({ isComplete, steps });
+});
+
 // -- Config ---------------------------------------------------------
 
 app.get("/api/v1/config", (c) => {
