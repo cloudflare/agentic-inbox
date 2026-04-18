@@ -21,6 +21,8 @@ import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 import { runSecurityPipeline } from "./security";
+import { runDeepScan } from "./intel/deep-scan";
+import { getSecuritySettings } from "./security/settings";
 import { isDmarcReport, ingestDmarcReport } from "./dmarc/ingest";
 import { dmarcRoutes } from "./routes/dmarc";
 import { caseRoutes } from "./routes/cases";
@@ -447,6 +449,31 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		}
 	} catch (e) {
 		console.error("Security pipeline failed:", (e as Error).message);
+	}
+
+	// Async deep-scan. Runs AFTER the sync pipeline decision and only ever
+	// tightens the verdict (never downgrades). Enqueued via ctx.waitUntil
+	// so it doesn't block email receipt; failures are logged but don't
+	// propagate. Gated on the same `security.enabled` flag as the sync path.
+	if (securityVerdict) {
+		try {
+			const settings = await getSecuritySettings(env, mailboxId);
+			ctx.waitUntil(
+				runDeepScan({ env, mailboxId, emailId: messageId, thresholds: settings.thresholds })
+					.then(
+						(r) => {
+							if (r.added_score > 0) {
+								console.log(
+									`deep-scan ${messageId}: +${r.added_score} → ${r.final_action} (${r.reasons.slice(0, 3).join("; ")})`,
+								);
+							}
+						},
+						(e) => console.error("deep-scan failed:", (e as Error).message),
+					),
+			);
+		} catch (e) {
+			console.error("deep-scan enqueue failed:", (e as Error).message);
+		}
 	}
 
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));

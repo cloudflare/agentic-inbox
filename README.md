@@ -34,6 +34,7 @@ Click the button above to deploy to your Cloudflare account. The deploy flow wil
 - **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
 - **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
 - **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
+- **Security pipeline** — Opt-in SPF/DKIM/DMARC parsing, URL homograph detection, LLM classifier, sender reputation, threat-intel feed matching, and async deep-scan (redirect-chain resolution, RDAP domain age, attachment heuristics). See [Security](#security) below
 
 ## Stack
 
@@ -69,6 +70,69 @@ npm run deploy
 - [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) configured for deployed/shared environments (required in production)
 
 Any user who passes the shared Cloudflare Access policy can access all mailboxes in this app by design. This includes the MCP server at `/mcp` -- external AI tools (Claude Code, Cursor, etc.) connected via MCP can operate on any mailbox by passing a `mailboxId` parameter. There is no per-mailbox authorization; the Cloudflare Access policy is the single trust boundary.
+
+## Security
+
+The security pipeline is **opt-in per mailbox** — existing mailboxes are unaffected until you flip the toggle in **Settings → Security**. When enabled, every inbound email runs through a synchronous scoring pipeline (SPF/DKIM/DMARC parse → URL heuristics → LLM classifier → sender reputation → threat-intel feed match → aggregate verdict), then an async deep-scan stage layered on top.
+
+### Recommended configuration after enabling
+
+These two settings are the high-leverage ones. Both live in **Settings → Security**; both are empty by default for back-compat.
+
+#### 1. Trusted authentication servers
+
+Sets which `Authentication-Results` headers are trusted when computing the SPF/DKIM/DMARC verdict. Without this list populated, an attacker-controlled upstream mail server can inject a forged `Authentication-Results: attacker.example; spf=pass; dkim=pass; dmarc=pass` header and the parser will accept it.
+
+Populate with the authserv-id(s) that actually sit on your mail path. For a typical Cloudflare-routed setup:
+
+```
+mx.cloudflare.net
+```
+
+If your mail traverses a Google/Microsoft forwarder before Cloudflare, add those too (suffix match is supported — `google.com` covers `mx1.google.com`, `mx5.google.com`, etc.):
+
+```
+mx.cloudflare.net, google.com, outlook.com
+```
+
+#### 2. Business hours
+
+Optional. When enabled, mail delivered outside your working hours gets a small score nudge (+10) — BEC / wire-fraud requests disproportionately land at 3 AM and on weekends. The nudge can push a borderline verdict over the tag/quarantine threshold; it can never single-handedly quarantine an email on time alone (the triage layer deliberately ignores the signal for explicit allowlists and trusted history).
+
+Takes an IANA timezone plus an hour window:
+
+```
+Timezone: America/New_York
+Start:    09
+End:      18  (exclusive — 18:00 itself is off-hours)
+Weekends: flagged when weekdays_only is on
+```
+
+### Pipeline stages
+
+| Stage | Latency | Notes |
+| --- | --- | --- |
+| Auth header parse | µs | SPF/DKIM/DMARC from `Authentication-Results`; gated by trusted authserv-ids |
+| URL extract + homograph/shortener check | ms | Levenshtein vs a high-value-domain list |
+| Sender reputation | ms | Rolling avg score per mailbox; flagged-sender fast path |
+| Threat-intel bloom lookup | ms | Against [workers/intel/feeds.ts](workers/intel/feeds.ts) (URLhaus, PhishDestroy, configurable) |
+| Triage short-circuits | µs | Hard-block on confirmed intel / flagged sender; hard-allow on DMARC pass + allowlist or trusted history |
+| LLM classifier | seconds (5s cap) | Workers AI; fail-closed to `suspicious` on timeout |
+| Verdict aggregation | µs | Pure scoring function; thresholds configurable per mailbox |
+| Off-hours boost | µs | Optional, scoring-only |
+| **Async deep-scan** | seconds–tens-of-seconds | `ctx.waitUntil`; see below |
+
+### Async deep-scan
+
+Fires after the sync verdict is stored and only ever *tightens* the decision (sync `allow` → deep-scan `quarantine` is fine; reverse is not). Contribution capped at `+40` so it can't dominate the sync signal.
+
+- **Redirect-chain resolution** — follows `bit.ly`-style wrappers up to 5 hops so downstream checks see the real destination.
+- **RDAP domain age** — queries `rdap.org` for registration date. Domains <7d get +20, <30d get +10. Fails silently on flaky RDAP servers.
+- **Attachment heuristics** — dangerous extensions, macro-enabled Office, `.pdf.exe`-style double extensions, MIME/extension mismatches, archives that advertise a payload in the filename.
+
+### Threat-intel hub
+
+The [`hub/`](hub/) subdirectory is a MISP-compatible community threat-intel hub — mailboxes can push phishing reports (`workers/intel/report.ts`) and pull corroborated lists back via the destroylist feed. Trust-weighted so one org can't single-handedly promote its own intel.
 
 ## Architecture
 

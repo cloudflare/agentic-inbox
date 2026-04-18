@@ -915,6 +915,76 @@ export class MailboxDO extends DurableObject<Env> {
 			.run();
 	}
 
+	/** Read all URL rows for a message — used by the async deep-scan stage. */
+	async getUrlsForEmail(emailId: string) {
+		return this.db
+			.select()
+			.from(schema.urls)
+			.where(eq(schema.urls.email_id, emailId))
+			.all();
+	}
+
+	async updateUrlScan(
+		urlId: string,
+		data: {
+			resolved_url?: string | null;
+			page_title?: string | null;
+			fetch_status?: string;
+			verdict?: string | null;
+		},
+	) {
+		this.db
+			.update(schema.urls)
+			.set(data)
+			.where(eq(schema.urls.id, urlId))
+			.run();
+	}
+
+	async getAttachmentsForEmail(emailId: string) {
+		return this.db
+			.select()
+			.from(schema.attachments)
+			.where(eq(schema.attachments.email_id, emailId))
+			.all();
+	}
+
+	async updateAttachmentScan(
+		attachmentId: string,
+		data: { scan_status: string; scan_verdict?: string | null },
+	) {
+		this.db
+			.update(schema.attachments)
+			.set(data)
+			.where(eq(schema.attachments.id, attachmentId))
+			.run();
+	}
+
+	async updateDeepScanStatus(emailId: string, status: string) {
+		this.db
+			.update(schema.emails)
+			.set({ deep_scan_status: status })
+			.where(eq(schema.emails.id, emailId))
+			.run();
+	}
+
+	/**
+	 * Read the currently-stored verdict blob so a deep-scan can layer its
+	 * findings onto the synchronous verdict without losing the earlier
+	 * signals. Returns the verdict JSON and the numeric score as stored.
+	 */
+	async getStoredVerdict(emailId: string) {
+		const row = this.db
+			.select({
+				verdict: schema.emails.security_verdict,
+				score: schema.emails.security_score,
+				explanation: schema.emails.security_explanation,
+			})
+			.from(schema.emails)
+			.where(eq(schema.emails.id, emailId))
+			.get();
+		return row ?? null;
+	}
+
 	async getSenderReputation(sender: string) {
 		const row = this.db
 			.select()
