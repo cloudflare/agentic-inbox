@@ -6,6 +6,8 @@
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
+		"test": "vitest run",
+		"test:watch": "vitest",
 		"typecheck": "wrangler types && tsc --noEmit",
 		"db:migrate:local": "wrangler d1 migrations apply ais-hub --local",
 		"db:migrate:remote": "wrangler d1 migrations apply ais-hub --remote"
@@ -16,7 +18,10 @@
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250101.0",
+		"@types/better-sqlite3": "^7.6.13",
+		"better-sqlite3": "^12.9.0",
 		"typescript": "^5.5.0",
+		"vitest": "^4.1.4",
 		"wrangler": "^3.80.0"
 	}
 }
