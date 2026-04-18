@@ -8,12 +8,40 @@ export interface SignatureSettings {
 	html?: string;
 }
 
+export interface BusinessHoursSettings {
+	timezone: string;
+	start_hour: number;
+	end_hour: number;
+	weekdays_only: boolean;
+	boost_on_off_hours: boolean;
+}
+
+export interface VerdictThresholdSettings {
+	tag: number;
+	quarantine: number;
+	block: number;
+}
+
+export interface SecuritySettings {
+	enabled?: boolean;
+	learning_mode?: boolean;
+	thresholds?: VerdictThresholdSettings;
+	allowlist_senders?: string[];
+	allowlist_domains?: string[];
+	trusted_authserv_ids?: string[];
+	trusted_auto_allow?: boolean;
+	trusted_auto_allow_min_messages?: number;
+	intel_auto_block?: boolean;
+	business_hours?: BusinessHoursSettings;
+}
+
 export interface MailboxSettings {
 	fromName?: string;
 	forwarding?: { enabled: boolean; email: string };
 	signature?: SignatureSettings;
 	autoReply?: { enabled: boolean; subject: string; message: string };
 	agentSystemPrompt?: string;
+	security?: SecuritySettings;
 }
 
 export interface Mailbox {

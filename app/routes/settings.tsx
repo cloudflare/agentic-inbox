@@ -7,6 +7,8 @@ import { RobotIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
+import { SecuritySettingsPanel } from "~/components/SecuritySettingsPanel";
+import type { SecuritySettings } from "~/types";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -20,12 +22,14 @@ export default function SettingsRoute() {
 
 	const [displayName, setDisplayName] = useState("");
 	const [agentPrompt, setAgentPrompt] = useState("");
+	const [security, setSecurity] = useState<SecuritySettings | undefined>(undefined);
 	const [isSaving, setIsSaving] = useState(false);
 
 	useEffect(() => {
 		if (mailbox) {
 			setDisplayName(mailbox.settings?.fromName || mailbox.name || "");
 			setAgentPrompt(mailbox.settings?.agentSystemPrompt || "");
+			setSecurity(mailbox.settings?.security);
 		}
 	}, [mailbox]);
 
@@ -36,6 +40,7 @@ export default function SettingsRoute() {
 			...mailbox.settings,
 			fromName: displayName,
 			agentSystemPrompt: agentPrompt.trim() || undefined,
+			security,
 		};
 		try {
 			await updateMailboxMutation.mutateAsync({ mailboxId, settings });
@@ -125,6 +130,9 @@ export default function SettingsRoute() {
 						It controls the agent's personality, writing style, and behavior rules.
 					</p>
 				</div>
+
+				{/* Security */}
+				<SecuritySettingsPanel value={security} onChange={setSecurity} />
 
 				{/* Save */}
 				<div className="flex justify-end">
