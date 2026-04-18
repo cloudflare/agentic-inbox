@@ -26,6 +26,13 @@ export function scoreReputation(rep: SenderReputation | null): { score: number; 
 		return { score, reasons };
 	}
 	if (rep.flagged) { score += 15; reasons.push("sender previously flagged"); }
-	if (rep.avg_score > 70) { score -= 5; }
+	// Consistently-bad history adds suspicion. The score here is a small
+	// nudge rather than a hard signal — the `flagged` branch above is the
+	// deliberate-action path; this catches senders whose verdicts have been
+	// piling up without anyone flipping the flag.
+	if (rep.avg_score > 70) {
+		score += 10;
+		reasons.push(`bad sender history (avg ${rep.avg_score.toFixed(0)})`);
+	}
 	return { score, reasons };
 }

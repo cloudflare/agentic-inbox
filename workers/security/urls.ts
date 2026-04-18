@@ -82,6 +82,33 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
+ * Small allow-list of second-level country-code TLDs. The Public Suffix List
+ * is the "correct" answer but pulling it in costs ~200KB of compiled data
+ * per Worker; this 20-entry list covers the domains that matter for the
+ * high-value-domain homograph check (so `amazom.co.uk` is compared against
+ * `amazon.co.uk` rather than the nonsensical `co.uk`).
+ */
+const MULTI_LABEL_PUBLIC_SUFFIXES = new Set([
+	"co.uk", "co.jp", "co.kr", "co.nz", "co.za", "co.in",
+	"com.au", "com.br", "com.cn", "com.mx", "com.sg", "com.tr", "com.ar",
+	"ac.uk", "gov.uk", "org.uk", "net.au", "org.au",
+]);
+
+/**
+ * Extract the registrable (eTLD+1) portion of a hostname, handling common
+ * multi-label suffixes so we compare like-for-like against HIGH_VALUE_DOMAINS.
+ */
+function registrableDomain(hostname: string): string {
+	const parts = hostname.split(".");
+	if (parts.length < 2) return hostname;
+	const last2 = parts.slice(-2).join(".");
+	if (parts.length >= 3 && MULTI_LABEL_PUBLIC_SUFFIXES.has(last2)) {
+		return parts.slice(-3).join(".");
+	}
+	return last2;
+}
+
+/**
  * Non-ASCII hostnames, bare punycode, or close Levenshtein matches to
  * high-value domains are flagged as homographs. Legitimate mail practically
  * never uses IDN hostnames; attackers use Cyrillic/Greek lookalikes.
@@ -94,7 +121,7 @@ export function isHomographic(hostname: string): boolean {
 	for (const d of HIGH_VALUE_DOMAINS) {
 		if (hostname === d || hostname.endsWith("." + d)) return false;
 	}
-	const registrable = hostname.split(".").slice(-2).join(".");
+	const registrable = registrableDomain(hostname);
 	for (const d of HIGH_VALUE_DOMAINS) {
 		const dist = levenshtein(registrable, d);
 		if (dist > 0 && dist <= 2) return true;
@@ -127,7 +154,7 @@ function pushUrl(out: ExtractedUrl[], seen: Set<string>, rawUrl: string, display
 	if (!hostname) return;
 	if (seen.has(rawUrl)) return;
 	seen.add(rawUrl);
-	const registrable = hostname.split(".").slice(-2).join(".");
+	const registrable = registrableDomain(hostname);
 	out.push({
 		url: rawUrl,
 		display_text: display,
