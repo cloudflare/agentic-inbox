@@ -100,7 +100,7 @@ export interface SecurityVerdict {
 	};
 	signals: string[];
 	/** Present when a triage tier short-circuited the pipeline. */
-	triage?: "hard_allow" | "hard_block";
+	triage?: "hard_allow" | "hard_block" | "attachment_block" | "folder_bypass";
 }
 
 export function parseVerdict(raw: string | null | undefined): SecurityVerdict | null {

@@ -260,8 +260,36 @@ app.delete("/api/v1/mailboxes/:mailboxId/emails/:id", async (c: AppContext) => {
 
 app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) => {
 	const { folderId } = (await c.req.json()) as { folderId: string };
-	const success = await c.var.mailboxStub.moveEmail(c.req.param("id")!, folderId);
-	return success ? c.json({ status: "moved" }) : c.json({ error: "Folder not found" }, 400);
+	const emailId = c.req.param("id")!;
+	const mailboxId = c.req.param("mailboxId")!;
+
+	// Snapshot the email's pre-move state so the "treat_as_verified" hook
+	// below can decide based on the *folder transition*, not just the
+	// destination. This keeps the sender-reputation bump idempotent: moving
+	// out of and back into a verified folder does not double-count.
+	const before = await c.var.mailboxStub.getEmail(emailId);
+
+	const success = await c.var.mailboxStub.moveEmail(emailId, folderId);
+	if (!success) return c.json({ error: "Folder not found" }, 400);
+
+	// Per-folder `treat_as_verified` hook. When the user moves a message
+	// INTO a verified folder from a non-verified folder, bump the sender's
+	// reputation with a favourable score (0). Best-effort — never fail the
+	// move because of a reputation write.
+	if (before?.sender) {
+		try {
+			const settings = await getSecuritySettings(c.env, mailboxId);
+			const destPolicy = settings.folder_policies?.[folderId];
+			const srcPolicy = before.folder_id ? settings.folder_policies?.[before.folder_id] : undefined;
+			if (destPolicy?.treat_as_verified && !srcPolicy?.treat_as_verified) {
+				await c.var.mailboxStub.upsertSenderReputation(before.sender, 0);
+			}
+		} catch (e) {
+			console.error("treat_as_verified reputation bump failed:", (e as Error).message);
+		}
+	}
+
+	return c.json({ status: "moved" });
 });
 
 // -- Threads --------------------------------------------------------
@@ -435,12 +463,21 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 			env,
 			mailboxId,
 			messageId,
+			// `receiveEmail` always lands inbound mail in INBOX today. If a
+			// future filter-rule engine routes mail into other folders on
+			// receive, this destination folder must be passed through so the
+			// folder-bypass triage tier can honour per-folder policy.
+			targetFolder: Folders.INBOX,
 			parsedEmail: {
 				subject: parsedEmail.subject,
 				from: parsedEmail.from,
 				html: parsedEmail.html,
 				text: parsedEmail.text,
 				headers: parsedEmail.headers,
+				attachments: parsedEmail.attachments?.map((a) => ({
+					filename: a.filename ?? null,
+					mimeType: a.mimeType ?? null,
+				})),
 			},
 		});
 		securityVerdict = result.verdict;

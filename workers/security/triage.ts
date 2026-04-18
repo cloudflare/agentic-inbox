@@ -6,10 +6,24 @@
  * Layered short-circuit triage. Evaluated BEFORE the LLM classifier so we
  * can skip the expensive stage for obvious-safe or obvious-malicious mail.
  *
- * Two tiers:
+ * Four tiers, in order:
+ *   0. Folder bypass — per-folder policy (see MailboxSecuritySettings).
+ *      If the target folder is configured `skip_all`, short-circuit with a
+ *      synthetic allow verdict. If `skip_classifier`, tell the caller to
+ *      skip the LLM stage but keep the rest of the pipeline. This tier is
+ *      a latency/cost optimisation plus manual trust signal — only the
+ *      mailbox owner can configure it, and the pipeline's default target
+ *      folder is INBOX, so an attacker cannot direct mail into a bypass
+ *      folder without first compromising the owner's filter rules.
  *   1. Hard block — confirmed intel-feed match OR explicitly flagged sender.
  *      Quarantines immediately; classifier never runs.
- *   2. Hard allow — DMARC pass AND (explicit allowlist OR trusted history).
+ *   2. Attachment block — attachment-type gate (see attachments.ts). Blocks
+ *      on executable extensions and a user-configured custom blocklist.
+ *      Runs BEFORE hard-allow on purpose: a DMARC-passing allowlisted sender
+ *      who suddenly attaches a .exe is, by definition, not sending
+ *      legitimate mail anymore (account takeover, auto-forwarded malware,
+ *      etc.). We'd rather quarantine than let the allowlist paper over it.
+ *   3. Hard allow — DMARC pass AND (explicit allowlist OR trusted history).
  *      Returns allow immediately; classifier never runs.
  *
  * Hard-block wins over hard-allow: if someone compromises a trusted sender
@@ -18,7 +32,9 @@
  * IMPORTANT INVARIANT: hard-allow REQUIRES DMARC pass. Allowlist alone is
  * never sufficient — that would let anyone spoof the From address of a
  * trusted domain. DMARC pass is the bind between the From header and the
- * actual sending infrastructure.
+ * actual sending infrastructure. The folder-bypass tier is deliberately
+ * independent of this invariant; it reflects an explicit owner decision
+ * ("don't scan this folder") rather than a trust claim about the sender.
  */
 
 import type { AuthVerdict } from "./auth";
@@ -27,6 +43,8 @@ import type { ClassificationResult } from "./classification";
 import type { ExtractedUrl } from "./urls";
 import type { FinalVerdict, VerdictThresholds } from "./verdict";
 import type { MailboxSecuritySettings } from "./settings";
+import type { AttachmentLike } from "./attachments";
+import { scoreAttachments } from "./attachments";
 
 export interface IntelMatchInfo {
 	matched: true;
@@ -42,12 +60,26 @@ export interface TriageInputs {
 	urls: ExtractedUrl[];
 	intelMatch: IntelMatchInfo | null;
 	settings: MailboxSecuritySettings;
+	/** Folder the message was delivered into. Used by the folder-bypass tier. */
+	targetFolder: string;
+	/** PostalMime-parsed attachments (filename/mimetype). Empty array is fine. */
+	attachments: AttachmentLike[];
 }
 
-export interface TriageResult {
+export interface TriageShortCircuit {
 	verdict: FinalVerdict;
-	tier: "hard_block" | "hard_allow";
+	tier: "hard_block" | "hard_allow" | "folder_bypass" | "attachment_block";
 	reason: string;
+}
+
+/**
+ * Return value of `evaluateTriage`. Either tier fires (`shortcircuit`), or
+ * the pipeline continues — possibly with the LLM classifier skipped
+ * (`skipClassifier` from the folder-bypass `skip_classifier` mode).
+ */
+export interface TriageResult {
+	shortcircuit?: TriageShortCircuit;
+	skipClassifier?: boolean;
 }
 
 const SKIP_CLASSIFICATION: ClassificationResult = {
@@ -56,26 +88,74 @@ const SKIP_CLASSIFICATION: ClassificationResult = {
 	reasoning: "classifier skipped by triage",
 };
 
-export function evaluateTriage(inputs: TriageInputs): TriageResult | null {
+export function evaluateTriage(inputs: TriageInputs): TriageResult {
 	const { settings } = inputs;
 
-	// Tier 1: hard block — runs first so a compromised-but-allowlisted
-	// sender who's sending a known-bad URL still gets stopped.
+	// Tier 0: folder bypass. Runs first because it reflects an explicit
+	// owner decision about a folder; we don't want to spend cycles on
+	// hard-block/hard-allow evaluation when the whole folder is opted out.
+	const folderPolicy = settings.folder_policies?.[inputs.targetFolder];
+	if (folderPolicy?.mode === "skip_all") {
+		const reason = `folder policy: skip_all (${inputs.targetFolder})`;
+		const verdict: FinalVerdict = {
+			action: "allow",
+			score: 0,
+			explanation: reason,
+			auth: inputs.auth,
+			classification: { ...SKIP_CLASSIFICATION, reasoning: "pipeline skipped by folder policy" },
+			signals: [reason],
+		};
+		return { shortcircuit: { verdict, tier: "folder_bypass", reason } };
+	}
+	const skipClassifier = folderPolicy?.mode === "skip_classifier";
+
+	// Tier 1: hard block — runs first (among sender/content tiers) so a
+	// compromised-but-allowlisted sender who's sending a known-bad URL still
+	// gets stopped.
 	if (settings.intel_auto_block) {
 		const block = evaluateHardBlock(inputs);
-		if (block) return block;
+		if (block) return { shortcircuit: block };
 	}
 
-	// Tier 2: hard allow — requires DMARC pass in ALL paths. See invariant above.
+	// Tier 2: attachment block — cheap metadata-only check. Runs before
+	// hard-allow so a compromised/allowlisted sender carrying an .exe still
+	// gets stopped. Hard-allow DMARC invariant is preserved separately.
+	const attBlock = evaluateAttachmentGate(inputs);
+	if (attBlock) return { shortcircuit: attBlock };
+
+	// Tier 3: hard allow — requires DMARC pass in ALL paths. See invariant above.
 	if (settings.trusted_auto_allow) {
 		const allow = evaluateHardAllow(inputs);
-		if (allow) return allow;
+		if (allow) return { shortcircuit: allow };
 	}
 
-	return null;
+	return { skipClassifier };
 }
 
-function evaluateHardBlock(inputs: TriageInputs): TriageResult | null {
+function evaluateAttachmentGate(inputs: TriageInputs): TriageShortCircuit | null {
+	if (!inputs.attachments || inputs.attachments.length === 0) return null;
+	const policy = inputs.settings.attachment_policy;
+	if (!policy) return null;
+
+	const result = scoreAttachments(inputs.attachments, policy);
+	if (!result.hardBlock) return null;
+
+	// Note: this tier fires BEFORE hard-allow, so a DMARC-passing allowlisted
+	// sender with an executable attachment is still quarantined. That's the
+	// intended behaviour — see the module-level docstring for the rationale.
+	const reason = result.hardBlockReason ?? result.reasons[0] ?? "attachment blocked";
+	const verdict: FinalVerdict = {
+		action: "quarantine",
+		score: 100,
+		explanation: reason,
+		auth: inputs.auth,
+		classification: { ...SKIP_CLASSIFICATION, label: "suspicious", reasoning: "classifier skipped by attachment-gate triage" },
+		signals: result.reasons.length > 0 ? result.reasons : [reason],
+	};
+	return { verdict, tier: "attachment_block", reason };
+}
+
+function evaluateHardBlock(inputs: TriageInputs): TriageShortCircuit | null {
 	const reasons: string[] = [];
 
 	if (inputs.reputation?.flagged) {
@@ -98,7 +178,7 @@ function evaluateHardBlock(inputs: TriageInputs): TriageResult | null {
 	return { verdict, tier: "hard_block", reason: reasons.join("; ") };
 }
 
-function evaluateHardAllow(inputs: TriageInputs): TriageResult | null {
+function evaluateHardAllow(inputs: TriageInputs): TriageShortCircuit | null {
 	// CRITICAL INVARIANT: require DMARC pass. Without it, anyone can spoof
 	// the From: address of a trusted domain.
 	if (inputs.auth.dmarc !== "pass") return null;

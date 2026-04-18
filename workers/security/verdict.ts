@@ -30,7 +30,7 @@ export interface FinalVerdict {
 	classification: ClassificationResult;
 	signals: string[];
 	/** If a triage tier short-circuited the pipeline, which one. */
-	triage?: "hard_allow" | "hard_block";
+	triage?: "hard_allow" | "hard_block" | "folder_bypass" | "attachment_block";
 }
 
 export interface VerdictInputs {

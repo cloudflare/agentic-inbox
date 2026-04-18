@@ -29,6 +29,7 @@ import { aggregateVerdict, type FinalVerdict } from "./verdict";
 import { getSecuritySettings } from "./settings";
 import { checkUrlAgainstFeeds, type FeedMatch } from "../intel/feeds";
 import { evaluateTriage, type IntelMatchInfo } from "./triage";
+import type { AttachmentLike } from "./attachments";
 import { scoreOffHours } from "./time-rules";
 import type { VerdictThresholds } from "./verdict";
 
@@ -62,12 +63,15 @@ export interface RunPipelineInput {
 	env: Env;
 	mailboxId: string;
 	messageId: string;
+	/** Folder the message was delivered into. Drives the folder-bypass triage tier. */
+	targetFolder: string;
 	parsedEmail: {
 		subject?: string;
 		from?: { address?: string };
 		html?: string;
 		text?: string;
 		headers?: unknown;
+		attachments?: AttachmentLike[];
 	};
 }
 
@@ -78,13 +82,14 @@ export interface PipelineResult {
 }
 
 export async function runSecurityPipeline(input: RunPipelineInput): Promise<PipelineResult> {
-	const { env, mailboxId, messageId, parsedEmail } = input;
+	const { env, mailboxId, messageId, parsedEmail, targetFolder } = input;
 	const settings = await getSecuritySettings(env, mailboxId);
 	if (!settings.enabled) return { verdict: null, skipped: true };
 
 	const sender = (parsedEmail.from?.address || "").toLowerCase();
 	const bodyHtml = parsedEmail.html || parsedEmail.text || "";
 	const subject = parsedEmail.subject || "";
+	const attachments = parsedEmail.attachments ?? [];
 
 	// Cheap signals first — all below run in parallel-friendly order and
 	// complete in milliseconds. The classifier LLM call is the expensive
@@ -121,9 +126,12 @@ export async function runSecurityPipeline(input: RunPipelineInput): Promise<Pipe
 		urls,
 		intelMatch: intelForTriage,
 		settings,
+		targetFolder,
+		attachments,
 	});
-	if (triaged) {
-		let verdict: FinalVerdict = { ...triaged.verdict, triage: triaged.tier };
+	if (triaged.shortcircuit) {
+		const sc = triaged.shortcircuit;
+		let verdict: FinalVerdict = { ...sc.verdict, triage: sc.tier };
 		// Learning mode still applies — even a hard-block is downgraded to tag.
 		if (settings.learning_mode && (verdict.action === "quarantine" || verdict.action === "block")) {
 			verdict = { ...verdict, action: "tag" };
@@ -132,8 +140,10 @@ export async function runSecurityPipeline(input: RunPipelineInput): Promise<Pipe
 		return { verdict, skipped: false };
 	}
 
-	// Full path: LLM classification + aggregation.
-	const classification = await classifyEmail(env.AI, { subject, sender, bodyHtml, auth });
+	// Full path: LLM classification (possibly skipped by folder-bypass tier) + aggregation.
+	const classification = triaged.skipClassifier
+		? { label: "safe" as const, confidence: 1.0, reasoning: "classifier skipped by folder policy" }
+		: await classifyEmail(env.AI, { subject, sender, bodyHtml, auth });
 
 	let verdict = aggregateVerdict(
 		{ auth, classification, urls, reputation },

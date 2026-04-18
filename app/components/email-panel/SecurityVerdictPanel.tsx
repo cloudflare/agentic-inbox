@@ -21,16 +21,21 @@ export default function SecurityVerdictPanel({ email }: { email: Email }) {
 	const [expanded, setExpanded] = useState(false);
 
 	if (!verdict) return null;
-	// Quiet path for the normal allow case, but surface hard-block explicitly
-	// even when the user is reading the quarantined message.
-	if (verdict.action === "allow" && verdict.triage !== "hard_block") return null;
+	// Quiet path for the normal allow case, but surface hard-block /
+	// attachment-block explicitly even when the user is reading the
+	// quarantined message.
+	if (verdict.action === "allow"
+		&& verdict.triage !== "hard_block"
+		&& verdict.triage !== "attachment_block") return null;
 
 	const { borderClass, bgClass, iconColorClass, icon, headline } = ui(verdict.action);
 	const triageTag = verdict.triage === "hard_allow"
 		? "allowlist fast-path"
 		: verdict.triage === "hard_block"
 			? "triage hard-block"
-			: null;
+			: verdict.triage === "attachment_block"
+				? "blocked attachment type"
+				: null;
 
 	return (
 		<div className={`px-4 md:px-6 pt-3`}>

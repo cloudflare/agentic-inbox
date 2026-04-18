@@ -11,6 +11,7 @@
 
 import type { Env } from "../types";
 import { DEFAULT_THRESHOLDS, type VerdictThresholds } from "./verdict";
+import { DEFAULT_ATTACHMENT_POLICY, type AttachmentPolicy } from "./attachments";
 
 /**
  * Business-hours definition for the off-hours scrutiny tier.
@@ -70,6 +71,28 @@ export interface MailboxSecuritySettings {
 	 * gets a small verdict-score boost. See `time-rules.ts`.
 	 */
 	business_hours?: BusinessHours;
+	/**
+	 * Per-folder bypass policies keyed by folder id (e.g. "INBOX", "Newsletters").
+	 * See `triage.ts` for the folder-bypass tier semantics and
+	 * `workers/index.ts` for the `treat_as_verified` reputation-bump hook.
+	 */
+	folder_policies?: Record<string, FolderPolicy>;
+	/**
+	 * Attachment-type gate. When present, runs before hard-allow in triage
+	 * so a DMARC-passing allowlisted sender carrying an .exe still gets
+	 * quarantined. See `attachments.ts`.
+	 */
+	attachment_policy?: AttachmentPolicy;
+}
+
+/**
+ * Per-folder policy: either bypasses part of the pipeline (`mode`) or marks
+ * the folder as a trust signal (`treat_as_verified` — moving mail in bumps
+ * the sender's reputation). Both fields are independent.
+ */
+export interface FolderPolicy {
+	mode?: "skip_all" | "skip_classifier";
+	treat_as_verified?: boolean;
 }
 
 export const DEFAULT_SECURITY_SETTINGS: MailboxSecuritySettings = {
