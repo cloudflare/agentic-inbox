@@ -94,10 +94,28 @@ interface EmailListResponse {
 
 // ---------- API client ----------
 
+export interface SetupStep {
+	id: string;
+	label: string;
+	status: "complete" | "incomplete" | "error" | "info";
+	detail?: string;
+	docsUrl?: string;
+	required: boolean;
+}
+
+export interface SetupStatus {
+	isComplete: boolean;
+	steps: SetupStep[];
+}
+
 const api = {
 	// Config
 	getConfig: () =>
 		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),
+
+	// Setup
+	getSetupStatus: () =>
+		get<SetupStatus>("/api/v1/setup-status"),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),

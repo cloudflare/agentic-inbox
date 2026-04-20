@@ -8,6 +8,7 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
+import { renderAccessNotConfiguredPage } from "./lib/setup-page";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
@@ -44,19 +45,18 @@ const app = new Hono<{ Bindings: Env }>();
 
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
-	// Skip validation in development
 	if (import.meta.env.DEV) {
+		// TODO: remove this preview flag after testing the Access setup page
+		const preview = c.req.query("__access_error");
+		if (preview === "not-configured") return c.html(renderAccessNotConfiguredPage(), 500);
 		return next();
 	}
 
 	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
 
-	// Fail closed in production if Access is not configured.
+	// Access not configured — serve a setup instructions page.
 	if (!POLICY_AUD || !TEAM_DOMAIN) {
-		return c.text(
-			"Cloudflare Access must be configured in production. Set POLICY_AUD and TEAM_DOMAIN.",
-			500,
-		);
+		return c.html(renderAccessNotConfiguredPage(), 500);
 	}
 
 	const token = c.req.header("cf-access-jwt-assertion");
@@ -67,10 +67,7 @@ app.use("*", async (c, next) => {
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
 		const JWKS = createRemoteJWKSet(certsUrl);
-		await jwtVerify(token, JWKS, {
-			issuer,
-			audience: POLICY_AUD,
-		});
+		await jwtVerify(token, JWKS, { issuer, audience: POLICY_AUD });
 	} catch {
 		return c.text("Invalid or expired Access token", 403);
 	}

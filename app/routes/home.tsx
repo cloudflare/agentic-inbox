@@ -12,7 +12,7 @@ import {
 	Text,
 	useKumoToastManager,
 } from "@cloudflare/kumo";
-import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { EnvelopeIcon, GearIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
@@ -145,15 +145,22 @@ export default function HomeRoute() {
 				<div className="mb-8">
 					<div className="flex items-center justify-between">
 						<h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
-						{!isConfigured && (
-							<Button
-								variant="primary"
-								icon={<PlusIcon size={16} />}
-								onClick={() => setIsCreateOpen(true)}
-							>
-								New Mailbox
-							</Button>
-						)}
+						<div className="flex items-center gap-2">
+							<RouterLink to="/setup">
+								<Button variant="ghost" size="sm" icon={<GearIcon size={16} />}>
+									Setup
+								</Button>
+							</RouterLink>
+							{!isConfigured && (
+								<Button
+									variant="primary"
+									icon={<PlusIcon size={16} />}
+									onClick={() => setIsCreateOpen(true)}
+								>
+									New Mailbox
+								</Button>
+							)}
+						</div>
 					</div>
 					{domains.length > 0 && (
 						<p className="text-sm text-kumo-subtle mt-1">
@@ -222,19 +229,30 @@ export default function HomeRoute() {
 								No mailboxes yet
 							</h3>
 							<p className="text-sm text-kumo-subtle max-w-sm mb-5">
-								{isConfigured
-									? "Your email routing is configured but no mailboxes have been created yet. They will appear here automatically."
-									: "Create a mailbox to start sending and receiving emails with your domain."}
+								{domains.length === 0
+									? "No domains are configured. Set up your domain to start sending and receiving emails."
+									: isConfigured
+										? "Your email routing is configured but no mailboxes have been created yet. They will appear here automatically."
+										: "Create a mailbox to start sending and receiving emails with your domain."}
 							</p>
-							{!isConfigured && (
-								<Button
-									variant="primary"
-									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateOpen(true)}
-								>
-									Create Mailbox
-								</Button>
-							)}
+							<div className="flex items-center gap-2">
+								{domains.length === 0 && (
+									<RouterLink to="/setup">
+										<Button variant="primary" icon={<GearIcon size={16} />}>
+											Go to Setup
+										</Button>
+									</RouterLink>
+								)}
+								{!isConfigured && domains.length > 0 && (
+									<Button
+										variant="primary"
+										icon={<PlusIcon size={16} />}
+										onClick={() => setIsCreateOpen(true)}
+									>
+										Create Mailbox
+									</Button>
+								)}
+							</div>
 						</div>
 					</div>
 				)}
@@ -252,70 +270,85 @@ export default function HomeRoute() {
 								{createError}
 							</Text>
 						)}
-						<div>
-							<span className="text-sm font-medium text-kumo-default mb-1.5 block">
-								Email Address
-							</span>
-							<div className="flex items-center gap-2">
-								<div className="flex-1">
-									<Input
-										aria-label="Address prefix"
-										placeholder="info"
-										size="sm"
-										value={newPrefix}
-										onChange={(e) => setNewPrefix(e.target.value)}
-										required
-									/>
-								</div>
-								<span className="text-sm text-kumo-subtle">@</span>
-								{domains.length > 1 ? (
-									<div className="flex-1">
-							<Select
-								aria-label="Domain"
-								value={selectedDomain}
-								onValueChange={(value) => {
-									if (value) setSelectedDomain(value);
-								}}
-							>
-											{domains.map((d) => (
-												<Select.Option key={d} value={d}>
-													{d}
-												</Select.Option>
-											))}
-										</Select>
-									</div>
-								) : (
-									<span className="text-sm text-kumo-subtle">
-										{selectedDomain || "no domain"}
-									</span>
-								)}
-							</div>
-						</div>
-						<Input
-							label="Display Name (optional)"
-							placeholder="Info"
-							size="sm"
-							value={newName}
-							onChange={(e) => setNewName(e.target.value)}
-						/>
-						<div className="flex justify-end gap-2 pt-2">
-							<Dialog.Close
-								render={(props) => (
-									<Button {...props} variant="secondary" size="sm">
-										Cancel
+						{domains.length === 0 ? (
+							<div className="text-center py-4">
+								<p className="text-sm text-kumo-subtle mb-3">
+									No domains configured. Set up your domain first.
+								</p>
+								<RouterLink to="/setup">
+									<Button variant="primary" size="sm" icon={<GearIcon size={16} />}>
+										Go to Setup
 									</Button>
-								)}
-							/>
-							<Button
-								type="submit"
-								variant="primary"
-								size="sm"
-								loading={isCreating}
-								disabled={!selectedDomain}
-							>
-								Create
-							</Button>
-						</div>
+								</RouterLink>
+							</div>
+						) : (
+							<>
+								<div>
+									<span className="text-sm font-medium text-kumo-default mb-1.5 block">
+										Email Address
+									</span>
+									<div className="flex items-center gap-2">
+										<div className="flex-1">
+											<Input
+												aria-label="Address prefix"
+												placeholder="info"
+												size="sm"
+												value={newPrefix}
+												onChange={(e) => setNewPrefix(e.target.value)}
+												required
+											/>
+										</div>
+										<span className="text-sm text-kumo-subtle">@</span>
+										{domains.length > 1 ? (
+											<div className="flex-1">
+												<Select
+													aria-label="Domain"
+													value={selectedDomain}
+													onValueChange={(value) => {
+														if (value) setSelectedDomain(value);
+													}}
+												>
+													{domains.map((d) => (
+														<Select.Option key={d} value={d}>
+															{d}
+														</Select.Option>
+													))}
+												</Select>
+											</div>
+										) : (
+											<span className="text-sm text-kumo-subtle">
+												{selectedDomain || "no domain"}
+											</span>
+										)}
+									</div>
+								</div>
+								<Input
+									label="Display Name (optional)"
+									placeholder="Info"
+									size="sm"
+									value={newName}
+									onChange={(e) => setNewName(e.target.value)}
+								/>
+								<div className="flex justify-end gap-2 pt-2">
+									<Dialog.Close
+										render={(props) => (
+											<Button {...props} variant="secondary" size="sm">
+												Cancel
+											</Button>
+										)}
+									/>
+									<Button
+										type="submit"
+										variant="primary"
+										size="sm"
+										loading={isCreating}
+										disabled={!selectedDomain}
+									>
+										Create
+									</Button>
+								</div>
+							</>
+						)}
 					</form>
 				</Dialog>
 			</Dialog.Root>
