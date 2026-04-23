@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "agentic-inbox",
+	"name": "agentic-inbox-v2",
 	"compatibility_date": "2025-11-28",
 	"main": "./workers/app.ts",
 	"observability": {
@@ -54,27 +54,17 @@
 			"transferred_classes": [
 				{
 					"from": "MailboxDO",
-					"from_script": "email-explorer-with-agents",
+					"from_script": "agentic-inbox",
 					"to": "MailboxDO"
-				}
-			]
-		},
-		{
-			"tag": "v2",
-			"transferred_classes": [
+				},
 				{
 					"from": "EmailAgent",
-					"from_script": "email-explorer-with-agents",
+					"from_script": "agentic-inbox",
 					"to": "EmailAgent"
-				}
-			]
-		},
-		{
-			"tag": "v3",
-			"transferred_classes": [
+				},
 				{
 					"from": "EmailMCP",
-					"from_script": "email-explorer-with-agents",
+					"from_script": "agentic-inbox",
 					"to": "EmailMCP"
 				}
 			]
