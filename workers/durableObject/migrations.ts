@@ -2,89 +2,102 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-export interface Migration {
-	name: string;
-	sql: string;
-}
-
 /**
- * Minimal migration runner that replaces workers-qb's DOQB.migrations().apply().
+ * Idempotent schema setup for MailboxDO.
  *
- * Uses the `d1_migrations` tracking table for backward compatibility with
- * existing deployments that were managed by workers-qb. New deployments
- * create the same table so the schema is consistent either way.
+ * Previous iterations used a migration runner (workers-qb, then a hand-rolled
+ * equivalent) with a tracking table. That added complexity and broke during
+ * the DO transfer from `email-explorer-with-agents` → `agentic-inbox` because
+ * the two workers disagreed on which tracking table to look at.
+ *
+ * This function just declares the FINAL schema using `CREATE TABLE IF NOT EXISTS`
+ * + `CREATE INDEX IF NOT EXISTS`. It's safe to run on every DO instantiation:
+ * - Fresh DOs get all tables + indexes + seed folders.
+ * - Existing DOs (whether migrated step-by-step via workers-qb or transferred
+ *   from the legacy worker) already have the tables with real data, so every
+ *   statement is a no-op.
+ *
+ * If the schema needs to evolve in the future, add the change here with a
+ * guard (`CREATE INDEX IF NOT EXISTS`, or a runtime column check for new
+ * columns since SQLite lacks `ADD COLUMN IF NOT EXISTS`).
  */
 export function applyMigrations(
 	sql: SqlStorage,
-	migrations: Migration[],
+	_unused?: unknown,
 	storage?: DurableObjectStorage,
 ): void {
-	try {
-		sql.exec(`CREATE TABLE IF NOT EXISTS d1_migrations (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+	const run = () => {
+		// Core tables
+		sql.exec(`CREATE TABLE IF NOT EXISTS folders (
+			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL UNIQUE,
-			applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+			is_deletable INTEGER NOT NULL DEFAULT 1
 		)`);
-	} catch (e) {
-		console.error("[migrations] Failed to CREATE d1_migrations table:", (e as Error).message);
-		throw e;
-	}
 
-	// Log currently-applied migration names for diagnostics
+		sql.exec(`CREATE TABLE IF NOT EXISTS emails (
+			id TEXT PRIMARY KEY,
+			folder_id TEXT NOT NULL,
+			subject TEXT,
+			sender TEXT,
+			recipient TEXT,
+			date TEXT,
+			read INTEGER DEFAULT 0,
+			starred INTEGER DEFAULT 0,
+			body TEXT,
+			in_reply_to TEXT,
+			email_references TEXT,
+			thread_id TEXT,
+			message_id TEXT,
+			raw_headers TEXT,
+			cc TEXT,
+			bcc TEXT,
+			FOREIGN KEY(folder_id) REFERENCES folders(id) ON DELETE CASCADE
+		)`);
+
+		sql.exec(`CREATE TABLE IF NOT EXISTS attachments (
+			id TEXT PRIMARY KEY,
+			email_id TEXT NOT NULL,
+			filename TEXT NOT NULL,
+			mimetype TEXT NOT NULL,
+			size INTEGER NOT NULL,
+			content_id TEXT,
+			disposition TEXT,
+			FOREIGN KEY(email_id) REFERENCES emails(id) ON DELETE CASCADE
+		)`);
+
+		// Seed default folders. INSERT OR IGNORE makes this idempotent on
+		// the `name` UNIQUE constraint: existing rows are left untouched.
+		sql.exec(
+			`INSERT OR IGNORE INTO folders (id, name, is_deletable) VALUES
+				('inbox',   'Inbox',   0),
+				('sent',    'Sent',    0),
+				('trash',   'Trash',   0),
+				('archive', 'Archive', 0),
+				('spam',    'Spam',    0),
+				('draft',   'Drafts',  0)`,
+		);
+
+		// Indexes
+		sql.exec(`CREATE INDEX IF NOT EXISTS idx_emails_thread_id    ON emails(thread_id)`);
+		sql.exec(`CREATE INDEX IF NOT EXISTS idx_emails_in_reply_to  ON emails(in_reply_to)`);
+		sql.exec(`CREATE INDEX IF NOT EXISTS idx_emails_folder_id    ON emails(folder_id)`);
+		sql.exec(`CREATE INDEX IF NOT EXISTS idx_emails_date         ON emails(date)`);
+		sql.exec(`CREATE INDEX IF NOT EXISTS idx_emails_folder_date  ON emails(folder_id, date DESC)`);
+	};
+
 	try {
-		const applied = [...sql.exec(`SELECT name FROM d1_migrations ORDER BY id`)];
-		console.log("[migrations] Already applied:", applied.map((r: any) => r.name).join(", ") || "(none)");
+		if (storage) {
+			storage.transactionSync(run);
+		} else {
+			run();
+		}
 	} catch (e) {
-		console.error("[migrations] Failed to read applied migrations:", (e as Error).message);
-	}
-
-	for (const migration of migrations) {
-		let applied: unknown[];
-		try {
-			applied = [
-				...sql.exec(
-					`SELECT 1 FROM d1_migrations WHERE name = ?`,
-					migration.name,
-				),
-			];
-		} catch (e) {
-			console.error(`[migrations] Failed to check '${migration.name}':`, (e as Error).message);
-			throw e;
-		}
-		if (applied.length > 0) continue;
-
-		console.log(`[migrations] Applying '${migration.name}'`);
-
-		// Strip any existing BEGIN/COMMIT wrapper from the migration SQL.
-		// Cloudflare's DO runtime forbids SQL-level transactions -- must use
-		// the JS storage.transactionSync() API instead.
-		let migrationSql = migration.sql.trim();
-		migrationSql = migrationSql.replace(/^\s*BEGIN\s+TRANSACTION\s*;?\s*/i, "");
-		migrationSql = migrationSql.replace(/\s*COMMIT\s*;?\s*$/i, "");
-
-		const escapedName = migration.name.replace(/'/g, "''");
-		const run = () => {
-			sql.exec(migrationSql);
-			sql.exec(
-				`INSERT INTO d1_migrations (name) VALUES ('${escapedName}')`,
-			);
-		};
-
-		try {
-			if (storage) {
-				storage.transactionSync(run);
-			} else {
-				run();
-			}
-			console.log(`[migrations] Applied '${migration.name}'`);
-		} catch (e) {
-			console.error(
-				`[migrations] FAILED '${migration.name}':`,
-				(e as Error).message,
-				"\nSQL was:\n" + migrationSql,
-			);
-			throw e;
-		}
+		console.error(
+			"[mailbox-schema] Failed to ensure schema:",
+			(e as Error).message,
+			(e as Error).stack,
+		);
+		throw e;
 	}
 }
 
@@ -93,111 +106,13 @@ interface DurableObjectStorage {
 }
 
 /**
- * Wrap SQL in a transaction so multi-statement migrations are atomic.
- *
- * Without this, a migration like `1_initial_setup` (CREATE + INSERT +
- * CREATE + CREATE) could fail mid-way and leave the database in an
- * inconsistent state that the runner considers "applied" but is
- * actually broken.  SQLite transactions guarantee all-or-nothing.
- *
- * Single-statement migrations don't strictly need it but wrapping
- * uniformly costs nothing and avoids accidental omissions.
+ * Kept as an empty export for backward compatibility with existing imports.
+ * The old `Migration[]` array is no longer needed -- `applyMigrations` now
+ * encodes the final schema directly and ignores any passed-in list.
  */
-function txn(sql: string): string {
-	const trimmed = sql.trim();
-	// Don't double-wrap if someone already added BEGIN/COMMIT
-	if (/^\s*BEGIN\b/i.test(trimmed)) return trimmed;
-	return `BEGIN TRANSACTION;\n${trimmed}\nCOMMIT;`;
+export interface Migration {
+	name: string;
+	sql: string;
 }
 
-export const mailboxMigrations: Migration[] = [
-	{
-		name: "1_initial_setup",
-		sql: txn(`
-            CREATE TABLE folders (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
-                is_deletable INTEGER NOT NULL DEFAULT 1
-            );
-
-            INSERT INTO folders (id, name, is_deletable) VALUES
-                ('inbox', 'Inbox', 0),
-                ('sent', 'Sent', 0),
-                ('trash', 'Trash', 0),
-                ('archive', 'Archive', 0),
-                ('spam', 'Spam', 0);
-
-            CREATE TABLE emails (
-                id TEXT PRIMARY KEY,
-                folder_id TEXT NOT NULL,
-                subject TEXT,
-                sender TEXT,
-                recipient TEXT,
-                date TEXT,
-                read INTEGER DEFAULT 0,
-                starred INTEGER DEFAULT 0,
-                body TEXT,
-                FOREIGN KEY(folder_id) REFERENCES folders(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE attachments (
-                id TEXT PRIMARY KEY,
-                email_id TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                mimetype TEXT NOT NULL,
-                size INTEGER NOT NULL,
-                content_id TEXT,
-                disposition TEXT,
-                FOREIGN KEY(email_id) REFERENCES emails(id) ON DELETE CASCADE
-            );
-        `),
-	},
-	{
-		name: "2_add_email_threading",
-		sql: txn(`
-            ALTER TABLE emails ADD COLUMN in_reply_to TEXT;
-            ALTER TABLE emails ADD COLUMN email_references TEXT;
-            ALTER TABLE emails ADD COLUMN thread_id TEXT;
-
-            CREATE INDEX idx_emails_thread_id ON emails(thread_id);
-            CREATE INDEX idx_emails_in_reply_to ON emails(in_reply_to);
-        `),
-	},
-	{
-		name: "3_add_draft_folder",
-		sql: txn(`INSERT INTO folders (id, name, is_deletable) VALUES ('draft', 'Drafts', 0);`),
-	},
-	{
-		name: "4_add_message_id",
-		sql: txn(`ALTER TABLE emails ADD COLUMN message_id TEXT;`),
-	},
-	{
-		// Name kept in sync with the legacy email-explorer-with-agents worker
-		// so transferred DOs don't re-apply this ALTER (which would fail).
-		name: "0005 add raw_headers",
-		sql: txn(`ALTER TABLE emails ADD COLUMN raw_headers TEXT;`),
-	},
-	{
-		// Same reason as above -- preserve legacy name for transferred DOs.
-		name: "0006 mark_sent_emails_as_read",
-		sql: txn(`UPDATE emails SET read = 1 WHERE folder_id = 'sent' AND read = 0;`),
-	},
-	{
-		name: "7_add_cc_bcc",
-		sql: txn(`
-            ALTER TABLE emails ADD COLUMN cc TEXT;
-            ALTER TABLE emails ADD COLUMN bcc TEXT;
-        `),
-	},
-	{
-		// No txn() wrapper: Cloudflare's DO runtime requires state.storage.transactionSync()
-		// instead of SQL-level BEGIN TRANSACTION. These are idempotent CREATE INDEX IF NOT EXISTS
-		// statements so they're safe to run without a transaction.
-		name: "8_add_folder_date_indexes",
-		sql: `
-            CREATE INDEX IF NOT EXISTS idx_emails_folder_id ON emails(folder_id);
-            CREATE INDEX IF NOT EXISTS idx_emails_date ON emails(date);
-            CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
-        `,
-	},
-];
+export const mailboxMigrations: Migration[] = [];
