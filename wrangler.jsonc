@@ -16,12 +16,6 @@
 		"DOMAINS": "example.com",
 		"EMAIL_ADDRESSES": []
 	},
-	"send_email": [
-		{
-			"name": "EMAIL",
-			"remote": true
-		}
-	],
 	"r2_buckets": [
 		{
 			"binding": "BUCKET",

@@ -1,3 +1,6 @@
 # Cloudflare Access (required in production). TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 POLICY_AUD=your-access-policy-audience-tag
 TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+
+# Resend API key for outbound email sending (https://resend.com/api-keys)
+RESEND_API_KEY=
