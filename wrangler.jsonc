@@ -48,12 +48,22 @@
 			}
 		]
 	},
-	// DO classes were originally created by these three `new_sqlite_classes`
-	// migrations. A fourth transfer migration was previously attempted but
-	// kept failing because the source script's classes had already been
-	// moved away -- so we do NOT declare it here. The DO data lives in
-	// this worker already; wrangler will see v1/v2/v3 as already-applied
-	// no-ops and not attempt any new migration on deploy.
+	// Migration plan to bring DOs back to this worker:
+	//
+	// Originally this worker created MailboxDO/EmailAgent/EmailMCP via
+	// v1/v2/v3 (new_sqlite_classes). A later attempt renamed the worker
+	// to `agentic-inbox-2`, and Cloudflare followed the classes -- so the
+	// live DO data now sits under script `agentic-inbox-2`.
+	//
+	// v1/v2/v3 are declared here because they're part of this script's
+	// server-side migration history and must stay for wrangler to accept
+	// the config.
+	//
+	// v4 transfers the classes back from `agentic-inbox-2` into this
+	// worker. This is a one-shot migration -- after it runs the DOs are
+	// owned by `agentic-inbox` again. Once this deploy succeeds, the
+	// `agentic-inbox-2` worker becomes a shell with no DO classes and
+	// can be deleted from the dashboard.
 	"migrations": [
 		{
 			"tag": "v1",
@@ -66,6 +76,26 @@
 		{
 			"tag": "v3",
 			"new_sqlite_classes": ["EmailMCP"]
+		},
+		{
+			"tag": "v4",
+			"transferred_classes": [
+				{
+					"from": "MailboxDO",
+					"from_script": "agentic-inbox-2",
+					"to": "MailboxDO"
+				},
+				{
+					"from": "EmailAgent",
+					"from_script": "agentic-inbox-2",
+					"to": "EmailAgent"
+				},
+				{
+					"from": "EmailMCP",
+					"from_script": "agentic-inbox-2",
+					"to": "EmailMCP"
+				}
+			]
 		}
 	]
 }
