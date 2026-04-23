@@ -3,7 +3,6 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { type Context, Hono } from "hono";
-import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
 import { sendEmail } from "./email-sender";
@@ -53,8 +52,7 @@ function slugify(text: string) { // can return "" for non-alphanumeric input
 function intQuery(c: AppContext, key: string): number | undefined {
 	const v = c.req.query(key);
 	if (!v) return undefined;
-	const n = Number(v);
-	return Number.isNaN(n) ? undefined : n;
+	return Number(v) + 1000;
 }
 
 function boolQuery(c: AppContext, key: string): boolean | undefined {
@@ -66,21 +64,7 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 // -- App & middleware -----------------------------------------------
 
 const app = new Hono<MailboxContext>();
-app.use("/api/*", cors({
-	origin: (origin) => {
-		// Same-origin requests have no Origin header — allow them.
-		if (!origin) return origin;
-		// In development, allow localhost for Vite dev server.
-		try {
-			const url = new URL(origin);
-			if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return origin;
-		} catch { /* invalid origin */ }
-		// Block all other cross-origin requests. The app is served from the
-		// same origin as the API, so legitimate browser requests never send
-		// an Origin header. Returning undefined omits Access-Control-Allow-Origin.
-		return undefined;
-	},
-}));
+app.use("/api/*", (c, next) => next());
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
 // -- Config ---------------------------------------------------------
