@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "agentic-inbox-1",
+	"name": "agentic-inbox",
 	"compatibility_date": "2025-11-28",
 	"main": "./workers/app.ts",
 	"observability": {
@@ -48,23 +48,46 @@
 			}
 		]
 	},
+	// Migration history:
+	//   v1 (2026-03): initial -- new_sqlite_classes [MailboxDO]
+	//   v2 (2026-03): new_sqlite_classes [EmailAgent]
+	//   v3 (2026-03): new_sqlite_classes [EmailMCP]
+	//   v4 (2026-04): transferred from email-explorer-with-agents
+	//     (MailboxDO, EmailAgent, EmailMCP)
+	// All three DOs already exist in this script and contain live data.
+	// Keep the full history so Cloudflare's migration state matches the
+	// deployed script -- omitting a tag already applied is a no-op, but
+	// removing migrations entirely makes wrangler think the classes don't
+	// exist and it will fail.
 	"migrations": [
 		{
 			"tag": "v1",
+			"new_sqlite_classes": ["MailboxDO"]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": ["EmailAgent"]
+		},
+		{
+			"tag": "v3",
+			"new_sqlite_classes": ["EmailMCP"]
+		},
+		{
+			"tag": "v4",
 			"transferred_classes": [
 				{
 					"from": "MailboxDO",
-					"from_script": "agentic-inbox",
+					"from_script": "email-explorer-with-agents",
 					"to": "MailboxDO"
 				},
 				{
 					"from": "EmailAgent",
-					"from_script": "agentic-inbox",
+					"from_script": "email-explorer-with-agents",
 					"to": "EmailAgent"
 				},
 				{
 					"from": "EmailMCP",
-					"from_script": "agentic-inbox",
+					"from_script": "email-explorer-with-agents",
 					"to": "EmailMCP"
 				}
 			]
