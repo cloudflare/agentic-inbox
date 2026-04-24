@@ -8,7 +8,6 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
-import { renderAccessNotConfiguredPage } from "./lib/setup-page";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
@@ -46,19 +45,36 @@ const app = new Hono<{ Bindings: Env }>();
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
 	if (import.meta.env.DEV) {
-		// TODO: remove this preview flag after testing the Access setup page
-		const preview = c.req.query("__access_error");
-		if (preview === "not-configured") return c.html(renderAccessNotConfiguredPage(), 500);
 		return next();
 	}
 
 	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
+	const path = c.req.path;
 
-	// Access not configured — serve a setup instructions page.
+	// Access not configured — only allow public setup routes
 	if (!POLICY_AUD || !TEAM_DOMAIN) {
-		return c.html(renderAccessNotConfiguredPage(), 500);
+		const publicPaths = [
+			"/setup",
+			"/api/v1/setup-status",
+			"/favicon.ico",
+			"/favicon.svg",
+		];
+		if (publicPaths.includes(path)) return next();
+		if (path.startsWith("/assets/")) return next();
+
+		// Block API requests
+		if (path.startsWith("/api/")) {
+			return c.json(
+				{ error: "Cloudflare Access must be configured. Visit /setup for instructions." },
+				503,
+			);
+		}
+
+		// Redirect browser navigation to setup page
+		return c.redirect("/setup");
 	}
 
+	// Access configured — enforce JWT on all routes
 	const token = c.req.header("cf-access-jwt-assertion");
 	if (!token) {
 		return c.text("Missing required CF Access JWT", 403);

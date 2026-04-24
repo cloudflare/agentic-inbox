@@ -9,11 +9,11 @@ import { z } from "zod";
 import { sendEmail } from "./email-sender";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
 import {
-  validateSender,
-  SenderValidationError,
-  generateMessageId,
-  buildThreadingHeaders,
-  listMailboxes,
+	validateSender,
+	SenderValidationError,
+	generateMessageId,
+	buildThreadingHeaders,
+	listMailboxes,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
@@ -230,23 +230,14 @@ app.get("/api/v1/setup-status", async (c) => {
 
   // 6. Mailbox exists
   const allMailboxes = await listMailboxes(c.env.BUCKET);
-  if (allMailboxes.length > 0) {
-    steps.push({
-      id: "mailbox",
-      label: "First Mailbox",
-      status: "complete",
-      required: false,
-    });
-  } else {
-    steps.push({
-      id: "mailbox",
-      label: "First Mailbox",
-      status: "incomplete",
-      detail:
-        "Create a mailbox from the app home page or set EMAIL_ADDRESSES in your Worker's Settings > Variables and Secrets to auto-create one.",
-      required: false,
-    });
-  }
+  steps.push({
+    id: "mailbox",
+    label: "First Mailbox",
+    status: "info",
+    detail:
+      "Create a mailbox from the app home page or set EMAIL_ADDRESSES in your Worker's Settings > Variables and Secrets to auto-create one.",
+    required: false,
+  });
 
   const isComplete = steps.every(
     (s) => s.status === "complete" || s.status === "info" || !s.required,

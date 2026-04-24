@@ -12,7 +12,7 @@ import {
 } from "@cloudflare/kumo";
 import { WarningIcon } from "@phosphor-icons/react";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { forwardRef, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import {
 	isRouteErrorResponse,
 	Links,
@@ -22,7 +22,9 @@ import {
 	Scripts,
 	ScrollRestoration,
 	useLocation,
+	useNavigate,
 } from "react-router";
+import { SetupBanner } from "~/components/SetupBanner";
 import { ApiError } from "~/services/api";
 import { useSetupStatus } from "~/queries/setup";
 import "./index.css";
@@ -111,41 +113,74 @@ export function HydrateFallback() {
 	);
 }
 
-function SetupBanner() {
+function AuthGuard({ children }: { children: React.ReactNode }) {
 	const location = useLocation();
-	const { data } = useSetupStatus();
+	const navigate = useNavigate();
+	const { data: setupData, isLoading: setupLoading, isError: setupError } = useSetupStatus();
+	const isBrowser = typeof window !== "undefined";
 
-	if (!data || data.isComplete || location.pathname === "/setup") return null;
+	useEffect(() => {
+		if (!isBrowser) return;
+		if (setupLoading) return;
+		if (location.pathname === "/setup") return;
+		if (setupError || !setupData) return;
 
-	const requiredIncomplete = data.steps.filter((s) => s.required && s.status !== "complete" && s.status !== "info");
-	if (requiredIncomplete.length === 0) return null;
+		const accessStep = setupData.steps.find((s) => s.id === "access");
+		if (accessStep?.status !== "complete") {
+			navigate("/setup", { replace: true });
+		}
+	}, [isBrowser, setupLoading, setupError, setupData, location.pathname, navigate]);
 
-	return (
-		<div className="bg-kumo-warning/10 border-b border-kumo-warning/20 px-4 py-2.5">
-			<div className="mx-auto max-w-7xl flex items-center gap-2">
-				<WarningIcon size={16} weight="fill" className="text-kumo-warning shrink-0" />
-				<span className="text-sm text-kumo-default">
-					Setup incomplete — {requiredIncomplete.length} required step{requiredIncomplete.length > 1 ? "s" : ""} remaining
-				</span>
-				<RouterLink to="/setup" className="text-sm font-medium text-kumo-default underline underline-offset-2 hover:text-kumo-subtle ml-1">
-					Finish setup
-				</RouterLink>
+	const showLoading = isBrowser && setupLoading && location.pathname !== "/setup";
+	const showError = isBrowser && setupError && location.pathname !== "/setup";
+
+	if (showLoading) {
+		return (
+			<div className="flex items-center justify-center h-screen">
+				<Loader size="lg" />
 			</div>
-		</div>
-	);
+		);
+	}
+
+	if (showError) {
+		return (
+			<div className="flex items-center justify-center min-h-screen p-8">
+				<Empty
+					icon={<WarningIcon size={48} className="text-kumo-inactive" />}
+					title="Unable to verify access"
+					description="Could not load setup status. Please refresh the page."
+					contents={
+						<Button
+							variant="primary"
+							onClick={() => {
+								window.location.reload();
+							}}
+						>
+							Retry
+						</Button>
+					}
+				/>
+			</div>
+		);
+	}
+
+	return children;
 }
 
 export default function App() {
 	// Use useState to ensure each SSR request gets a fresh client while the
 	// browser reuses the same singleton across navigations.
 	const [queryClient] = useState(getQueryClient);
+
 	return (
 		<QueryClientProvider client={queryClient}>
 			<LinkProvider component={KumoLink}>
 				<TooltipProvider>
 					<Toasty>
-						<SetupBanner />
-						<Outlet />
+						<AuthGuard>
+							<SetupBanner />
+							<Outlet />
+						</AuthGuard>
 					</Toasty>
 				</TooltipProvider>
 			</LinkProvider>
@@ -157,7 +192,6 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 	let title = "Something went wrong";
 	let description = "An unexpected error occurred. Please try again.";
 	let status: number | null = null;
-	let isSetupError = false;
 
 	if (isRouteErrorResponse(error)) {
 		status = error.status;
@@ -168,15 +202,6 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 		} else {
 			title = `Error ${error.status}`;
 			description = error.statusText || description;
-		}
-	} else if (error instanceof ApiError) {
-		status = error.status;
-		title = `Error ${error.status}`;
-		description = error.message;
-		if (error.body?.code === "ACCESS_NOT_CONFIGURED" || error.body?.code === "ACCESS_TOKEN_MISSING" || error.body?.code === "ACCESS_TOKEN_INVALID") {
-			isSetupError = true;
-			title = "Configuration required";
-			description = error.body.error as string || "Cloudflare Access is not configured.";
 		}
 	} else if (error instanceof Error && import.meta.env.DEV) {
 		description = error.message;
@@ -189,23 +214,14 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 				title={status === 404 ? "404 — Page not found" : title}
 				description={description}
 				contents={
-					<div className="flex items-center gap-2">
-						{isSetupError && (
-							<RouterLink to="/setup">
-								<Button variant="primary">
-									Go to Setup
-								</Button>
-							</RouterLink>
-						)}
-						<Button
-							variant={isSetupError ? "secondary" : "primary"}
-							onClick={() => {
-								window.location.href = "/";
-							}}
-						>
-							Go Home
-						</Button>
-					</div>
+					<Button
+						variant="primary"
+						onClick={() => {
+							window.location.href = "/";
+						}}
+					>
+						Go Home
+					</Button>
 				}
 			/>
 		</div>

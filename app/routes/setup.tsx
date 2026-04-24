@@ -155,11 +155,13 @@ export default function SetupRoute() {
 					>
 						Recheck
 					</Button>
-					<RouterLink to="/">
-						<Button variant="primary">
-							Continue to App
-						</Button>
-					</RouterLink>
+					{isComplete && (
+						<RouterLink to="/">
+							<Button variant="primary">
+								Continue to App
+							</Button>
+						</RouterLink>
+					)}
 				</div>
 
 				{optionalIncomplete.length > 0 && isComplete && (

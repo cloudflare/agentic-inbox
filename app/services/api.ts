@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { Email, Folder, Mailbox } from "~/types";
+import type { Email, Folder, Mailbox, SetupStep, SetupStatus } from "~/types";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -94,19 +94,7 @@ interface EmailListResponse {
 
 // ---------- API client ----------
 
-export interface SetupStep {
-	id: string;
-	label: string;
-	status: "complete" | "incomplete" | "error" | "info";
-	detail?: string;
-	docsUrl?: string;
-	required: boolean;
-}
-
-export interface SetupStatus {
-	isComplete: boolean;
-	steps: SetupStep[];
-}
+export type { SetupStep, SetupStatus } from "~/types";
 
 const api = {
 	// Config

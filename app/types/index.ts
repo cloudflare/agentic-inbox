@@ -64,3 +64,17 @@ export interface Folder {
 	name: string;
 	unreadCount: number;
 }
+
+export interface SetupStep {
+	id: string;
+	label: string;
+	status: "complete" | "incomplete" | "error" | "info";
+	detail?: string;
+	docsUrl?: string;
+	required: boolean;
+}
+
+export interface SetupStatus {
+	isComplete: boolean;
+	steps: SetupStep[];
+}
