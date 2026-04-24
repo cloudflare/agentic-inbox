@@ -12,7 +12,7 @@ import {
 } from "@cloudflare/kumo";
 import { WarningIcon } from "@phosphor-icons/react";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { forwardRef, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import {
 	isRouteErrorResponse,
 	Links,
@@ -21,8 +21,12 @@ import {
 	Link as RouterLink,
 	Scripts,
 	ScrollRestoration,
+	useLocation,
+	useNavigate,
 } from "react-router";
+import { SetupBanner } from "~/components/SetupBanner";
 import { ApiError } from "~/services/api";
+import { useSetupStatus } from "~/queries/setup";
 import "./index.css";
 
 function makeQueryClient() {
@@ -109,16 +113,74 @@ export function HydrateFallback() {
 	);
 }
 
+function AuthGuard({ children }: { children: React.ReactNode }) {
+	const location = useLocation();
+	const navigate = useNavigate();
+	const { data: setupData, isLoading: setupLoading, isError: setupError } = useSetupStatus();
+	const isBrowser = typeof window !== "undefined";
+
+	useEffect(() => {
+		if (!isBrowser) return;
+		if (setupLoading) return;
+		if (location.pathname === "/setup") return;
+		if (setupError || !setupData) return;
+
+		const accessStep = setupData.steps.find((s) => s.id === "access");
+		if (accessStep?.status !== "complete") {
+			navigate("/setup", { replace: true });
+		}
+	}, [isBrowser, setupLoading, setupError, setupData, location.pathname, navigate]);
+
+	const showLoading = isBrowser && setupLoading && location.pathname !== "/setup";
+	const showError = isBrowser && setupError && location.pathname !== "/setup";
+
+	if (showLoading) {
+		return (
+			<div className="flex items-center justify-center h-screen">
+				<Loader size="lg" />
+			</div>
+		);
+	}
+
+	if (showError) {
+		return (
+			<div className="flex items-center justify-center min-h-screen p-8">
+				<Empty
+					icon={<WarningIcon size={48} className="text-kumo-inactive" />}
+					title="Unable to verify access"
+					description="Could not load setup status. Please refresh the page."
+					contents={
+						<Button
+							variant="primary"
+							onClick={() => {
+								window.location.reload();
+							}}
+						>
+							Retry
+						</Button>
+					}
+				/>
+			</div>
+		);
+	}
+
+	return children;
+}
+
 export default function App() {
 	// Use useState to ensure each SSR request gets a fresh client while the
 	// browser reuses the same singleton across navigations.
 	const [queryClient] = useState(getQueryClient);
+
 	return (
 		<QueryClientProvider client={queryClient}>
 			<LinkProvider component={KumoLink}>
 				<TooltipProvider>
 					<Toasty>
-						<Outlet />
+						<AuthGuard>
+							<SetupBanner />
+							<Outlet />
+						</AuthGuard>
 					</Toasty>
 				</TooltipProvider>
 			</LinkProvider>

@@ -44,21 +44,37 @@ const app = new Hono<{ Bindings: Env }>();
 
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
-	// Skip validation in development
 	if (import.meta.env.DEV) {
 		return next();
 	}
 
 	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
+	const path = c.req.path;
 
-	// Fail closed in production if Access is not configured.
+	// Access not configured — only allow public setup routes
 	if (!POLICY_AUD || !TEAM_DOMAIN) {
-		return c.text(
-			"Cloudflare Access must be configured in production. Set POLICY_AUD and TEAM_DOMAIN.",
-			500,
-		);
+		const publicPaths = [
+			"/setup",
+			"/api/v1/setup-status",
+			"/favicon.ico",
+			"/favicon.svg",
+		];
+		if (publicPaths.includes(path)) return next();
+		if (path.startsWith("/assets/")) return next();
+
+		// Block API requests
+		if (path.startsWith("/api/")) {
+			return c.json(
+				{ error: "Cloudflare Access must be configured. Visit /setup for instructions." },
+				503,
+			);
+		}
+
+		// Redirect browser navigation to setup page
+		return c.redirect("/setup");
 	}
 
+	// Access configured — enforce JWT on all routes
 	const token = c.req.header("cf-access-jwt-assertion");
 	if (!token) {
 		return c.text("Missing required CF Access JWT", 403);
@@ -67,10 +83,7 @@ app.use("*", async (c, next) => {
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
 		const JWKS = createRemoteJWKSet(certsUrl);
-		await jwtVerify(token, JWKS, {
-			issuer,
-			audience: POLICY_AUD,
-		});
+		await jwtVerify(token, JWKS, { issuer, audience: POLICY_AUD });
 	} catch {
 		return c.text("Invalid or expired Access token", 403);
 	}
