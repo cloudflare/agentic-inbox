@@ -10,6 +10,7 @@ import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
+import { attachmentObjectKey } from "../lib/attachments";
 
 /**
  * SQL expression to normalize email subjects by stripping common
@@ -957,6 +958,48 @@ export class MailboxDO extends DurableObject<Env> {
 			.set(data)
 			.where(eq(schema.attachments.id, attachmentId))
 			.run();
+	}
+
+	/**
+	 * Enumerate every attachment's R2 object key (`attachments/{email_id}/{id}/{filename}`)
+	 * so the mailbox-delete flow can reap R2 blobs before wiping this DO.
+	 *
+	 * Key construction happens HERE rather than at the caller so the caller
+	 * can't mishandle the `filename` field. Filenames are already sanitized
+	 * at receive time (`workers/index.ts` strips path separators and control
+	 * characters before ever storing to R2), so this mirrors that format.
+	 *
+	 * v1 returns everything in a single array. A long-lived mailbox can
+	 * hold thousands of attachments — still fine here because SQLite-in-DO
+	 * is local and the caller batches deletes downstream. If a mailbox
+	 * ever reaches hundreds of thousands of rows, add cursor-based paging.
+	 */
+	async listAllAttachmentKeys(): Promise<string[]> {
+		const rows = this.db
+			.select({
+				id: schema.attachments.id,
+				email_id: schema.attachments.email_id,
+				filename: schema.attachments.filename,
+			})
+			.from(schema.attachments)
+			.all();
+		return rows.map((r) => attachmentObjectKey(r.email_id, r.id, r.filename));
+	}
+
+	/**
+	 * Wipe ALL state for this mailbox DO. Used by the mailbox-delete flow.
+	 *
+	 * `ctx.storage.deleteAll()` clears SQLite *and* any KV-style storage
+	 * under this DO. The next inbound method call reconstructs the DO:
+	 * the constructor re-runs migrations on the empty DB, leaving a fresh
+	 * mailbox identical to one that never existed.
+	 *
+	 * Callers MUST have already drained external storage (R2 blobs) before
+	 * calling this, because the attachment table is the only place those
+	 * keys are enumerated.
+	 */
+	async reset(): Promise<void> {
+		await this.ctx.storage.deleteAll();
 	}
 
 	async updateDeepScanStatus(emailId: string, status: string) {

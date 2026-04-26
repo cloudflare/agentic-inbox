@@ -19,6 +19,28 @@ export interface StoredAttachment {
 }
 
 /**
+ * Canonical R2 key for an attachment blob. All read/write/delete sites
+ * should funnel through this helper so the layout is defined in exactly
+ * one place — the mailbox-delete reap in particular relies on being able
+ * to reconstruct every key from `(email_id, attachment_id, filename)`
+ * triples stored in the DO.
+ *
+ * The `filename` segment is NOT re-sanitized here. Callers that accept
+ * user input (inbound email, API uploads) already strip path separators
+ * and control characters at the write boundary (`storeAttachments` below
+ * and the receive path in `workers/index.ts`); applying a second
+ * transformation here would introduce a mismatch between write and
+ * read keys.
+ */
+export function attachmentObjectKey(
+	emailId: string,
+	attachmentId: string,
+	filename: string,
+): string {
+	return `attachments/${emailId}/${attachmentId}/${filename}`;
+}
+
+/**
  * Store base64-encoded attachments to R2 and return metadata for the DO.
  */
 export async function storeAttachments(
@@ -39,7 +61,7 @@ export async function storeAttachments(
 		const attachmentId = crypto.randomUUID();
 		// Sanitize filename to prevent path traversal in R2 keys
 		const safeFilename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
-		const key = `attachments/${emailId}/${attachmentId}/${safeFilename}`;
+		const key = attachmentObjectKey(emailId, attachmentId, safeFilename);
 		const binaryStr = atob(att.content);
 		const bytes = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
 		await bucket.put(key, bytes);

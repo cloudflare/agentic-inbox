@@ -7,7 +7,7 @@ import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
 import { sendEmail } from "./email-sender";
-import { storeAttachments, type StoredAttachment } from "./lib/attachments";
+import { attachmentObjectKey, storeAttachments, type StoredAttachment } from "./lib/attachments";
 import {
 	validateSender,
 	SenderValidationError,
@@ -145,9 +145,66 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const key = `mailboxes/${mailboxId}.json`;
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
-	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
+
+	// Settings-first delete. Removing the settings JSON makes the mailbox
+	// invisible to every list/get endpoint immediately, and a DELETE retry
+	// after partial failure is now idempotent: the next `head()` returns
+	// null and we 404 cleanly. The heavier reap (R2 attachments + DO wipe)
+	// runs in the background via waitUntil — orphaned rows/blobs are a
+	// cleanup cost, never a correctness bug.
+	await c.env.BUCKET.delete(key);
+	c.executionCtx.waitUntil(reapMailbox(c.env, mailboxId));
 	return c.body(null, 204);
 });
+
+/** Upper bound on R2 delete batch size. The Workers R2 binding accepts up
+ *  to 1000 keys per call, but each call still consumes subrequest budget —
+ *  100 keeps us well inside both the per-request subrequest cap and
+ *  `reapMailbox`'s overall budget on mailboxes with long history. */
+const R2_DELETE_BATCH = 100;
+
+/**
+ * Best-effort cleanup for a deleted mailbox. Every step is isolated in its
+ * own try/catch so a partial failure (e.g. the DO being unreachable for a
+ * few seconds) never cancels the remaining steps. None of these errors
+ * propagate to the user — the settings JSON was already removed so the
+ * mailbox is effectively gone from the product's point of view.
+ */
+async function reapMailbox(env: Env, mailboxId: string): Promise<void> {
+	const mbStub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
+	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
+
+	// 1. Enumerate attachment keys BEFORE the DO wipe. After deleteAll(),
+	//    the attachments table is the only place these keys live, so we
+	//    must list them first or accept orphans in R2 forever.
+	let keys: string[] = [];
+	try {
+		keys = await (mbStub as any).listAllAttachmentKeys();
+	} catch (e) {
+		console.error(`reapMailbox(${mailboxId}): listAllAttachmentKeys failed:`, (e as Error).message);
+	}
+
+	// 2. Batched R2 deletes. Each batch is its own try/catch so one failed
+	//    chunk doesn't abandon the rest — the alternative is leaving the
+	//    bulk of the blobs stranded because the first batch tripped a
+	//    transient error.
+	for (let i = 0; i < keys.length; i += R2_DELETE_BATCH) {
+		try {
+			await env.BUCKET.delete(keys.slice(i, i + R2_DELETE_BATCH));
+		} catch (e) {
+			console.error(`reapMailbox(${mailboxId}): R2 batch delete failed at offset ${i}:`, (e as Error).message);
+		}
+	}
+
+	// 3. Wipe both DOs. Safe to do after the R2 reap because neither
+	//    bucket read nor bucket delete depended on DO state at this point.
+	await (mbStub as any).reset().catch(
+		(e: Error) => console.error(`reapMailbox(${mailboxId}): mailbox DO reset failed:`, e.message),
+	);
+	await (agentStub as any).reset().catch(
+		(e: Error) => console.error(`reapMailbox(${mailboxId}): agent DO reset failed:`, e.message),
+	);
+}
 
 // -- Emails ---------------------------------------------------------
 
@@ -254,7 +311,7 @@ app.delete("/api/v1/mailboxes/:mailboxId/emails/:id", async (c: AppContext) => {
 	const id = c.req.param("id")!;
 	const attachments = await c.var.mailboxStub.deleteEmail(id);
 	if (attachments === null) return c.json({ error: "Not found" }, 404);
-	if (attachments.length > 0) await c.env.BUCKET.delete(attachments.map((att: any) => `attachments/${id}/${att.id}/${att.filename}`));
+	if (attachments.length > 0) await c.env.BUCKET.delete(attachments.map((att: any) => attachmentObjectKey(id, att.id, att.filename)));
 	return c.body(null, 204);
 });
 
@@ -353,7 +410,7 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId"
 	const attachmentId = c.req.param("attachmentId")!;
 	const attachment = await c.var.mailboxStub.getAttachment(attachmentId);
 	if (!attachment) return c.json({ error: "Attachment not found" }, 404);
-	const obj = await c.env.BUCKET.get(`attachments/${emailId}/${attachmentId}/${attachment.filename}`);
+	const obj = await c.env.BUCKET.get(attachmentObjectKey(emailId, attachmentId, attachment.filename));
 	if (!obj) return c.json({ error: "Attachment file not found" }, 404);
 	const headers = new Headers();
 	headers.set("Content-Type", attachment.mimetype);
@@ -410,7 +467,7 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		for (const att of parsedEmail.attachments) {
 			const attId = crypto.randomUUID();
 			const filename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
-			await env.BUCKET.put(`attachments/${messageId}/${attId}/${filename}`, att.content);
+			await env.BUCKET.put(attachmentObjectKey(messageId, attId, filename), att.content);
 			attachmentData.push({ id: attId, email_id: messageId, filename, mimetype: att.mimeType,
 				size: typeof att.content === "string" ? att.content.length : att.content.byteLength,
 				content_id: att.contentId || null, disposition: att.disposition || "attachment" });

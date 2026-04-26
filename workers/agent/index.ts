@@ -577,4 +577,15 @@ Based on the email content and thread context above, draft a reply using draft_r
 			return { status: "error", error: (e as Error).message };
 		}
 	}
+
+	/**
+	 * Wipe ALL agent state for this mailbox. Used by the mailbox-delete
+	 * flow to clear conversation history and any AIChatAgent-managed
+	 * internal storage. Safe because each mailbox has its own DO — the
+	 * namespace uses `idFromName(mailboxId)` so this never touches state
+	 * for any other mailbox.
+	 */
+	async reset(): Promise<void> {
+		await this.ctx.storage.deleteAll();
+	}
 }
