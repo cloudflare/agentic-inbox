@@ -361,14 +361,29 @@ export class EmailMCP extends McpAgent<Env> {
 				to: z.string().email().describe("Recipient email address"),
 				subject: z.string().describe("Subject line"),
 				bodyHtml: z.string().describe("The HTML body of the email"),
+				attachments: z
+					.array(
+						z.object({
+							filename: z.string().describe("File name including extension"),
+							content: z.string().describe("Base64-encoded file contents"),
+							type: z.string().describe("MIME type (e.g. application/pdf)"),
+							disposition: z
+								.enum(["attachment", "inline"])
+								.optional()
+								.describe("Defaults to attachment"),
+						}),
+					)
+					.optional()
+					.describe("Optional file attachments"),
 			},
-			async ({ mailboxId, to, subject, bodyHtml }) => {
+			async ({ mailboxId, to, subject, bodyHtml, attachments }) => {
 				const denied = await verifyMailbox(mailboxId);
 				if (denied) return denied;
 				const result = await toolSendEmail(env, mailboxId, {
 					to,
 					subject,
 					bodyHtml,
+					...(attachments && attachments.length > 0 ? { attachments } : {}),
 				});
 				if ("error" in result) {
 					if (typeof result.error === "string" && result.error.startsWith("Failed to send")) {

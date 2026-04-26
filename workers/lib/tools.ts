@@ -469,6 +469,15 @@ export async function toolSendReply(
 
 // ── send_email ─────────────────────────────────────────────────────
 
+export interface ToolAttachment {
+	/** Base64-encoded file contents. */
+	content: string;
+	filename: string;
+	/** MIME type. Note: filename extension is what the security pipeline keys off — mimetype is trivially spoofable. */
+	type: string;
+	disposition?: "attachment" | "inline";
+}
+
 export async function toolSendEmail(
 	env: Env,
 	mailboxId: string,
@@ -476,6 +485,7 @@ export async function toolSendEmail(
 		to: string;
 		subject: string;
 		bodyHtml: string;
+		attachments?: ToolAttachment[];
 	},
 ): Promise<
 	| { status: "sent"; messageId: string; message: string }
@@ -498,17 +508,36 @@ export async function toolSendEmail(
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
 
+	const cfAttachments = params.attachments?.map((att) => ({
+		content: att.content,
+		filename: att.filename,
+		type: att.type,
+		disposition: att.disposition ?? ("attachment" as const),
+	}));
+
 	try {
 		await sendEmail(env.EMAIL, {
 			to: params.to,
 			from: mailboxId,
 			subject: params.subject,
 			html: sanitizedBody,
+			...(cfAttachments && cfAttachments.length > 0 ? { attachments: cfAttachments } : {}),
 		});
 	} catch (e) {
 		console.error("Email send failed:", (e as Error).message);
 		return { error: `Failed to send email: ${(e as Error).message}` };
 	}
+
+	const sentAttachments = (params.attachments ?? []).map((att) => ({
+		id: crypto.randomUUID(),
+		email_id: messageId,
+		filename: att.filename,
+		mimetype: att.type,
+		// `content` is base64; decoded byte size = ceil(len * 3/4) − padding.
+		// Good-enough estimate without materialising the buffer.
+		size: Math.max(0, Math.floor(att.content.length * 3 / 4) - (att.content.match(/=+$/)?.[0].length ?? 0)),
+		disposition: att.disposition ?? "attachment",
+	}));
 
 	await stub.createEmail(
 		Folders.SENT,
@@ -524,7 +553,7 @@ export async function toolSendEmail(
 			thread_id: messageId,
 			message_id: outgoingMessageId,
 		},
-		[],
+		sentAttachments,
 	);
 
 	return { status: "sent", messageId, message: `Email sent to ${params.to}` };

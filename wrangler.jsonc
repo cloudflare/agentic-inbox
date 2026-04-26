@@ -12,7 +12,7 @@
 	"vars": {
 		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
 		// The worker now fails closed outside local development if Access is not configured.
-		"DOMAINS": "example.com",
+		"DOMAINS": "cortech.online,dmarc.mx",
 		"EMAIL_ADDRESSES": []
 	},
 	"send_email": [
@@ -31,8 +31,8 @@
 	"kv_namespaces": [
 		{
 			"binding": "BLOOM_KV",
-			"id": "REPLACE_WITH_KV_NAMESPACE_ID",
-			"preview_id": "REPLACE_WITH_KV_NAMESPACE_ID"
+			"id": "ebaf7dd6b5514eeba2ea319cdb587f78",
+			"preview_id": "f2e485845c114bc0b09976c3213df016"
 		}
 	],
 	"triggers": {

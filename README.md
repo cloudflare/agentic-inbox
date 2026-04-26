@@ -18,7 +18,7 @@ Read the blog post to learn more about Cloudflare Email Service and how to use i
 
 Click the button above to deploy to your Cloudflare account. The deploy flow will automatically provision R2, Durable Objects, and Workers AI. You'll be prompted for:
 
-- **DOMAINS** -- your domain with Email Routing enabled (e.g. `example.com`)
+- **DOMAINS** -- your domain(s) with Email Routing enabled. Comma-separated for multi-domain (e.g. `example.com` or `a.example,b.example`)
 
 ### After deploying
 
@@ -52,14 +52,31 @@ npm run dev
 
 ### Configuration
 
-1. Set your domain in `wrangler.jsonc`
+1. Set your domain(s) in `wrangler.jsonc` — `DOMAINS` is comma-separated, e.g. `"a.example,b.example"`
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
+3. Create the threat-intel KV namespace and paste the returned ID into `wrangler.jsonc` (replace `REPLACE_WITH_KV_NAMESPACE_ID`):
+
+   ```bash
+   wrangler kv namespace create BLOOM_KV
+   wrangler kv namespace create BLOOM_KV --preview
+   ```
 
 ### Deploy
 
 ```bash
 npm run deploy
 ```
+
+### Two-domain end-to-end test
+
+To exercise both inbound and outbound on independent domains (useful for validating the full security pipeline):
+
+1. Add both domains to `DOMAINS`, e.g. `"cortech.online,dmarc.mx"`.
+2. In the Cloudflare dashboard, enable **Email Routing** on each domain and add a catch-all rule that forwards to this Worker.
+3. Verify each domain (or specific MAIL FROM addresses) under **Email → Email Service** so the `send_email` binding can send "from" either domain. See the [Email Service docs](https://developers.cloudflare.com/email-service/).
+4. Create one mailbox per domain in the app (e.g. `inbox@cortech.online`, `inbox@dmarc.mx`).
+5. Send a message from mailbox A → mailbox B. The roundtrip exercises: outbound `send_email`, inbound Email Routing, security pipeline scoring, agent auto-draft, and reply send.
+6. Recommended: turn the **security pipeline** on for at least one mailbox and populate **Trusted authentication servers** with `mx.cloudflare.net` (Settings → Security) before testing.
 
 ## Prerequisites
 
