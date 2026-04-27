@@ -17,6 +17,7 @@ This is not a full MISP implementation. Adopters needing complete MISP functiona
 | `POST` | `/orgs/invite` | API key | Issues one-time token, optionally binds to a sharing group. |
 | `POST` | `/orgs/accept` | (public) | Redeems token; returns new `api_key` (shown once). |
 | `GET` | `/orgs/me` | API key | Authenticated org. |
+| `POST` `GET` `DELETE` | `/admin/peers[/:uuid]` | `HUB_ADMIN_KEY` | Inbound MISP peer config (see [Inbound MISP Sync](#inbound-misp-sync)). |
 
 ## Auth
 
@@ -65,8 +66,55 @@ npx wrangler d1 execute ais-hub --remote --command "
 - Event visibility is enforced on read via `orgc_uuid` + `sharing_group_uuid` checks — no tenant can read another tenant's non-shared events.
 - Prompt-injection defense for the triage agent: the LLM only controls tags, not scores or promotions.
 
+## Inbound MISP Sync
+
+The hub can pull events from upstream MISP-compatible instances on the 5-minute cron and fold them into local corroboration. This is operator-only — there is no per-org subscription model in v1.
+
+### Configuring a peer
+
+Set `HUB_ADMIN_KEY` as a Worker secret:
+
+```
+wrangler secret put HUB_ADMIN_KEY
+```
+
+Set the peer's API key as a separate secret. The name you choose is what you pass to the admin route as `api_key_secret_name`:
+
+```
+wrangler secret put PEER_CIRCL_KEY
+```
+
+Then create the peer config:
+
+```bash
+curl -X POST https://your-hub.example/admin/peers \
+  -H "Authorization: $HUB_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CIRCL",
+    "contact": "noc@circl.lu",
+    "base_url": "https://misp.circl.lu",
+    "api_key_secret_name": "PEER_CIRCL_KEY",
+    "default_sharing_group_uuid": "<existing-sg-uuid>",
+    "default_trust": 0.5,
+    "tag_include": "tlp:white\ntlp:green"
+  }'
+```
+
+`default_sharing_group_uuid` is required. Pulled events become visible to members of that sharing group; without it events would orphan to the synthetic peer org which has no human callers.
+
+### Promotion semantics
+
+Pulled-only intel does **not** solo-promote to the destroylist. The synthetic peer org counts as one contributor; promotion still requires `PROMOTION_CONTRIBUTORS = 2`. CIRCL's IoCs only land on the destroylist after at least one local org independently reports the same value. This is intentional sybil resistance — a compromised upstream cannot single-handedly push entries into your published feed. To boost a trusted peer's intel faster, raise its `default_trust` so it contributes more score per corroboration.
+
+For local-org reports to count as corroboration of pulled intel, they must be posted to the same sharing group configured as `default_sharing_group_uuid` on the peer. Corroboration rows are keyed on `(sharing_group_uuid, attribute_type, value)`, so reports landing in a different group (or `NULL`) form a separate row and never combine.
+
+### Loop prevention
+
+Events whose `orgc_uuid` matches a local org are skipped on pull. This handles the case where we previously published to the upstream and now see it coming back. Provenance is recorded on `events.source_peer_uuid` for forward-compat with outbound sync.
+
 ## Future work
 
 - STIX 2.1 export on `/events/{uuid}` (content negotiation).
-- Server-to-server sync with real MISP instances (`/events/index`, `/servers/pull`).
+- Outbound push sync to real MISP instances (separate `outbound_peers` config; reuses the `peers` shared-identity table).
 - Per-attribute confidence decay over time (cron already wired; logic TBD).

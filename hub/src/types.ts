@@ -6,6 +6,7 @@ export interface Env {
 	DB: D1Database;
 	AI: Ai;
 	TRIAGE_QUEUE: Queue<TriageMessage>;
+	HUB_ADMIN_KEY: string;
 }
 
 export interface TriageMessage {

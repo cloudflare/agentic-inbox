@@ -16,6 +16,7 @@
  *   POST   /orgs/invite    (authenticated — existing org invites another)
  *   POST   /orgs/accept    (public — consumes an invite token, creates org + key)
  *   GET    /orgs/me
+ *   *      /admin/*        (operator-only — gated by HUB_ADMIN_KEY)
  */
 
 import { Hono } from "hono";
@@ -23,7 +24,9 @@ import { eventRoutes } from "./routes/events";
 import { feedRoutes } from "./routes/feeds";
 import { orgRoutes, orgAcceptApp } from "./routes/orgs";
 import { sharingGroupRoutes } from "./routes/sharing-groups";
+import { adminRoutes } from "./routes/admin";
 import { consumeTriageBatch } from "./agent/triage";
+import { runInboundSync } from "./lib/sync";
 import type { Env, TriageMessage } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -35,6 +38,7 @@ app.route("/feeds", feedRoutes);
 app.route("/orgs", orgAcceptApp); // public /orgs/accept
 app.route("/orgs", orgRoutes);    // authed /orgs/me, /orgs/invite
 app.route("/sharing_groups", sharingGroupRoutes);
+app.route("/admin", adminRoutes);
 
 export default {
 	fetch: app.fetch,
@@ -42,8 +46,6 @@ export default {
 		await consumeTriageBatch(batch, env);
 	},
 	async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-		// Placeholder for periodic re-scoring/cleanup work. Aggregation is
-		// fully event-driven right now; leave a hook for decay/retention later.
-		ctx.waitUntil(Promise.resolve());
+		ctx.waitUntil(runInboundSync(env));
 	},
 };

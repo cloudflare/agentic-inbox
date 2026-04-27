@@ -12,7 +12,7 @@
  */
 
 import Database from "better-sqlite3";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -29,16 +29,20 @@ export interface TestDb {
 	close(): void;
 }
 
-const SCHEMA_PATH = resolve(__dirname, "../../migrations/0001_schema.sql");
+const MIGRATIONS_DIR = resolve(__dirname, "../../migrations");
 
 export function makeTestDb(): TestDb {
 	const raw = new Database(":memory:");
 	// Cloudflare D1 does NOT enforce foreign keys by default. Match that so
 	// tests exercise the same permissive behaviour production code relies on.
 	raw.pragma("foreign_keys = OFF");
-	const schema = readFileSync(SCHEMA_PATH, "utf-8");
-	// better-sqlite3's `exec` runs multiple statements; it is NOT child_process.
-	raw.exec(schema);
+	// Apply migrations in lexical order (0001, 0002, ...). better-sqlite3's
+	// `exec` runs multiple statements in a single SQL string.
+	const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
+	for (const f of files) {
+		const migrationSql = readFileSync(resolve(MIGRATIONS_DIR, f), "utf-8");
+		raw.exec(migrationSql);
+	}
 
 	const d1 = {
 		prepare(sql: string): PreparedLike {
@@ -72,8 +76,25 @@ export function makeTestDb(): TestDb {
 						},
 					};
 				},
-			};
+				// Expose boundObj for use in batch().
+				_getBoundObj() { return boundObj; },
+				_getStmt() { return stmt; },
+			} as PreparedLike & { _getBoundObj(): Record<string, unknown>; _getStmt(): ReturnType<Database.Database["prepare"]> };
 			return api;
+		},
+		async batch(statements: PreparedLike[]): Promise<{ results: unknown[] }[]> {
+			// Run all statements inside a single SQLite transaction to emulate
+			// D1's atomic batch semantics. Each statement returns a result object.
+			const results: { results: unknown[] }[] = [];
+			const txn = raw.transaction(() => {
+				for (const stmt of statements) {
+					const s = stmt as PreparedLike & { _getBoundObj(): Record<string, unknown>; _getStmt(): ReturnType<Database.Database["prepare"]> };
+					const info = s._getStmt().run(s._getBoundObj());
+					results.push({ results: [{ changes: info.changes, last_row_id: Number(info.lastInsertRowid) }] });
+				}
+			});
+			txn();
+			return results;
 		},
 	} as unknown as D1Database;
 
