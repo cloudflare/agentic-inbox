@@ -1,11 +1,11 @@
 <div align="center">
   <h1>PhishSOC</h1>
-  <p><em>A self-hosted email client with an AI agent, running entirely on Cloudflare Workers</em></p>
+  <p><em>A phishing-aware email SOC on Cloudflare Workers — full mailbox UI, AI triage agent, and a real-time SPF/DKIM/DMARC + URL/RDAP scoring pipeline.</em></p>
 </div>
 
-PhishSOC lets you send, receive, and manage emails through a modern web interface -- all powered by your own Cloudflare account. Incoming emails arrive via [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/), each mailbox is isolated in its own [Durable Object](https://developers.cloudflare.com/durable-objects/) with a SQLite database, and attachments are stored in [R2](https://developers.cloudflare.com/r2/).
+PhishSOC is a self-hosted phishing-detection layer wrapped around a complete Cloudflare-native email client. Mail arrives via [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/), each mailbox is isolated in its own [Durable Object](https://developers.cloudflare.com/durable-objects/) with a SQLite database, and attachments are stored in [R2](https://developers.cloudflare.com/r2/). When the security pipeline is enabled per mailbox, every inbound message is scored — SPF/DKIM/DMARC parse, URL/homograph heuristics, an LLM classifier, threat-intel feed matching, and an async deep-scan stage (redirect-chain resolution, RDAP domain age, attachment checks) — before it ever reaches the inbox.
 
-An **AI-powered Email Agent** can read your inbox, search conversations, and draft replies -- built with the [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) and [Workers AI](https://developers.cloudflare.com/workers-ai/).
+An **AI agent** runs alongside the inbox: it reads incoming mail, auto-drafts replies (always requiring explicit send-confirmation), and exposes 9 email tools — usable in-app or over [MCP](https://modelcontextprotocol.io/) so external clients like Claude Code or Cursor can act on any mailbox. Built with the [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) and [Workers AI](https://developers.cloudflare.com/workers-ai/).
 
 ![PhishSOC screenshot](./demo_app.png)
 
