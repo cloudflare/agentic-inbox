@@ -3,12 +3,6 @@ name: CodeQL
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "**/*.ts"
-      - "**/*.tsx"
-      - "**/*.js"
-      - "**/*.jsx"
-      - ".github/workflows/codeql.yml"
   push:
     branches: [main]
   schedule:

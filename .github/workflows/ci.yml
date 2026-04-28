@@ -3,18 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - "**/*.md"
-      - "LICENSE"
-      - "demo_app.png"
-      - ".github/dependabot.yml"
   push:
     branches: [main]
-    paths-ignore:
-      - "**/*.md"
-      - "LICENSE"
-      - "demo_app.png"
-      - ".github/dependabot.yml"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
