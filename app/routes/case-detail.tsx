@@ -12,9 +12,9 @@ import {
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import ScoreRing from "~/components/phishpilot/ScoreRing";
-import VerdictPill from "~/components/phishpilot/VerdictPill";
-import { statusLabel, statusTone } from "~/components/phishpilot/verdict";
+import ScoreRing from "~/components/phishsoc/ScoreRing";
+import VerdictPill from "~/components/phishsoc/VerdictPill";
+import { statusLabel, statusTone } from "~/components/phishsoc/verdict";
 
 interface CaseEmail { case_id: string; email_id: string; }
 interface CaseObservable { id: string; kind: string; value: string; }

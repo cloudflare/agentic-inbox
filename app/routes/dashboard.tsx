@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { CompassIcon } from "@phosphor-icons/react";
-import Sparkline from "~/components/phishpilot/Sparkline";
+import Sparkline from "~/components/phishsoc/Sparkline";
 
 const STUB_SPARK = [4, 6, 5, 8, 7, 9, 6, 11, 10, 14, 12, 9];
 

@@ -2,7 +2,7 @@
 @import "@cloudflare/kumo/styles/tailwind";
 @import "tailwindcss";
 
-/* PhishPilot theme — make `dark:` utilities track our [data-theme] attribute
+/* PhishSOC theme — make `dark:` utilities track our [data-theme] attribute
    so Kumo's own `dark:` rules work alongside our token system. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -43,7 +43,7 @@
 	--radius-xl: 20px;
 }
 
-/* PhishPilot tokens — light. Default theme is dark (set on <html>) but light
+/* PhishSOC tokens — light. Default theme is dark (set on <html>) but light
    tokens still need to exist for the toggle. */
 :root {
 	/* Hue is the primary tunable. 35 = Rust (default per stakeholder). */

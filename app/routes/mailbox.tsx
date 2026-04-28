@@ -8,7 +8,7 @@ import { Outlet, useParams } from "react-router";
 import { Folders } from "shared/folders";
 import AgentSidebar from "~/components/AgentSidebar";
 import ComposeEmail from "~/components/ComposeEmail";
-import Shell from "~/components/phishpilot/Shell";
+import Shell from "~/components/phishsoc/Shell";
 import { type MailboxEvent, useMailboxEvents } from "~/hooks/useMailboxEvents";
 import { useMailbox } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";

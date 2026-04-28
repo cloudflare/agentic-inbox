@@ -5,8 +5,8 @@
 import { CaretRightIcon, PlusIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
-import VerdictPill from "~/components/phishpilot/VerdictPill";
-import { statusLabel, statusTone } from "~/components/phishpilot/verdict";
+import VerdictPill from "~/components/phishsoc/VerdictPill";
+import { statusLabel, statusTone } from "~/components/phishsoc/verdict";
 
 interface CaseRow {
 	id: string;

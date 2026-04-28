@@ -96,7 +96,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 					rel="stylesheet"
 					href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;450;500;600&display=swap"
 				/>
-				<title>PhishPilot</title>
+				<title>PhishSOC</title>
 				<Meta />
 				<Links />
 				{/* Sync persisted theme from localStorage before hydration to avoid FOUC. */}

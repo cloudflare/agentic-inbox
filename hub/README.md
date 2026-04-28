@@ -1,6 +1,6 @@
 # AIS Hub
 
-A community threat-intel hub for the Agentic Inbox Security project. MISP-compatible (subset). Runs on Cloudflare Workers + D1 + Queues.
+A community threat-intel hub for the PhishSOC project. MISP-compatible (subset). Runs on Cloudflare Workers + D1 + Queues.
 
 ## Supported API surface
 

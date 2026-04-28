@@ -3,8 +3,8 @@ interface LogoProps {
 	showWordmark?: boolean;
 }
 
-// Compass-dial mark + "Phish/Pilot" wordmark. Mark uses ink for the dial and
-// accent for the indicator; wordmark splits Phish (ink) / Pilot (accent) per
+// Compass-dial mark + "Phish/SOC" wordmark. Mark uses ink for the dial and
+// accent for the indicator; wordmark splits Phish (ink) / SOC (accent) per
 // the brand guide.
 export default function Logo({ size = 22, showWordmark = true }: LogoProps) {
 	return (
@@ -30,7 +30,7 @@ export default function Logo({ size = 22, showWordmark = true }: LogoProps) {
 			{showWordmark && (
 				<span className="pp-serif text-[18px] leading-none">
 					<span className="text-ink">Phish</span>
-					<span className="text-accent">Pilot</span>
+					<span className="text-accent">SOC</span>
 				</span>
 			)}
 		</div>

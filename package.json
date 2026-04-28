@@ -1,10 +1,10 @@
 {
-	"name": "agentic-inbox",
+	"name": "phishsoc",
 	"private": true,
 	"license": "Apache-2.0",
 	"type": "module",
 	"cloudflare": {
-		"label": "Agentic Inbox",
+		"label": "PhishSOC",
 		"products": [
 			"Workers",
 			"Durable Objects",

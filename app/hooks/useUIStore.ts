@@ -25,7 +25,7 @@ export const ACCENT_PRESETS: Array<{ name: AccentName; hue: number }> = [
 	{ name: "Ink", hue: 260 },
 ];
 
-const STORAGE_KEY = "phishpilot-ui";
+const STORAGE_KEY = "phishsoc-ui";
 
 interface PersistedPrefs {
 	theme: Theme;
@@ -90,7 +90,7 @@ interface UIState {
 	openComposeModal: (options?: ComposeOptions) => void;
 	closeComposeModal: () => void;
 
-	// Theme + brand-hue (PhishPilot). SSR uses the safe defaults; the boot
+	// Theme + brand-hue (PhishSOC). SSR uses the safe defaults; the boot
 	// script in /theme-boot.js applies persisted prefs to <html> before
 	// hydration, and a top-level effect in root.tsx hydrates the store from
 	// localStorage after mount so toggles persist.

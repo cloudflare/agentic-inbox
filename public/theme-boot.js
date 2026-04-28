@@ -4,7 +4,7 @@
 // the SSR markup so visitors with empty storage stay consistent.
 (function () {
 	try {
-		var raw = localStorage.getItem("phishpilot-ui");
+		var raw = localStorage.getItem("phishsoc-ui");
 		var theme = "dark";
 		var hue = 35;
 		if (raw) {
