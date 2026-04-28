@@ -166,7 +166,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 		set({ theme });
 	},
 	toggleTheme: () => {
-		const theme = get().theme === "dark" ? "light" : "dark";
+		const theme: Theme = get().theme === "dark" ? "light" : "dark";
 		const next = { ...pickPrefs(get()), theme };
 		savePrefs(next);
 		set({ theme });

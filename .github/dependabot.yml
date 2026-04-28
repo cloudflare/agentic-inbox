@@ -1,0 +1,61 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+    groups:
+      tiptap:
+        patterns:
+          - "@tiptap/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router"
+          - "@react-router/*"
+      cloudflare:
+        patterns:
+          - "@cloudflare/*"
+          - "wrangler"
+          - "workers-ai-provider"
+      dev-dependencies:
+        dependency-type: development
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@cloudflare/*"
+          - "wrangler"
+          - "@types/react*"
+      production-dependencies:
+        dependency-type: production
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@tiptap/*"
+          - "@cloudflare/*"
+          - "react"
+          - "react-dom"
+          - "react-router"
+          - "@react-router/*"
+          - "workers-ai-provider"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - "*"
