@@ -29,6 +29,17 @@ const requestHandler = createRequestHandler(
 	import.meta.env.MODE,
 );
 
+function getAccessUrls(teamDomain: string) {
+	const certsPath = "/cdn-cgi/access/certs";
+	const teamUrl = new URL(teamDomain);
+	const issuer = teamUrl.origin;
+	const certsUrl = teamUrl.pathname.endsWith(certsPath)
+		? teamUrl
+		: new URL(certsPath, issuer);
+
+	return { issuer, certsUrl };
+}
+
 // Main app that wraps the API and adds React Router fallback
 const app = new Hono<{ Bindings: Env }>();
 
@@ -55,11 +66,10 @@ app.use("*", async (c, next) => {
 	}
 
 	try {
-		const JWKS = createRemoteJWKSet(
-			new URL(`${TEAM_DOMAIN}/cdn-cgi/access/certs`),
-		);
+		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
+		const JWKS = createRemoteJWKSet(certsUrl);
 		await jwtVerify(token, JWKS, {
-			issuer: TEAM_DOMAIN,
+			issuer,
 			audience: POLICY_AUD,
 		});
 	} catch {
