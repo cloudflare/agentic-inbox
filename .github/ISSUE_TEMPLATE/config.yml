@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/schmug/PhishSOC/security/advisories/new
+    about: Report security issues privately via GitHub Security Advisories — please do not open a public issue.
+  - name: Question / discussion
+    url: https://github.com/schmug/PhishSOC/discussions
+    about: For open-ended questions, ideas, or help requests.

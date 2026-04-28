@@ -1,0 +1,63 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly.
+title: "bug: <short summary>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill in what you can — partial reports are still useful.
+        For **security vulnerabilities**, do NOT use this form; use [private vulnerability reporting](https://github.com/schmug/PhishSOC/security/advisories) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you observe? What did you expect instead?
+      placeholder: |
+        I tried to X and saw Y. I expected Z.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimum sequence of steps to trigger the bug.
+      placeholder: |
+        1. Deploy with `npm run deploy`
+        2. Send an email matching ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Best guess — maintainers will adjust.
+      options:
+        - Low — cosmetic / minor inconvenience
+        - Medium — feature impaired but workaround exists
+        - High — feature broken, no workaround
+        - Critical — data loss, auth bypass, or service down
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit / version
+      description: Output of `git rev-parse HEAD` or the deployed Worker version tag.
+      placeholder: "e.g. 1c34ef8 or v0.3.1"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / errors
+      description: Worker logs, browser console output, or stack traces. Redact secrets.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those go to private reporting).
+          required: true

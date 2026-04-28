@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose a new capability or a meaningful change to existing behavior.
+title: "feat: <short summary>"
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user-facing or operational problem are you trying to solve?
+      placeholder: |
+        Today I have to X manually because ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should PhishSOC do? Sketch the UX, API, or pipeline change.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you weighed and why you'd pick this one.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Frontend (app/)
+        - Worker / API (workers/)
+        - Hub federation (hub/)
+        - Detection pipeline (SPF/DKIM/DMARC, URL, RDAP, LLM)
+        - AI agent / chat
+        - Deploy / wrangler config
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true

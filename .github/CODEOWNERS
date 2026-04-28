@@ -1,0 +1,4 @@
+# CODEOWNERS - auto-requests review on touched paths.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+* @schmug
