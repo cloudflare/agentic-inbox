@@ -7,6 +7,7 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import path from "node:path";
 
 export default defineConfig({
   plugins: [
@@ -15,4 +16,11 @@ export default defineConfig({
     reactRouter(),
     tsconfigPaths(),
   ],
+  server: {
+    fs: {
+      // When running inside a git worktree, node_modules resolves to the parent
+      // checkout. Allow Vite to serve files from the repo root one level up.
+      allow: [path.resolve(__dirname, "..", "..", "..")],
+    },
+  },
 });

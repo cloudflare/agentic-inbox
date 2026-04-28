@@ -14,6 +14,54 @@ export interface ComposeOptions {
 	draftEmail?: Email | null;
 }
 
+export type Theme = "light" | "dark";
+export type AccentName = "Rust" | "Sage" | "Slate" | "Plum" | "Ink";
+
+export const ACCENT_PRESETS: Array<{ name: AccentName; hue: number }> = [
+	{ name: "Rust", hue: 35 },
+	{ name: "Sage", hue: 145 },
+	{ name: "Slate", hue: 230 },
+	{ name: "Plum", hue: 320 },
+	{ name: "Ink", hue: 260 },
+];
+
+const STORAGE_KEY = "phishpilot-ui";
+
+interface PersistedPrefs {
+	theme: Theme;
+	hue: number;
+	accentName: AccentName;
+}
+
+function loadPrefs(): PersistedPrefs {
+	if (typeof window === "undefined") {
+		return { theme: "dark", hue: 35, accentName: "Rust" };
+	}
+	try {
+		const raw = localStorage.getItem(STORAGE_KEY);
+		if (raw) {
+			const parsed = JSON.parse(raw) as Partial<PersistedPrefs>;
+			return {
+				theme: parsed.theme === "light" ? "light" : "dark",
+				hue: typeof parsed.hue === "number" ? parsed.hue : 35,
+				accentName: (parsed.accentName as AccentName) ?? "Rust",
+			};
+		}
+	} catch {
+		/* ignore */
+	}
+	return { theme: "dark", hue: 35, accentName: "Rust" };
+}
+
+function savePrefs(prefs: PersistedPrefs) {
+	if (typeof window === "undefined") return;
+	try {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+	} catch {
+		/* ignore quota / private mode */
+	}
+}
+
 interface UIState {
 	// Side panel state
 	selectedEmailId: string | null;
@@ -41,6 +89,18 @@ interface UIState {
 	isComposeModalOpen: boolean;
 	openComposeModal: (options?: ComposeOptions) => void;
 	closeComposeModal: () => void;
+
+	// Theme + brand-hue (PhishPilot). SSR uses the safe defaults; the boot
+	// script in /theme-boot.js applies persisted prefs to <html> before
+	// hydration, and a top-level effect in root.tsx hydrates the store from
+	// localStorage after mount so toggles persist.
+	theme: Theme;
+	hue: number;
+	accentName: AccentName;
+	setTheme: (theme: Theme) => void;
+	toggleTheme: () => void;
+	setAccent: (name: AccentName) => void;
+	hydratePrefsFromStorage: () => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -51,6 +111,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 	isComposeModalOpen: false,
 	isSidebarOpen: false,
 	isAgentPanelOpen: true,
+
+	theme: "dark",
+	hue: 35,
+	accentName: "Rust",
 
 	selectEmail: (id) => set({ selectedEmailId: id, isComposing: false }),
 
@@ -95,4 +159,30 @@ export const useUIStore = create<UIState>((set, get) => ({
 			isComposeModalOpen: false,
 			composeOptions: { mode: "new", originalEmail: null },
 		}),
+
+	setTheme: (theme) => {
+		const next = { ...pickPrefs(get()), theme };
+		savePrefs(next);
+		set({ theme });
+	},
+	toggleTheme: () => {
+		const theme = get().theme === "dark" ? "light" : "dark";
+		const next = { ...pickPrefs(get()), theme };
+		savePrefs(next);
+		set({ theme });
+	},
+	setAccent: (name) => {
+		const preset = ACCENT_PRESETS.find((p) => p.name === name) ?? ACCENT_PRESETS[0];
+		const next = { ...pickPrefs(get()), accentName: preset.name, hue: preset.hue };
+		savePrefs(next);
+		set({ accentName: preset.name, hue: preset.hue });
+	},
+	hydratePrefsFromStorage: () => {
+		const prefs = loadPrefs();
+		set(prefs);
+	},
 }));
+
+function pickPrefs(s: UIState): PersistedPrefs {
+	return { theme: s.theme, hue: s.hue, accentName: s.accentName };
+}

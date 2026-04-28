@@ -23,6 +23,8 @@ import {
 	ScrollRestoration,
 } from "react-router";
 import { ApiError } from "~/services/api";
+import { useUIStore } from "~/hooks/useUIStore";
+import { useEffect } from "react";
 import "./index.css";
 
 function makeQueryClient() {
@@ -77,7 +79,7 @@ const KumoLink = forwardRef<
 
 export function Layout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en">
+		<html lang="en" data-theme="dark" style={{ ["--hue" as string]: "35" }}>
 			<head>
 				<meta charSet="UTF-8" />
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -88,17 +90,44 @@ export function Layout({ children }: { children: React.ReactNode }) {
 					sizes="48x48 32x32 16x16"
 				/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-				<title>Agentic Inbox</title>
+				<link rel="preconnect" href="https://fonts.googleapis.com" />
+				<link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+				<link
+					rel="stylesheet"
+					href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;450;500;600&display=swap"
+				/>
+				<title>PhishPilot</title>
 				<Meta />
 				<Links />
+				{/* Sync persisted theme from localStorage before hydration to avoid FOUC. */}
+				<script src="/theme-boot.js" />
 			</head>
-			<body className="bg-kumo-recessed text-kumo-default antialiased">
+			<body className="bg-paper text-ink antialiased">
+				<ThemeBridge />
 				{children}
 				<ScrollRestoration />
 				<Scripts />
 			</body>
 		</html>
 	);
+}
+
+// Hydrates the Zustand store from localStorage on mount and mirrors theme/hue
+// changes back to <html>. The boot script handles first paint; this keeps the
+// DOM in sync once the user toggles theme or hue at runtime.
+function ThemeBridge() {
+	const theme = useUIStore((s) => s.theme);
+	const hue = useUIStore((s) => s.hue);
+	const hydratePrefs = useUIStore((s) => s.hydratePrefsFromStorage);
+	useEffect(() => {
+		hydratePrefs();
+	}, [hydratePrefs]);
+	useEffect(() => {
+		if (typeof document === "undefined") return;
+		document.documentElement.setAttribute("data-theme", theme);
+		document.documentElement.style.setProperty("--hue", String(hue));
+	}, [theme, hue]);
+	return null;
 }
 
 export function HydrateFallback() {

@@ -8,8 +8,7 @@ import { Outlet, useParams } from "react-router";
 import { Folders } from "shared/folders";
 import AgentSidebar from "~/components/AgentSidebar";
 import ComposeEmail from "~/components/ComposeEmail";
-import Header from "~/components/Header";
-import Sidebar from "~/components/Sidebar";
+import Shell from "~/components/phishpilot/Shell";
 import { type MailboxEvent, useMailboxEvents } from "~/hooks/useMailboxEvents";
 import { useMailbox } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
@@ -21,13 +20,7 @@ export default function MailboxRoute() {
 	useMailbox(mailboxId);
 	const prevMailboxIdRef = useRef<string | undefined>(undefined);
 	const queryClient = useQueryClient();
-	const {
-		isSidebarOpen,
-		closeSidebar,
-		isAgentPanelOpen,
-		closePanel,
-		closeComposeModal,
-	} = useUIStore();
+	const { closeSidebar, isAgentPanelOpen, closePanel, closeComposeModal } = useUIStore();
 
 	const handleMailboxEvent = useCallback(
 		(event: MailboxEvent) => {
@@ -71,44 +64,21 @@ export default function MailboxRoute() {
 	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
 
 	return (
-		<div className="flex h-screen overflow-hidden">
-			{/* Mobile sidebar overlay backdrop */}
-			{isSidebarOpen && (
-				<div
-					className="fixed inset-0 z-30 bg-black/30 md:hidden"
-					onClick={closeSidebar}
-					onKeyDown={(e) => e.key === "Escape" && closeSidebar()}
-					role="button"
-					tabIndex={-1}
-					aria-label="Close sidebar"
-				/>
-			)}
+		<>
+			<Shell>
+				<Outlet />
+			</Shell>
 
-			{/* Sidebar: hidden on mobile by default, shown as overlay when open */}
-			<div
-				className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-0 ${
-					isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-				}`}
-			>
-				<Sidebar />
-			</div>
-
-			{/* Main content */}
-			<div className="flex-1 flex flex-col min-w-0 bg-kumo-base">
-				<Header />
-				<main className="flex-1 overflow-hidden">
-					<Outlet />
-				</main>
-			</div>
-
-			{/* Agent + MCP sidebar -- togglable on desktop */}
+			{/* Agent + MCP sidebar -- togglable on desktop. Rendered as a fixed
+			    overlay so it composes with the new Shell layout without forcing
+			    Shell to know about it. */}
 			{isAgentPanelOpen && (
-				<div className="hidden lg:flex w-[380px] shrink-0 border-l border-kumo-line flex-col bg-kumo-base overflow-hidden">
+				<div className="hidden lg:flex fixed top-0 right-0 bottom-0 w-[380px] z-20 border-l border-line flex-col bg-paper overflow-hidden">
 					<AgentSidebar />
 				</div>
 			)}
 
 			<ComposeEmail />
-		</div>
+		</>
 	);
 }

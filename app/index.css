@@ -2,26 +2,186 @@
 @import "@cloudflare/kumo/styles/tailwind";
 @import "tailwindcss";
 
-body {
-  margin: 0;
+/* PhishPilot theme — make `dark:` utilities track our [data-theme] attribute
+   so Kumo's own `dark:` rules work alongside our token system. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Tailwind v4 theme: expose tokens as utilities (bg-paper, text-ink, etc.).
+   Per-mode values live in :root / [data-theme="dark"] below — Tailwind reads
+   the CSS variable, so a single utility resolves correctly in both modes. */
+@theme {
+	--color-paper: var(--paper);
+	--color-paper-2: var(--paper-2);
+	--color-paper-3: var(--paper-3);
+	--color-line: var(--line);
+	--color-line-strong: var(--line-strong);
+	--color-ink: var(--ink);
+	--color-ink-2: var(--ink-2);
+	--color-ink-3: var(--ink-3);
+	--color-ink-4: var(--ink-4);
+	--color-accent: var(--accent);
+	--color-accent-2: var(--accent-2);
+	--color-accent-tint: var(--accent-tint);
+	--color-accent-ink: var(--accent-ink);
+	--color-safe: var(--safe);
+	--color-safe-tint: var(--safe-tint);
+	--color-suspect: var(--suspect);
+	--color-suspect-tint: var(--suspect-tint);
+	--color-danger: var(--danger);
+	--color-danger-tint: var(--danger-tint);
+	--color-info: var(--info);
+	--color-info-tint: var(--info-tint);
+
+	--font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+	--font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+	--font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--radius-xs: 4px;
+	--radius-sm: 6px;
+	--radius-md: 9px;
+	--radius-lg: 14px;
+	--radius-xl: 20px;
 }
+
+/* PhishPilot tokens — light. Default theme is dark (set on <html>) but light
+   tokens still need to exist for the toggle. */
+:root {
+	/* Hue is the primary tunable. 35 = Rust (default per stakeholder). */
+	--hue: 35;
+
+	--paper: oklch(97.2% 0.012 85);
+	--paper-2: oklch(94.5% 0.014 85);
+	--paper-3: oklch(91.5% 0.016 85);
+	--line: oklch(86% 0.014 85);
+	--line-strong: oklch(78% 0.018 85);
+	--ink: oklch(22% 0.018 85);
+	--ink-2: oklch(36% 0.012 85);
+	--ink-3: oklch(52% 0.010 85);
+	--ink-4: oklch(64% 0.008 85);
+
+	--accent: oklch(42% 0.09 var(--hue));
+	--accent-2: oklch(52% 0.10 var(--hue));
+	--accent-tint: oklch(92% 0.04 var(--hue));
+	--accent-ink: oklch(28% 0.06 var(--hue));
+
+	--safe: oklch(48% 0.09 145);
+	--safe-tint: oklch(93% 0.035 145);
+	--suspect: oklch(58% 0.13 65);
+	--suspect-tint: oklch(94% 0.045 75);
+	--danger: oklch(48% 0.15 25);
+	--danger-tint: oklch(93% 0.05 25);
+	--info: oklch(48% 0.07 240);
+	--info-tint: oklch(93% 0.025 240);
+
+	--shadow-1: 0 1px 0 oklch(100% 0 0 / 0.4) inset, 0 1px 2px oklch(0% 0 0 / 0.04);
+	--shadow-2: 0 1px 0 oklch(100% 0 0 / 0.4) inset, 0 4px 12px oklch(0% 0 0 / 0.06);
+	--shadow-pop: 0 1px 0 oklch(100% 0 0 / 0.4) inset, 0 12px 40px oklch(0% 0 0 / 0.12);
+
+	color-scheme: light;
+}
+
+[data-theme="dark"] {
+	--paper: oklch(18% 0.008 85);
+	--paper-2: oklch(22% 0.010 85);
+	--paper-3: oklch(26% 0.012 85);
+	--line: oklch(31% 0.014 85);
+	--line-strong: oklch(38% 0.014 85);
+	--ink: oklch(94% 0.006 85);
+	--ink-2: oklch(78% 0.008 85);
+	--ink-3: oklch(62% 0.008 85);
+	--ink-4: oklch(50% 0.008 85);
+
+	--accent: oklch(72% 0.10 var(--hue));
+	--accent-2: oklch(80% 0.10 var(--hue));
+	--accent-tint: oklch(28% 0.05 var(--hue));
+	--accent-ink: oklch(86% 0.08 var(--hue));
+
+	--safe: oklch(70% 0.11 145);
+	--safe-tint: oklch(28% 0.04 145);
+	--suspect: oklch(75% 0.13 75);
+	--suspect-tint: oklch(30% 0.05 75);
+	--danger: oklch(68% 0.16 25);
+	--danger-tint: oklch(30% 0.06 25);
+	--info: oklch(72% 0.10 240);
+	--info-tint: oklch(28% 0.04 240);
+
+	--shadow-1: 0 1px 0 oklch(100% 0 0 / 0.04) inset, 0 1px 2px oklch(0% 0 0 / 0.3);
+	--shadow-2: 0 1px 0 oklch(100% 0 0 / 0.04) inset, 0 4px 14px oklch(0% 0 0 / 0.4);
+	--shadow-pop: 0 1px 0 oklch(100% 0 0 / 0.04) inset, 0 14px 50px oklch(0% 0 0 / 0.5);
+
+	color-scheme: dark;
+}
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--font-sans);
+	font-feature-settings: "cv11", "ss01";
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+	background: var(--line);
+	border-radius: 8px;
+	border: 2px solid var(--paper);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--line-strong); }
+
+/* Verdict pills — referenced from VerdictPill primitive. */
+.pp-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+	border: 0.5px solid transparent;
+}
+.pp-pill-safe    { color: var(--safe);    background: var(--safe-tint);    border-color: color-mix(in oklch, var(--safe) 20%, transparent); }
+.pp-pill-suspect { color: var(--suspect); background: var(--suspect-tint); border-color: color-mix(in oklch, var(--suspect) 22%, transparent); }
+.pp-pill-danger  { color: var(--danger);  background: var(--danger-tint);  border-color: color-mix(in oklch, var(--danger) 22%, transparent); }
+.pp-pill-info    { color: var(--info);    background: var(--info-tint);    border-color: color-mix(in oklch, var(--info) 22%, transparent); }
+.pp-pill-muted   { color: var(--ink-3);   background: var(--paper-3);      border-color: var(--line); }
+.pp-pill-accent  { color: var(--accent);  background: var(--accent-tint);  border-color: color-mix(in oklch, var(--accent) 25%, transparent); }
+
+.pp-card {
+	background: var(--paper);
+	border: 0.5px solid var(--line);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-1);
+}
+
+.pp-mono { font-family: var(--font-mono); font-feature-settings: "zero", "ss01"; }
+.pp-serif { font-family: var(--font-serif); }
+.pp-tabular { font-variant-numeric: tabular-nums; }
+
+@keyframes pp-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.4; }
+}
+.pp-pulse { animation: pp-pulse 1.6s ease-in-out infinite; }
 
 /* TipTap list styles */
 .ProseMirror ul {
-  list-style-type: disc;
-  padding-left: 1.5em;
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
+	list-style-type: disc;
+	padding-left: 1.5em;
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
 }
 
 .ProseMirror ol {
-  list-style-type: decimal;
-  padding-left: 1.5em;
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
+	list-style-type: decimal;
+	padding-left: 1.5em;
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
 }
 
 .ProseMirror li {
-  margin-top: 0.25em;
-  margin-bottom: 0.25em;
+	margin-top: 0.25em;
+	margin-bottom: 0.25em;
 }
