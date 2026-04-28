@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/cloudflare-agentic-inbox-badge.png)](https://mseep.ai/app/cloudflare-agentic-inbox)
+
 <div align="center">
   <h1>Agentic Inbox</h1>
   <p><em>A self-hosted email client with an AI agent, running entirely on Cloudflare Workers</em></p>
