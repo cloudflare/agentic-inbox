@@ -14,7 +14,7 @@
 		{
 			"binding": "DB",
 			"database_name": "ais-hub",
-			"database_id": "REPLACE_WITH_D1_DATABASE_ID",
+			"database_id": "3ebfd62e-1f0a-4310-a2d8-452bb2c6edc4",
 			"migrations_dir": "./migrations"
 		}
 	],
@@ -36,6 +36,16 @@
 	"triggers": {
 		"crons": [
 			"*/5 * * * *"
+		]
+	},
+	"unsafe": {
+		"bindings": [
+			{
+				"name": "RL_ACCEPT",
+				"type": "ratelimit",
+				"namespace_id": "1001",
+				"simple": { "limit": 10, "period": 60 }
+			}
 		]
 	}
 }

@@ -27,6 +27,10 @@ const AcceptSchema = z.object({
 });
 
 orgAcceptApp.post("/accept", async (c) => {
+	const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+	const { success } = await c.env.RL_ACCEPT.limit({ key: ip });
+	if (!success) return c.json({ error: "rate_limited" }, 429);
+
 	const parsed = AcceptSchema.safeParse(await c.req.json().catch(() => null));
 	if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400);
 	const { token, name, contact } = parsed.data;

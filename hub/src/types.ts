@@ -7,6 +7,7 @@ export interface Env {
 	AI: Ai;
 	TRIAGE_QUEUE: Queue<TriageMessage>;
 	HUB_ADMIN_KEY: string;
+	RL_ACCEPT: RateLimit;
 }
 
 export interface TriageMessage {

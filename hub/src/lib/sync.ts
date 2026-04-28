@@ -146,7 +146,8 @@ async function fetchPage(
 	};
 	if (since) body.timestamp = since; // >= semantics on the upstream side
 
-	const res = await fetch(`${peer.base_url.replace(/\/$/, "")}/events/restSearch`, {
+	const url = `${peer.base_url.replace(/\/$/, "")}/events/restSearch`;
+	const res = await fetch(url, {
 		method: "POST",
 		headers: {
 			"Authorization": apiKey,
@@ -155,9 +156,17 @@ async function fetchPage(
 		},
 		body: JSON.stringify(body),
 		signal: AbortSignal.timeout(15_000),
-	}).catch(() => null);
+	}).catch((err) => {
+		console.warn(`sync fetch threw: ${(err as Error).message}`);
+		return null;
+	});
 
-	if (!res || !res.ok) return null;
+	if (!res) return null;
+	if (!res.ok) {
+		const snippet = await res.text().then((t) => t.slice(0, 400)).catch(() => "<read failed>");
+		console.warn(`sync fetch ${url} -> ${res.status} ${res.statusText} | body: ${snippet}`);
+		return null;
+	}
 	const json = (await res.json().catch(() => null)) as { response?: UpstreamEvent[] } | UpstreamEvent[] | null;
 	if (Array.isArray(json)) return json;
 	return json?.response ?? [];
