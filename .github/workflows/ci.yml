@@ -34,3 +34,33 @@ jobs:
 
       - name: Test
         run: npm test
+
+  hub-verify:
+    name: Typecheck & Test (hub)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hub/package-lock.json
+
+      # `npm install` (not `npm ci`) because hub's lockfile carries
+      # platform-specific optional deps that drift between macOS and
+      # Linux runners. Goal here is "hub's code typechecks and tests
+      # pass," not byte-exact dep reproducibility — root CI is what
+      # gates the deployable artifact.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
