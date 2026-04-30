@@ -63,17 +63,17 @@ export default function AgentPanelSlot({ rightPanel }: AgentPanelSlotProps) {
 					aria-modal="true"
 					className="fixed inset-y-0 right-0 z-50 flex w-[min(420px,90vw)] flex-col border-l border-line bg-paper shadow-xl outline-none transition-transform data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full"
 				>
-					<div className="flex items-center justify-between border-b border-line px-3 py-2">
-						<span className="text-[11px] uppercase tracking-[0.08em] text-ink-3">
-							Co-pilot
-						</span>
-						<BaseDialog.Close
-							aria-label="Close agent panel"
-							className="flex h-7 w-7 items-center justify-center rounded-md text-ink-3 hover:bg-paper-2 hover:text-ink transition-colors bg-transparent border-0 cursor-pointer"
-						>
-							<XIcon size={14} weight="bold" />
-						</BaseDialog.Close>
-					</div>
+					{/* Floating close button rather than a header bar — AgentSidebar
+					    already renders its own Agent/MCP tab bar at the top, and a
+					    second header would stack visually. The button sits over the
+					    tab row at the right edge so it's reachable without crowding
+					    the tabs. */}
+					<BaseDialog.Close
+						aria-label="Close agent panel"
+						className="absolute top-1.5 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-md text-ink-3 hover:bg-paper-2 hover:text-ink transition-colors bg-transparent border-0 cursor-pointer"
+					>
+						<XIcon size={14} weight="bold" />
+					</BaseDialog.Close>
 					<div className="flex-1 min-h-0 overflow-hidden">{rightPanel}</div>
 				</BaseDialog.Popup>
 			</BaseDialog.Portal>
