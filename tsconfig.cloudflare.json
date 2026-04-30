@@ -7,6 +7,7 @@
     "app/**/.client/**/*",
     "workers/**/*",
     "shared/**/*",
+    "tests/frontend/**/*",
     "worker-configuration.d.ts"
   ],
   "compilerOptions": {
