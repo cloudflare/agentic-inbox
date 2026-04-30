@@ -110,7 +110,7 @@ function KpiGrid({ data }: { data: DashboardSummary }) {
 	];
 
 	return (
-		<div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+		<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
 			{kpis.map((k) => (
 				<div key={k.label} className="pp-card p-4">
 					<div className="text-[10.5px] uppercase tracking-[0.06em] text-ink-3 mb-2">
@@ -137,7 +137,7 @@ function ThreatPressureCard({ values }: { values: number[] }) {
 					{total} actioned
 				</div>
 			</div>
-			<Sparkline values={values} width={480} height={56} />
+			<Sparkline values={values} height={56} />
 			<p className="text-[11.5px] text-ink-3">
 				Per-2-hour count of emails the pipeline tagged, quarantined, or blocked.
 			</p>

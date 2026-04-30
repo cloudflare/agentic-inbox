@@ -1,25 +1,30 @@
 interface SparklineProps {
 	values: number[];
-	width?: number;
 	height?: number;
 	color?: string;
 }
+
+// Fixed virtual width — the SVG stretches to fill its container via
+// `preserveAspectRatio="none"`, so callers don't pass a pixel width. This is
+// what lets the chart reflow cleanly between a 320px phone and a 1280px
+// dashboard pane without overflow or hard-coded magic numbers.
+const VIRTUAL_WIDTH = 100;
 
 // Inline SVG line chart. Tiny by design — no axes, no labels, just shape.
 // Color defaults to the accent CSS var so it reflows with hue presets.
 export default function Sparkline({
 	values,
-	width = 96,
 	height = 24,
 	color = "var(--accent)",
 }: SparklineProps) {
 	if (values.length === 0) {
-		return <div style={{ width, height }} />;
+		return <div style={{ width: "100%", height }} />;
 	}
 	const min = Math.min(...values);
 	const max = Math.max(...values);
 	const range = max - min || 1;
-	const step = values.length > 1 ? width / (values.length - 1) : width;
+	const step =
+		values.length > 1 ? VIRTUAL_WIDTH / (values.length - 1) : VIRTUAL_WIDTH;
 	const points = values
 		.map((v, i) => {
 			const x = i * step;
@@ -29,9 +34,10 @@ export default function Sparkline({
 		.join(" ");
 	return (
 		<svg
-			width={width}
+			width="100%"
 			height={height}
-			viewBox={`0 0 ${width} ${height}`}
+			viewBox={`0 0 ${VIRTUAL_WIDTH} ${height}`}
+			preserveAspectRatio="none"
 			className="overflow-visible"
 			aria-hidden
 		>
@@ -42,6 +48,7 @@ export default function Sparkline({
 				strokeWidth={1.5}
 				strokeLinecap="round"
 				strokeLinejoin="round"
+				vectorEffect="non-scaling-stroke"
 			/>
 		</svg>
 	);

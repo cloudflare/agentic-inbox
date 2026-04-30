@@ -5,14 +5,16 @@ import {
 	GaugeIcon,
 	GearSixIcon,
 	GraphIcon,
+	ListIcon,
 	MagnifyingGlassIcon,
 	MoonIcon,
 	SparkleIcon,
 	SunIcon,
 	TrayIcon,
+	XIcon,
 } from "@phosphor-icons/react";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { NavLink, useNavigate, useParams } from "react-router";
+import { NavLink, useLocation, useNavigate, useParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useDashboardSummary } from "~/queries/dashboard";
 import { useMailbox, useMailboxes } from "~/queries/mailboxes";
@@ -96,23 +98,164 @@ function NavItem({ to, icon, label, count, end }: NavItemProps) {
 
 function SectionLabel({ children }: { children: ReactNode }) {
 	return (
-		<div className="px-3 pt-4 pb-1.5 text-[10.5px] uppercase tracking-[0.08em] text-ink-4">
+		<div className="px-3 pt-4 pb-1.5 text-[10.5px] uppercase tracking-[0.08em] text-ink-3">
 			{children}
 		</div>
+	);
+}
+
+interface NavContentsProps {
+	mailboxId: string | undefined;
+	mailbox: { name?: string | null; email?: string | null } | undefined;
+	mailboxCount: number;
+	pipelineState: PipelineState;
+	theme: "light" | "dark";
+	onToggleTheme: () => void;
+	onSwitchOrg: () => void;
+	onPipelineClick: () => void;
+}
+
+// Shared sidebar contents — rendered inline on `md+` and inside the mobile
+// drawer on `<md`. Keeping a single source of truth here means the next
+// nav-item addition only has to touch one place.
+function NavContents({
+	mailboxId,
+	mailbox,
+	mailboxCount,
+	pipelineState,
+	theme,
+	onToggleTheme,
+	onSwitchOrg,
+	onPipelineClick,
+}: NavContentsProps) {
+	const orgDomain = mailbox?.email?.split("@")[1] ?? "—";
+	const orgInitial = (mailbox?.name || mailbox?.email || "?")[0]?.toUpperCase();
+	const base = mailboxId ? `/mailbox/${encodeURIComponent(mailboxId)}` : "";
+
+	return (
+		<>
+			<div className="px-4 pt-4 pb-3">
+				<Logo />
+			</div>
+
+			{/* Org switcher card — clicking it would open a tenant switcher;
+			    in POC it just routes to the home picker. */}
+			<button
+				type="button"
+				onClick={onSwitchOrg}
+				className="mx-3 flex items-center gap-2.5 rounded-md border border-line bg-paper px-2.5 py-2 text-left hover:border-line-strong transition-colors"
+			>
+				<span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-tint text-accent-ink pp-serif text-[15px]">
+					{orgInitial}
+				</span>
+				<span className="flex-1 min-w-0">
+					<span className="block truncate text-[12.5px] font-medium text-ink">
+						{mailbox?.name || "Select mailbox"}
+					</span>
+					<span className="block truncate text-[10.5px] text-ink-3">
+						{orgDomain} · {mailboxCount} mailbox{mailboxCount === 1 ? "" : "es"}
+					</span>
+				</span>
+				<CaretRightIcon size={12} className="text-ink-3 shrink-0" />
+			</button>
+
+			<nav className="mt-3 px-3 flex-1 overflow-y-auto">
+				{mailboxId ? (
+					<>
+						<NavItem
+							to={`${base}/dashboard`}
+							icon={<GaugeIcon size={16} />}
+							label="Dashboard"
+						/>
+						<NavItem
+							to={`${base}/cases`}
+							icon={<BriefcaseIcon size={16} />}
+							label="Cases"
+						/>
+						<NavItem
+							to={`${base}/emails/inbox`}
+							icon={<TrayIcon size={16} />}
+							label="Mail review"
+						/>
+						<NavItem
+							to={`${base}/hub`}
+							icon={<GraphIcon size={16} />}
+							label="Threat-intel hub"
+						/>
+						<SectionLabel>System</SectionLabel>
+						<NavItem
+							to={`${base}/settings`}
+							icon={<GearSixIcon size={16} />}
+							label="Settings"
+						/>
+					</>
+				) : (
+					<div className="px-3 py-2 text-[12px] text-ink-3">
+						Pick a mailbox to begin.
+					</div>
+				)}
+			</nav>
+
+			{/* Pipeline status pill. State derives from the dashboard summary's
+			    `pipelineSuccess` (#86). Real p50/p95 latency is tracked in #71
+			    and isn't surfaced here yet — the previous static "p50 —"
+			    placeholder was misleading and has been removed. */}
+			{mailboxId && (
+				<button
+					type="button"
+					role="status"
+					aria-live="polite"
+					aria-label={`Pipeline status: ${pipelineState.label}`}
+					onClick={onPipelineClick}
+					className="mx-3 mb-3 flex items-center gap-2 rounded-md border border-line bg-paper px-2.5 py-1.5 text-left hover:border-line-strong transition-colors"
+				>
+					<span className="relative flex h-2 w-2">
+						{pipelineState.pulse && (
+							<span
+								aria-hidden
+								className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${PIPELINE_DOT_BG[pipelineState.tone]}`}
+							/>
+						)}
+						<span
+							aria-hidden
+							className={`relative inline-flex h-2 w-2 rounded-full ${PIPELINE_DOT_BG[pipelineState.tone]}`}
+						/>
+					</span>
+					<span className="text-[11px] text-ink-2">
+						{pipelineState.label}
+					</span>
+				</button>
+			)}
+
+			<div className="border-t border-line px-3 py-2.5 flex items-center gap-2">
+				<div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-tint text-accent-ink text-[11px] font-medium">
+					SA
+				</div>
+				<div className="flex-1 min-w-0">
+					<div className="text-[12px] text-ink truncate">SOC analyst</div>
+					<div className="text-[10.5px] text-ink-3 truncate">Preview</div>
+				</div>
+				<button
+					type="button"
+					onClick={onToggleTheme}
+					className="flex h-7 w-7 items-center justify-center rounded-md text-ink-3 hover:bg-paper-3 hover:text-ink transition-colors"
+					aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+				>
+					{theme === "dark" ? <SunIcon size={14} /> : <MoonIcon size={14} />}
+				</button>
+			</div>
+		</>
 	);
 }
 
 export default function Shell({ children }: { children: ReactNode }) {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
 	const navigate = useNavigate();
-	const { theme, toggleTheme } = useUIStore();
+	const location = useLocation();
+	const { theme, toggleTheme, isSidebarOpen, openSidebar, closeSidebar } = useUIStore();
 	const { data: mailbox } = useMailbox(mailboxId);
 	const { data: mailboxes } = useMailboxes();
 	const mailboxCount = mailboxes?.length ?? 0;
-	const orgDomain = mailbox?.email?.split("@")[1] ?? "—";
-	const orgInitial = (mailbox?.name || mailbox?.email || "?")[0]?.toUpperCase();
-
-	const base = mailboxId ? `/mailbox/${encodeURIComponent(mailboxId)}` : "";
 
 	const { data: dashboardSummary } = useDashboardSummary(mailboxId);
 	const pipelineState = computePipelineState(dashboardSummary?.pipelineSuccess);
@@ -121,17 +264,31 @@ export default function Shell({ children }: { children: ReactNode }) {
 	const [searchQuery, setSearchQuery] = useState("");
 
 	useEffect(() => {
-		// Cmd/Ctrl+K from anywhere focuses the search input.
+		// Cmd/Ctrl+K from anywhere focuses the search input. Escape closes the
+		// mobile drawer if it's open.
 		const onKey = (e: KeyboardEvent) => {
 			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
 				e.preventDefault();
 				searchInputRef.current?.focus();
 				searchInputRef.current?.select();
+				return;
+			}
+			if (e.key === "Escape" && useUIStore.getState().isSidebarOpen) {
+				e.preventDefault();
+				useUIStore.getState().closeSidebar();
 			}
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 	}, []);
+
+	// Close the mobile drawer whenever the route changes. The mailbox-switch
+	// effect in routes/mailbox.tsx covers cross-mailbox navigation; this covers
+	// in-mailbox nav (Dashboard ↔ Cases etc.), so individual NavItem onClicks
+	// don't have to remember to dismiss.
+	useEffect(() => {
+		closeSidebar();
+	}, [location.pathname, closeSidebar]);
 
 	const handleSearchSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -142,125 +299,75 @@ export default function Shell({ children }: { children: ReactNode }) {
 		);
 	};
 
+	const navContents = (
+		<NavContents
+			mailboxId={mailboxId}
+			mailbox={mailbox}
+			mailboxCount={mailboxCount}
+			pipelineState={pipelineState}
+			theme={theme}
+			onToggleTheme={toggleTheme}
+			onSwitchOrg={() => {
+				closeSidebar();
+				navigate("/");
+			}}
+			onPipelineClick={() => {
+				if (!mailboxId) return;
+				closeSidebar();
+				navigate(`/mailbox/${encodeURIComponent(mailboxId)}/dashboard`);
+			}}
+		/>
+	);
+
 	return (
 		<div className="flex h-screen overflow-hidden bg-paper text-ink">
-			{/* Sidebar — 232px on desktop, hidden on mobile (mobile collapse not in scope for POC). */}
+			{/* Sidebar — 232px on desktop. On `<md` the same contents are surfaced
+			    via the hamburger drawer below. */}
 			<aside className="hidden md:flex w-[232px] shrink-0 flex-col bg-paper-2 border-r border-line">
-				<div className="px-4 pt-4 pb-3">
-					<Logo />
-				</div>
-
-				{/* Org switcher card — clicking it would open a tenant switcher;
-				    in POC it just routes to the home picker. */}
-				<button
-					type="button"
-					onClick={() => navigate("/")}
-					className="mx-3 flex items-center gap-2.5 rounded-md border border-line bg-paper px-2.5 py-2 text-left hover:border-line-strong transition-colors"
-				>
-					<span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-tint text-accent-ink pp-serif text-[15px]">
-						{orgInitial}
-					</span>
-					<span className="flex-1 min-w-0">
-						<span className="block truncate text-[12.5px] font-medium text-ink">
-							{mailbox?.name || "Select mailbox"}
-						</span>
-						<span className="block truncate text-[10.5px] text-ink-3">
-							{orgDomain} · {mailboxCount} mailbox{mailboxCount === 1 ? "" : "es"}
-						</span>
-					</span>
-					<CaretRightIcon size={12} className="text-ink-3 shrink-0" />
-				</button>
-
-				<nav className="mt-3 px-3 flex-1 overflow-y-auto">
-					{mailboxId ? (
-						<>
-							<NavItem
-								to={`${base}/dashboard`}
-								icon={<GaugeIcon size={16} />}
-								label="Dashboard"
-							/>
-							<NavItem
-								to={`${base}/cases`}
-								icon={<BriefcaseIcon size={16} />}
-								label="Cases"
-							/>
-							<NavItem
-								to={`${base}/emails/inbox`}
-								icon={<TrayIcon size={16} />}
-								label="Mail review"
-							/>
-							<NavItem
-								to={`${base}/hub`}
-								icon={<GraphIcon size={16} />}
-								label="Threat-intel hub"
-							/>
-							<SectionLabel>System</SectionLabel>
-							<NavItem
-								to={`${base}/settings`}
-								icon={<GearSixIcon size={16} />}
-								label="Settings"
-							/>
-						</>
-					) : (
-						<div className="px-3 py-2 text-[12px] text-ink-3">
-							Pick a mailbox to begin.
-						</div>
-					)}
-				</nav>
-
-				{/* Pipeline status pill. State derives from the dashboard summary's
-				    `pipelineSuccess` (#86). Real p50/p95 latency is tracked in #71
-				    and isn't surfaced here yet — the previous static "p50 —"
-				    placeholder was misleading and has been removed. */}
-				{mailboxId && (
-					<button
-						type="button"
-						role="status"
-						aria-live="polite"
-						aria-label={`Pipeline status: ${pipelineState.label}`}
-						onClick={() => navigate(`${base}/dashboard`)}
-						className="mx-3 mb-3 flex items-center gap-2 rounded-md border border-line bg-paper px-2.5 py-1.5 text-left hover:border-line-strong transition-colors"
-					>
-						<span className="relative flex h-2 w-2">
-							{pipelineState.pulse && (
-								<span
-									aria-hidden
-									className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${PIPELINE_DOT_BG[pipelineState.tone]}`}
-								/>
-							)}
-							<span
-								aria-hidden
-								className={`relative inline-flex h-2 w-2 rounded-full ${PIPELINE_DOT_BG[pipelineState.tone]}`}
-							/>
-						</span>
-						<span className="text-[11px] text-ink-2">
-							{pipelineState.label}
-						</span>
-					</button>
-				)}
-
-				<div className="border-t border-line px-3 py-2.5 flex items-center gap-2">
-					<div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-tint text-accent-ink text-[11px] font-medium">
-						SA
-					</div>
-					<div className="flex-1 min-w-0">
-						<div className="text-[12px] text-ink truncate">SOC analyst</div>
-						<div className="text-[10.5px] text-ink-3 truncate">Preview</div>
-					</div>
-					<button
-						type="button"
-						onClick={toggleTheme}
-						className="flex h-7 w-7 items-center justify-center rounded-md text-ink-3 hover:bg-paper-3 hover:text-ink transition-colors"
-						aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-					>
-						{theme === "dark" ? <SunIcon size={14} /> : <MoonIcon size={14} />}
-					</button>
-				</div>
+				{navContents}
 			</aside>
+
+			{/* Mobile drawer — backdrop + slide-over. Kept out of the DOM when
+			    closed so Esc/click-outside listeners aren't always attached and
+			    the desktop test surface stays unchanged. */}
+			{isSidebarOpen && (
+				<>
+					<div
+						data-testid="mobile-drawer-backdrop"
+						aria-hidden
+						className="md:hidden fixed inset-0 z-40 bg-black/50"
+						onClick={closeSidebar}
+					/>
+					<aside
+						role="dialog"
+						aria-label="Primary navigation"
+						className="md:hidden fixed left-0 top-0 bottom-0 z-50 w-[260px] max-w-[85vw] flex flex-col bg-paper-2 border-r border-line shadow-xl"
+					>
+						<button
+							type="button"
+							onClick={closeSidebar}
+							aria-label="Close menu"
+							className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md text-ink-3 hover:bg-paper-3 hover:text-ink transition-colors"
+						>
+							<XIcon size={16} />
+						</button>
+						{navContents}
+					</aside>
+				</>
+			)}
 
 			{/* Main column. Topbar pinned, content scrolls. */}
 			<div className="flex-1 flex flex-col min-w-0">
 				<header className="flex items-center gap-3 h-[52px] px-4 md:px-6 border-b border-line bg-paper">
+					<button
+						type="button"
+						onClick={openSidebar}
+						aria-label="Open menu"
+						aria-expanded={isSidebarOpen}
+						className="md:hidden flex h-8 w-8 items-center justify-center rounded-md text-ink-3 hover:bg-paper-2 hover:text-ink transition-colors shrink-0"
+					>
+						<ListIcon size={18} />
+					</button>
 					<form
 						role="search"
 						onSubmit={handleSearchSubmit}

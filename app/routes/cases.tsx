@@ -137,40 +137,72 @@ export default function CasesRoute() {
 					No cases yet. Report a phish from any email in your inbox to open one.
 				</div>
 			) : (
-				<div className="pp-card overflow-hidden">
-					{/* Header row */}
-					<div className="grid grid-cols-[140px_1fr_120px_110px_60px] items-center gap-4 px-4 py-2.5 border-b border-line bg-paper-2 text-[10.5px] uppercase tracking-[0.06em] text-ink-3">
-						<span>Case</span>
-						<span>Subject</span>
-						<span>Status</span>
-						<span>Age</span>
-						<span />
+				<>
+					{/* Desktop: 5-column grid table. */}
+					<div className="hidden md:block pp-card overflow-hidden">
+						{/* Header row */}
+						<div className="grid grid-cols-[140px_1fr_120px_110px_60px] items-center gap-4 px-4 py-2.5 border-b border-line bg-paper-2 text-[10.5px] uppercase tracking-[0.06em] text-ink-3">
+							<span>Case</span>
+							<span>Subject</span>
+							<span>Status</span>
+							<span>Age</span>
+							<span />
+						</div>
+						<ul>
+							{cases.map((c) => (
+								<li key={c.id}>
+									<Link
+										to={`/mailbox/${encodeURIComponent(mailboxId ?? "")}/cases/${encodeURIComponent(c.id)}`}
+										className="grid grid-cols-[140px_1fr_120px_110px_60px] items-center gap-4 px-4 py-3 border-b border-line last:border-b-0 hover:bg-paper-2 transition-colors"
+									>
+										<span className="pp-mono text-[12px] text-ink-2 truncate">
+											{c.id.slice(0, 12)}
+										</span>
+										<span className="text-[13px] text-ink truncate">
+											{c.title}
+										</span>
+										<VerdictPill tone={statusTone(c.status)}>
+											{statusLabel(c.status)}
+										</VerdictPill>
+										<span className="pp-mono text-[12px] text-ink-3">
+											{relativeAge(c.created_at)}
+										</span>
+										<CaretRightIcon size={14} className="text-ink-3 justify-self-end" />
+									</Link>
+								</li>
+							))}
+						</ul>
 					</div>
-					<ul>
+
+					{/* Mobile: stacked cards. The 5-column grid clips at 375px, so each
+					    row becomes a card with title on top, status + age + id below. */}
+					<ul className="md:hidden space-y-2">
 						{cases.map((c) => (
 							<li key={c.id}>
 								<Link
 									to={`/mailbox/${encodeURIComponent(mailboxId ?? "")}/cases/${encodeURIComponent(c.id)}`}
-									className="grid grid-cols-[140px_1fr_120px_110px_60px] items-center gap-4 px-4 py-3 border-b border-line last:border-b-0 hover:bg-paper-2 transition-colors"
+									className="pp-card flex items-start gap-3 p-3 hover:bg-paper-2 transition-colors"
 								>
-									<span className="pp-mono text-[12px] text-ink-2 truncate">
-										{c.id.slice(0, 12)}
-									</span>
-									<span className="text-[13px] text-ink truncate">
-										{c.title}
-									</span>
-									<VerdictPill tone={statusTone(c.status)}>
-										{statusLabel(c.status)}
-									</VerdictPill>
-									<span className="pp-mono text-[12px] text-ink-3">
-										{relativeAge(c.created_at)}
-									</span>
-									<CaretRightIcon size={14} className="text-ink-3 justify-self-end" />
+									<div className="flex-1 min-w-0">
+										<div className="text-[14px] text-ink truncate mb-1">
+											{c.title}
+										</div>
+										<div className="flex flex-wrap items-center gap-2 text-[11.5px] text-ink-3">
+											<VerdictPill tone={statusTone(c.status)}>
+												{statusLabel(c.status)}
+											</VerdictPill>
+											<span className="pp-mono">{relativeAge(c.created_at)}</span>
+											<span className="pp-mono truncate">
+												{c.id.slice(0, 12)}
+											</span>
+										</div>
+									</div>
+									<CaretRightIcon size={14} className="text-ink-3 mt-1 shrink-0" />
 								</Link>
 							</li>
 						))}
 					</ul>
-				</div>
+				</>
 			)}
 		</div>
 	);

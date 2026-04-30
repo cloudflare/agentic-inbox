@@ -81,7 +81,7 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 					Score 0–100 aggregated from auth, URL, classifier, and reputation signals.
 					Values below take effect when the pipeline is enabled.
 				</p>
-				<div className="grid grid-cols-3 gap-3">
+				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
 					<Input
 						label="Tag"
 						type="number"
