@@ -22,6 +22,20 @@ export interface VerdictThresholdSettings {
 	block: number;
 }
 
+export type AttachmentAction = "block" | "score" | "ignore";
+
+export interface AttachmentPolicySettings {
+	executable_action?: AttachmentAction;
+	container_action?: AttachmentAction;
+	macro_office_action?: AttachmentAction;
+	custom_blocklist_extensions?: string[];
+}
+
+export interface FolderPolicySettings {
+	mode?: "skip_all" | "skip_classifier";
+	treat_as_verified?: boolean;
+}
+
 export interface SecuritySettings {
 	enabled?: boolean;
 	learning_mode?: boolean;
@@ -33,6 +47,8 @@ export interface SecuritySettings {
 	trusted_auto_allow_min_messages?: number;
 	intel_auto_block?: boolean;
 	business_hours?: BusinessHoursSettings;
+	attachment_policy?: AttachmentPolicySettings;
+	folder_policies?: Record<string, FolderPolicySettings>;
 }
 
 export interface MailboxSettings {

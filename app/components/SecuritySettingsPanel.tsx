@@ -4,7 +4,15 @@
 
 import { Badge, Input, Switch } from "@cloudflare/kumo";
 import { ShieldIcon } from "@phosphor-icons/react";
-import type { SecuritySettings, BusinessHoursSettings, VerdictThresholdSettings } from "~/types";
+import type {
+	SecuritySettings,
+	BusinessHoursSettings,
+	VerdictThresholdSettings,
+	AttachmentAction,
+	AttachmentPolicySettings,
+	FolderPolicySettings,
+} from "~/types";
+import { SYSTEM_FOLDER_IDS, FOLDER_DISPLAY_NAMES } from "shared/folders";
 
 /**
  * Per-mailbox security settings UI. Mirrors `MailboxSecuritySettings` in
@@ -27,6 +35,17 @@ const DEFAULT_BUSINESS_HOURS: BusinessHoursSettings = {
 	boost_on_off_hours: false,
 };
 
+// Mirrors `DEFAULT_ATTACHMENT_POLICY` in `workers/security/attachments.ts`.
+// Kept here so the form shows the same effective state operators get from
+// leaving the section untouched on the server. Update both together.
+const DEFAULT_ATTACHMENT_POLICY: Required<
+	Pick<AttachmentPolicySettings, "executable_action" | "container_action" | "macro_office_action">
+> = {
+	executable_action: "block",
+	container_action: "score",
+	macro_office_action: "score",
+};
+
 export interface SecuritySettingsPanelProps {
 	value: SecuritySettings | undefined;
 	onChange: (next: SecuritySettings) => void;
@@ -36,8 +55,21 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 	const s = value ?? {};
 	const thresholds = s.thresholds ?? DEFAULT_THRESHOLDS;
 	const bh = s.business_hours;
+	const attachment = s.attachment_policy ?? {};
+	const folders = s.folder_policies ?? {};
 
 	const patch = (partial: Partial<SecuritySettings>) => onChange({ ...s, ...partial });
+	const patchAttachment = (partial: Partial<AttachmentPolicySettings>) =>
+		patch({ attachment_policy: { ...attachment, ...partial } });
+	const patchFolder = (folderId: string, next: FolderPolicySettings | undefined) => {
+		const nextFolders = { ...folders };
+		if (!next || (next.mode === undefined && !next.treat_as_verified)) {
+			delete nextFolders[folderId];
+		} else {
+			nextFolders[folderId] = next;
+		}
+		patch({ folder_policies: nextFolders });
+	};
 
 	return (
 		<div className="pp-card p-5 space-y-5">
@@ -243,6 +275,202 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 					/>
 				</div>
 			</div>
+
+			{/* Attachment filtering */}
+			<details className="border-t border-line pt-5 group">
+				<summary className="cursor-pointer list-none flex items-center justify-between">
+					<span className="text-xs font-medium text-ink">Attachment filtering</span>
+					<span className="text-xs text-ink-3 group-open:hidden">Show</span>
+					<span className="text-xs text-ink-3 hidden group-open:inline">Hide</span>
+				</summary>
+				<p className="text-xs text-ink-3 mt-3 mb-4">
+					How the attachment-type gate handles risky filetypes. Runs before the LLM
+					classifier so a known-bad attachment never spends LLM budget. Custom blocklist
+					entries always hard-block, even on a trusted/allowlisted sender.
+				</p>
+
+				<div className="space-y-5">
+					<AttachmentActionGroup
+						label="Executable files"
+						helper="Includes .exe, .scr, .com, .msi, .jar, .js, .vbs, .ps1, .bat, .lnk, and similar."
+						value={attachment.executable_action ?? DEFAULT_ATTACHMENT_POLICY.executable_action}
+						onChange={(v) => patchAttachment({ executable_action: v })}
+						disabled={!s.enabled}
+					/>
+					<AttachmentActionGroup
+						label="Container files"
+						helper="Includes .iso, .img, .vhd, .vhdx — commonly used to smuggle executables past gateways that block .exe directly."
+						value={attachment.container_action ?? DEFAULT_ATTACHMENT_POLICY.container_action}
+						onChange={(v) => patchAttachment({ container_action: v })}
+						disabled={!s.enabled}
+					/>
+					<AttachmentActionGroup
+						label="Macro-enabled Office files"
+						helper="Includes .docm, .xlsm, .pptm, .xlam, .xltm, .potm, .ppsm — macros are the classic malware delivery path."
+						value={attachment.macro_office_action ?? DEFAULT_ATTACHMENT_POLICY.macro_office_action}
+						onChange={(v) => patchAttachment({ macro_office_action: v })}
+						disabled={!s.enabled}
+					/>
+
+					<div>
+						<Input
+							label="Custom blocklist (extensions)"
+							value={(attachment.custom_blocklist_extensions ?? []).join(", ")}
+							onChange={(e) => patchAttachment({
+								custom_blocklist_extensions: parseExtensionList(e.target.value),
+							})}
+							placeholder="dmg, rtf"
+							disabled={!s.enabled}
+						/>
+						<p className="text-xs text-ink-3 mt-2">
+							Lowercase, no leading dot. e.g. <code className="text-ink">dmg, rtf</code>.
+							Anything listed here always hard-blocks, regardless of sender trust.
+						</p>
+					</div>
+				</div>
+			</details>
+
+			{/* Folder rules */}
+			<details className="border-t border-line pt-5 group">
+				<summary className="cursor-pointer list-none flex items-center justify-between">
+					<span className="text-xs font-medium text-ink">Folder rules</span>
+					<span className="text-xs text-ink-3 group-open:hidden">Show</span>
+					<span className="text-xs text-ink-3 hidden group-open:inline">Hide</span>
+				</summary>
+				<p className="text-xs text-ink-3 mt-3 mb-4">
+					Per-folder bypasses and trust signals. <strong>Skip classifier</strong> keeps the
+					rest of the pipeline (auth, URLs, intel) running but skips the LLM.
+					<strong> Skip all</strong> bypasses the entire pipeline — use only on folders an
+					attacker cannot deliver into. <strong>Treat moves here as verified</strong> bumps a
+					sender's reputation when you move their mail into the folder.
+				</p>
+
+				<div className="space-y-4">
+					{SYSTEM_FOLDER_IDS.map((folderId) => {
+						const policy = folders[folderId] ?? {};
+						return (
+							<FolderPolicyRow
+								key={folderId}
+								folderId={folderId}
+								label={FOLDER_DISPLAY_NAMES[folderId] ?? folderId}
+								policy={policy}
+								disabled={!s.enabled}
+								onChange={(next) => patchFolder(folderId, next)}
+							/>
+						);
+					})}
+				</div>
+			</details>
+		</div>
+	);
+}
+
+interface AttachmentActionGroupProps {
+	label: string;
+	helper: string;
+	value: AttachmentAction;
+	onChange: (next: AttachmentAction) => void;
+	disabled?: boolean;
+}
+
+function AttachmentActionGroup({ label, helper, value, onChange, disabled }: AttachmentActionGroupProps) {
+	const id = label.replace(/\s+/g, "-").toLowerCase();
+	return (
+		<fieldset disabled={disabled} className="space-y-2">
+			<legend className="text-sm text-ink">{label}</legend>
+			<p className="text-xs text-ink-3">{helper}</p>
+			<div role="radiogroup" aria-label={label} className="flex gap-4">
+				{(["block", "score", "ignore"] as const).map((action) => (
+					<label key={action} className="flex items-center gap-2 text-xs text-ink-2">
+						<input
+							type="radio"
+							name={`attachment-${id}`}
+							value={action}
+							checked={value === action}
+							onChange={() => onChange(action)}
+							disabled={disabled}
+							className="h-3.5 w-3.5 accent-accent"
+						/>
+						<span className="capitalize">{action}</span>
+					</label>
+				))}
+			</div>
+		</fieldset>
+	);
+}
+
+interface FolderPolicyRowProps {
+	folderId: string;
+	label: string;
+	policy: FolderPolicySettings;
+	disabled?: boolean;
+	onChange: (next: FolderPolicySettings | undefined) => void;
+}
+
+function FolderPolicyRow({ folderId, label, policy, disabled, onChange }: FolderPolicyRowProps) {
+	const skipAll = policy.mode === "skip_all";
+	const skipClassifier = policy.mode === "skip_classifier";
+	const treatAsVerified = !!policy.treat_as_verified;
+
+	const update = (next: Partial<FolderPolicySettings>) => onChange({ ...policy, ...next });
+
+	const onSkipClassifier = (checked: boolean) => {
+		// Mode is mutex on the server side: setting one clears the other.
+		// `skip_all` is the strict superset, so it stays winning when both
+		// would be on.
+		if (checked) {
+			update({ mode: skipAll ? "skip_all" : "skip_classifier" });
+		} else {
+			update({ mode: skipAll ? "skip_all" : undefined });
+		}
+	};
+	const onSkipAll = (checked: boolean) => {
+		if (checked) update({ mode: "skip_all" });
+		else update({ mode: skipClassifier ? "skip_classifier" : undefined });
+	};
+	const onTreatVerified = (checked: boolean) => update({ treat_as_verified: checked || undefined });
+
+	return (
+		<div className="rounded-md border border-line p-3">
+			<div className="text-sm text-ink mb-2">{label}</div>
+			<div className="space-y-2">
+				<label className="flex items-center gap-2 text-xs text-ink-2">
+					<input
+						type="checkbox"
+						checked={skipClassifier && !skipAll}
+						onChange={(e) => onSkipClassifier(e.target.checked)}
+						disabled={disabled || skipAll}
+						aria-label={`Skip classifier on ${label}`}
+						data-testid={`skip-classifier-${folderId}`}
+						className="h-3.5 w-3.5 accent-accent"
+					/>
+					<span>Skip classifier</span>
+				</label>
+				<label className="flex items-center gap-2 text-xs text-ink-2">
+					<input
+						type="checkbox"
+						checked={treatAsVerified}
+						onChange={(e) => onTreatVerified(e.target.checked)}
+						disabled={disabled}
+						aria-label={`Treat moves to ${label} as verified`}
+						data-testid={`treat-verified-${folderId}`}
+						className="h-3.5 w-3.5 accent-accent"
+					/>
+					<span>Treat moves here as verified</span>
+				</label>
+				<label className="flex items-center gap-2 text-xs text-red-500">
+					<input
+						type="checkbox"
+						checked={skipAll}
+						onChange={(e) => onSkipAll(e.target.checked)}
+						disabled={disabled}
+						aria-label={`Skip all on ${label}`}
+						data-testid={`skip-all-${folderId}`}
+						className="h-3.5 w-3.5 accent-red-500"
+					/>
+					<span>Skip all (bypass entire pipeline — only safe on folders an attacker cannot deliver into)</span>
+				</label>
+			</div>
 		</div>
 	);
 }
@@ -251,6 +479,15 @@ function parseList(raw: string): string[] {
 	return raw
 		.split(",")
 		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
+}
+
+/** Like parseList but also strips a leading dot, so users can paste either
+ *  `dmg, rtf` or `.dmg, .rtf` without breaking the consumer's match logic. */
+function parseExtensionList(raw: string): string[] {
+	return raw
+		.split(",")
+		.map((s) => s.trim().toLowerCase().replace(/^\./, ""))
 		.filter(Boolean);
 }
 

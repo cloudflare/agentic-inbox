@@ -21,6 +21,7 @@ import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 import { getMailboxSettings } from "./lib/mailbox-settings";
+import { MailboxSettings } from "../shared/mailbox-settings";
 import { runSecurityPipeline } from "./security";
 import { runDeepScan } from "./intel/deep-scan";
 import { getSecuritySettings } from "./security/settings";
@@ -168,7 +169,16 @@ app.get("/api/v1/mailboxes/:mailboxId/events", async (c) => {
 
 app.put("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
-	const { settings } = (await c.req.json()) as { settings: Record<string, unknown> };
+	const body = (await c.req.json()) as { settings?: unknown };
+	// Validate the typed sub-shapes (autoDraft, agentModel, security.attachment_policy,
+	// security.folder_policies). The schema is passthrough, so unknown fields
+	// round-trip untouched — bad enum values (e.g. executable_action: "lol")
+	// surface here as 400, not 500 from a downstream consumer.
+	const parsed = MailboxSettings.safeParse(body?.settings ?? {});
+	if (!parsed.success) {
+		return c.json({ error: "Invalid settings", issues: parsed.error.issues }, 400);
+	}
+	const settings = parsed.data;
 	const key = `mailboxes/${mailboxId}.json`;
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 	await c.env.BUCKET.put(key, JSON.stringify(settings));

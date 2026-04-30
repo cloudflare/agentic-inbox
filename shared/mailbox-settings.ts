@@ -10,7 +10,41 @@ import { z } from "zod";
  * future fields can land without coordinated frontend/backend deploys.
  * Strict on the read side: every consumer that reads a typed field uses
  * `MailboxSettings.parse(...)` which fills in defaults.
+ *
+ * `security` is a typed sub-shape: only `attachment_policy` and
+ * `folder_policies` are validated here — the rest of the object is
+ * passthrough so unrelated security fields (allowlist_senders, thresholds,
+ * business_hours, etc.) round-trip untouched. Defaults intentionally NOT
+ * set in the schema; the runtime consumer in `workers/security/settings.ts`
+ * (`getSecuritySettings`) is the single source of default values, and
+ * duplicating them here would invite drift.
  */
+
+const AttachmentAction = z.enum(["block", "score", "ignore"]);
+
+const AttachmentPolicy = z
+  .object({
+    executable_action: AttachmentAction.optional(),
+    container_action: AttachmentAction.optional(),
+    macro_office_action: AttachmentAction.optional(),
+    custom_blocklist_extensions: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
+const FolderPolicy = z
+  .object({
+    mode: z.enum(["skip_all", "skip_classifier"]).optional(),
+    treat_as_verified: z.boolean().optional(),
+  })
+  .passthrough();
+
+const SecuritySettings = z
+  .object({
+    attachment_policy: AttachmentPolicy.optional(),
+    folder_policies: z.record(z.string(), FolderPolicy).optional(),
+  })
+  .passthrough();
+
 export const MailboxSettings = z.object({
   agentSystemPrompt: z.string().optional(),
   autoDraft: z
@@ -19,6 +53,7 @@ export const MailboxSettings = z.object({
     })
     .default({ enabled: true }),
   agentModel: z.string().default("@cf/moonshotai/kimi-k2.5"),
+  security: SecuritySettings.optional(),
 }).passthrough();
 
 export type MailboxSettings = z.infer<typeof MailboxSettings>;
