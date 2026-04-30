@@ -42,10 +42,10 @@ function Avatar({ isDraft, isSelf, sender }: { isDraft?: boolean; isSelf: boolea
 		<div
 			className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
 				isDraft
-					? "bg-kumo-fill text-kumo-subtle"
+					? "bg-paper-3 text-ink-3"
 					: isSelf
-						? "bg-kumo-brand text-kumo-inverse"
-						: "bg-kumo-fill text-kumo-default"
+						? "bg-accent text-accent-ink"
+						: "bg-paper-3 text-ink"
 			}`}
 		>
 			{isDraft ? "D" : sender.charAt(0).toUpperCase()}
@@ -69,7 +69,7 @@ export default function ThreadMessage({
 	onPreviewImage,
 }: ThreadMessageProps) {
 	const isSelf = email.sender === mailboxEmail;
-	const containerClassName = `${!isLast ? "border-b border-kumo-line" : ""} ${isDraft ? "border-l-2 border-l-kumo-warning bg-kumo-warning/[0.02]" : ""}`;
+	const containerClassName = `${!isLast ? "border-b border-line" : ""} ${isDraft ? "border-l-2 border-l-suspect bg-suspect/[0.02]" : ""}`;
 	const senderLabel = isDraft ? "Draft reply" : isSelf ? "You" : email.sender;
 
 	if (!isExpanded) {
@@ -78,23 +78,23 @@ export default function ThreadMessage({
 				<button
 					type="button"
 					onClick={onToggleExpand}
-					className="w-full flex items-center gap-3 px-4 py-3 hover:bg-kumo-tint rounded-lg text-left"
+					className="w-full flex items-center gap-3 px-4 py-3 hover:bg-paper-2 rounded-lg text-left"
 				>
 					<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
 					<div className="flex-1 min-w-0">
 						<div className="flex items-center justify-between">
-							<span className="text-sm font-medium text-kumo-default truncate">
+							<span className="text-sm font-medium text-ink truncate">
 								{senderLabel}
 							</span>
-							<span className="text-xs text-kumo-subtle shrink-0">
+							<span className="text-xs text-ink-3 shrink-0">
 								{formatDetailDate(email.date)}
 							</span>
 						</div>
-						<p className="text-xs text-kumo-subtle truncate">
+						<p className="text-xs text-ink-3 truncate">
 							{stripHtml(email.body || "").slice(0, 80)}
 						</p>
 					</div>
-					<CaretDownIcon size={14} className="text-kumo-subtle shrink-0" />
+					<CaretDownIcon size={14} className="text-ink-3 shrink-0" />
 				</button>
 			</div>
 		);
@@ -111,22 +111,22 @@ export default function ThreadMessage({
 							className="shrink-0"
 							aria-label="Collapse message"
 						>
-							<div className="cursor-pointer hover:ring-2 hover:ring-kumo-brand/30 transition-shadow rounded-full">
+							<div className="cursor-pointer hover:ring-2 hover:ring-accent/30 transition-shadow rounded-full">
 								<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
 							</div>
 						</button>
 						<div className="min-w-0">
 							<div className="flex items-center gap-2">
-								<span className="text-sm font-medium text-kumo-default truncate">
+								<span className="text-sm font-medium text-ink truncate">
 									{senderLabel}
 								</span>
 								{isDraft && <Badge variant="outline">Draft</Badge>}
 							</div>
-							<div className="text-xs text-kumo-subtle">To: {email.recipient}</div>
+							<div className="text-xs text-ink-3">To: {email.recipient}</div>
 						</div>
 					</div>
 					<div className="flex items-center gap-1 shrink-0">
-						<span className="text-xs text-kumo-subtle">
+						<span className="text-xs text-ink-3">
 							{formatShortDate(email.date)}
 						</span>
 						{onViewSource && (
@@ -150,7 +150,7 @@ export default function ThreadMessage({
 						>
 							<CaretUpIcon
 								size={14}
-								className="text-kumo-subtle hover:text-kumo-default transition-colors"
+								className="text-ink-3 hover:text-ink transition-colors"
 							/>
 						</button>
 					</div>

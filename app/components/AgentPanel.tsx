@@ -23,6 +23,7 @@ import { useParams } from "react-router";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useFeedback } from "~/lib/feedback";
 import type { UIMessage } from "ai";
 
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -81,14 +82,14 @@ function ToolCallBadge({
 		state === "output-error";
 
 	return (
-		<div className="flex items-center gap-1.5 py-1 px-2 rounded bg-kumo-fill/50 text-xs">
-			<span className="text-kumo-brand">{info.icon}</span>
-			<span className="text-kumo-strong">{info.label}</span>
+		<div className="flex items-center gap-1.5 py-1 px-2 rounded bg-paper-3/50 text-xs">
+			<span className="text-accent">{info.icon}</span>
+			<span className="text-ink">{info.label}</span>
 			{isDone ? (
 				<CheckCircleIcon
 					size={12}
 					weight="fill"
-					className="text-kumo-success ml-auto"
+					className="text-safe ml-auto"
 				/>
 			) : (
 				<Loader size="sm" className="ml-auto" />
@@ -150,8 +151,8 @@ function MessageBubble({
 			<div
 				className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
 					isUser
-						? "bg-kumo-brand text-kumo-inverse"
-						: "bg-kumo-fill text-kumo-default"
+						? "bg-accent text-accent-ink"
+						: "bg-paper-3 text-ink"
 				}`}
 			>
 				{isUser ? (
@@ -173,8 +174,8 @@ function MessageBubble({
 								key={key}
 								className={`rounded-lg px-3 py-2 text-[13px] leading-relaxed break-words overflow-wrap-anywhere ${
 									isUser
-										? "bg-kumo-brand text-kumo-inverse rounded-br-sm"
-										: "bg-kumo-elevated text-kumo-default border border-kumo-line rounded-bl-sm overflow-hidden"
+										? "bg-accent text-accent-ink rounded-br-sm"
+										: "bg-paper-3 text-ink border border-line rounded-bl-sm overflow-hidden"
 								}`}
 							>
 								{isUser ? (
@@ -235,7 +236,7 @@ function MessageBubble({
 												</h5>
 											),
 											code: ({ children }) => (
-												<code className="bg-kumo-fill px-1 py-0.5 rounded text-[12px]">
+												<code className="bg-paper-3 pp-mono px-1 py-0.5 rounded text-[12px]">
 													{children}
 												</code>
 											),
@@ -247,17 +248,17 @@ function MessageBubble({
 												</div>
 											),
 											thead: ({ children }) => (
-												<thead className="border-b border-kumo-line bg-kumo-fill/30">
+												<thead className="border-b border-line bg-paper-3/30">
 													{children}
 												</thead>
 											),
 											th: ({ children }) => (
-												<th className="text-left px-2 py-1 font-semibold text-kumo-strong">
+												<th className="text-left px-2 py-1 font-semibold text-ink">
 													{children}
 												</th>
 											),
 											td: ({ children }) => (
-												<td className="px-2 py-1 border-b border-kumo-line/50">
+												<td className="px-2 py-1 border-b border-line/50">
 													{children}
 												</td>
 											),
@@ -306,10 +307,17 @@ function AgentChatConnected({
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const [inputValue, setInputValue] = useState("");
 	const { startCompose } = useUIStore();
+	const feedback = useFeedback();
 
 	const agent = useAgent({ agent: "EmailAgent", name: mailboxId });
 	const { messages, sendMessage, status, setMessages, stop } =
-		useAgentChat({ agent });
+		useAgentChat({
+			agent,
+			onError: (error) => {
+				console.error("agent chat error:", error);
+				feedback.error("Agent request failed. Try again.");
+			},
+		});
 	const isStreaming = status === "streaming" || status === "submitted";
 
 	useEffect(() => {
@@ -345,10 +353,10 @@ function AgentChatConnected({
 	return (
 		<div className="flex flex-col h-full">
 			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-1.5 border-b border-kumo-line shrink-0">
+			<div className="flex items-center justify-between px-3 py-1.5 border-b border-line shrink-0">
 				<div className="flex items-center gap-2">
 					<Badge variant="beta">AI</Badge>
-					<span className="text-xs text-kumo-subtle">
+					<span className="text-xs text-ink-3">
 						Email Agent
 					</span>
 				</div>
@@ -377,14 +385,14 @@ function AgentChatConnected({
 			<div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4">
 				{messages.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full gap-4">
-						<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-kumo-brand/10">
+						<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
 							<RobotIcon
 								size={24}
 								weight="duotone"
-								className="text-kumo-brand"
+								className="text-accent"
 							/>
 						</div>
-						<p className="text-xs text-kumo-subtle text-center leading-relaxed px-4">
+						<p className="text-xs text-ink-3 text-center leading-relaxed px-4">
 							I can read emails, search conversations, and draft
 							replies.
 						</p>
@@ -396,7 +404,7 @@ function AgentChatConnected({
 									onClick={() =>
 										sendMessage({ text: prompt })
 									}
-									className="text-left px-3 py-2 rounded-lg border border-kumo-line text-xs text-kumo-strong hover:bg-kumo-tint hover:border-kumo-fill-hover transition-colors cursor-pointer bg-transparent"
+									className="text-left px-3 py-2 rounded-lg border border-line text-xs text-ink hover:bg-paper-2 hover:border-line-strong transition-colors cursor-pointer bg-transparent"
 								>
 									{prompt}
 								</button>
@@ -455,12 +463,12 @@ function AgentChatConnected({
 						))}
 						{isStreaming && (
 							<div className="flex gap-2">
-								<div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-kumo-default">
+								<div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-paper-3 text-ink">
 									<RobotIcon size={12} weight="bold" />
 								</div>
-								<div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-kumo-elevated border border-kumo-line rounded-bl-sm">
+								<div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-paper-3 border border-line rounded-bl-sm">
 									<Loader size="sm" />
-									<span className="text-xs text-kumo-subtle">
+									<span className="text-xs text-ink-3">
 										Thinking...
 									</span>
 								</div>
@@ -471,7 +479,7 @@ function AgentChatConnected({
 			</div>
 
 			{/* Input */}
-			<div className="shrink-0 border-t border-kumo-line px-3 py-2">
+			<div className="shrink-0 border-t border-line px-3 py-2">
 				{isStreaming ? (
 					<div className="flex justify-center">
 						<Button
@@ -495,7 +503,7 @@ function AgentChatConnected({
 							placeholder="Ask your email agent..."
 							rows={1}
 							aria-label="Chat message input"
-							className="flex-1 resize-none rounded-lg border border-kumo-line bg-kumo-control px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring min-h-[36px] max-h-[100px]"
+							className="flex-1 resize-none rounded-lg border border-line bg-paper-2 px-3 py-2 text-xs text-ink placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-accent min-h-[36px] max-h-[100px]"
 							style={{ height: "auto", overflow: "hidden" }}
 							onInput={(e) => {
 								const t = e.target as HTMLTextAreaElement;
@@ -548,7 +556,7 @@ export default function AgentPanel() {
 	if (loadError) {
 		return (
 			<div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
-				<span className="text-xs text-kumo-error">{loadError}</span>
+				<span className="text-xs text-danger">{loadError}</span>
 			</div>
 		);
 	}
@@ -557,7 +565,7 @@ export default function AgentPanel() {
 		return (
 			<div className="flex flex-col items-center justify-center h-full gap-2">
 				<Loader size="base" />
-				<span className="text-xs text-kumo-subtle">
+				<span className="text-xs text-ink-3">
 					Connecting...
 				</span>
 			</div>

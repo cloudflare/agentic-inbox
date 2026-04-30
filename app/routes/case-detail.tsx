@@ -2,7 +2,6 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { useKumoToastManager } from "@cloudflare/kumo";
 import {
 	ArrowLeftIcon,
 	BriefcaseIcon,
@@ -15,6 +14,7 @@ import { Link, useParams } from "react-router";
 import ScoreRing from "~/components/phishsoc/ScoreRing";
 import VerdictPill from "~/components/phishsoc/VerdictPill";
 import { statusLabel, statusTone } from "~/components/phishsoc/verdict";
+import { useFeedback } from "~/lib/feedback";
 
 interface CaseEmail { case_id: string; email_id: string; }
 interface CaseObservable { id: string; kind: string; value: string; }
@@ -52,7 +52,7 @@ function relativeAge(iso: string): string {
 
 export default function CaseDetailRoute() {
 	const { mailboxId, caseId } = useParams<{ mailboxId: string; caseId: string }>();
-	const toast = useKumoToastManager();
+	const feedback = useFeedback();
 	const [data, setData] = useState<CaseRecord | null>(null);
 	const [loading, setLoading] = useState(true);
 
@@ -86,7 +86,7 @@ export default function CaseDetailRoute() {
 				body: JSON.stringify({ status }),
 			},
 		);
-		toast.add({ title: "Case updated" });
+		feedback.success("Case updated");
 		await load();
 	};
 

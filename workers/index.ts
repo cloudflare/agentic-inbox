@@ -20,6 +20,7 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import { getMailboxSettings } from "./lib/mailbox-settings";
 import { runSecurityPipeline } from "./security";
 import { runDeepScan } from "./intel/deep-scan";
 import { getSecuritySettings } from "./security/settings";
@@ -596,6 +597,14 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		} catch (e) {
 			console.error("deep-scan enqueue failed:", (e as Error).message);
 		}
+	}
+
+	// Auto-draft dispatch is gated on per-mailbox settings. The security
+	// pipeline above always runs; only the agent's onNewEmail fetch is
+	// skipped when the operator has disabled auto-draft for this mailbox.
+	const mailboxSettings = await getMailboxSettings(env, mailboxId);
+	if (!mailboxSettings.autoDraft.enabled) {
+		return;
 	}
 
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));

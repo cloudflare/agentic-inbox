@@ -46,20 +46,20 @@ export default function SecurityVerdictPanel({ email }: { email: Email }) {
 					onClick={() => setExpanded((e) => !e)}
 				>
 					<span className={iconColorClass}>{icon}</span>
-					<span className="font-medium text-kumo-default">{headline}</span>
+					<span className="font-medium text-ink">{headline}</span>
 					{triageTag && (
-						<span className="text-xs rounded-full bg-kumo-fill px-1.5 py-0.5 text-kumo-subtle">
+						<span className="text-xs rounded-full bg-paper-3 px-1.5 py-0.5 text-ink-3">
 							{triageTag}
 						</span>
 					)}
-					<span className="text-xs text-kumo-subtle ml-1">score {verdict.score}/100</span>
-					<span className="ml-auto text-kumo-subtle">
+					<span className="text-xs text-ink-3 ml-1">score {verdict.score}/100</span>
+					<span className="ml-auto text-ink-3">
 						{expanded ? <CaretUpIcon size={16} /> : <CaretDownIcon size={16} />}
 					</span>
 				</button>
 				{expanded && (
 					<div className="px-3 pb-3 pt-0 space-y-2">
-						<div className="text-kumo-default">{verdict.explanation}</div>
+						<div className="text-ink">{verdict.explanation}</div>
 
 						<div className="flex flex-wrap gap-1.5">
 							<AuthChip label="SPF" value={verdict.auth.spf} />
@@ -69,15 +69,15 @@ export default function SecurityVerdictPanel({ email }: { email: Email }) {
 						</div>
 
 						{verdict.classification.reasoning && (
-							<div className="text-xs text-kumo-subtle italic">
+							<div className="text-xs text-ink-3 italic">
 								Classifier: "{verdict.classification.reasoning}"
 							</div>
 						)}
 
 						{verdict.signals.length > 0 && (
 							<div>
-								<div className="text-xs font-medium text-kumo-subtle mb-1">Contributing signals</div>
-								<ul className="text-xs text-kumo-default list-disc ml-4 space-y-0.5">
+								<div className="text-xs font-medium text-ink-3 mb-1">Contributing signals</div>
+								<ul className="text-xs text-ink list-disc ml-4 space-y-0.5">
 									{verdict.signals.map((s, i) => <li key={i}>{s}</li>)}
 								</ul>
 							</div>
@@ -94,25 +94,25 @@ function ui(action: string) {
 		case "quarantine":
 		case "block":
 			return {
-				borderClass: "border-kumo-destructive/40",
-				bgClass: "bg-kumo-fill",
-				iconColorClass: "text-kumo-destructive",
+				borderClass: "border-danger/40",
+				bgClass: "bg-paper-3",
+				iconColorClass: "text-danger",
 				icon: <ShieldWarningIcon size={16} weight="fill" />,
 				headline: action === "block" ? "Blocked by security pipeline" : "Quarantined by security pipeline",
 			};
 		case "tag":
 			return {
-				borderClass: "border-kumo-warning/40",
-				bgClass: "bg-kumo-fill",
-				iconColorClass: "text-kumo-warning",
+				borderClass: "border-suspect/40",
+				bgClass: "bg-paper-3",
+				iconColorClass: "text-suspect",
 				icon: <ShieldIcon size={16} weight="bold" />,
 				headline: "Flagged as suspicious",
 			};
 		default:
 			return {
-				borderClass: "border-kumo-line",
-				bgClass: "bg-kumo-elevated",
-				iconColorClass: "text-kumo-subtle",
+				borderClass: "border-line",
+				bgClass: "bg-paper-3",
+				iconColorClass: "text-ink-3",
 				icon: <ShieldCheckIcon size={16} />,
 				headline: "Security verdict",
 			};
@@ -121,12 +121,12 @@ function ui(action: string) {
 
 function AuthChip({ label, value }: { label: string; value: string }) {
 	const color =
-		value === "pass" ? "text-kumo-success" :
-		value === "fail" || value === "softfail" ? "text-kumo-destructive" :
-		"text-kumo-subtle";
+		value === "pass" ? "text-safe" :
+		value === "fail" || value === "softfail" ? "text-danger" :
+		"text-ink-3";
 	return (
-		<span className="text-xs rounded border border-kumo-line px-1.5 py-0.5 bg-kumo-elevated">
-			<span className="text-kumo-subtle">{label} </span>
+		<span className="text-xs rounded border border-line px-1.5 py-0.5 bg-paper-3">
+			<span className="text-ink-3">{label} </span>
 			<span className={`font-medium ${color}`}>{value}</span>
 		</span>
 	);
@@ -134,15 +134,15 @@ function AuthChip({ label, value }: { label: string; value: string }) {
 
 function ClassifierChip({ label, confidence }: { label: string; confidence: number }) {
 	const color =
-		label === "phishing" || label === "bec" ? "text-kumo-destructive" :
-		label === "suspicious" ? "text-kumo-warning" :
-		label === "spam" ? "text-kumo-subtle" :
-		"text-kumo-success";
+		label === "phishing" || label === "bec" ? "text-danger" :
+		label === "suspicious" ? "text-suspect" :
+		label === "spam" ? "text-ink-3" :
+		"text-safe";
 	return (
-		<span className="text-xs rounded border border-kumo-line px-1.5 py-0.5 bg-kumo-elevated">
-			<span className="text-kumo-subtle">LLM </span>
+		<span className="text-xs rounded border border-line px-1.5 py-0.5 bg-paper-3">
+			<span className="text-ink-3">LLM </span>
 			<span className={`font-medium ${color}`}>{label}</span>
-			<span className="text-kumo-subtle"> ({Math.round(confidence * 100)}%)</span>
+			<span className="text-ink-3"> ({Math.round(confidence * 100)}%)</span>
 		</span>
 	);
 }

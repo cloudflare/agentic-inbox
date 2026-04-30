@@ -40,10 +40,10 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 	const patch = (partial: Partial<SecuritySettings>) => onChange({ ...s, ...partial });
 
 	return (
-		<div className="rounded-lg border border-kumo-line bg-kumo-base p-5 space-y-5">
+		<div className="pp-card p-5 space-y-5">
 			<div className="flex items-center gap-2">
-				<ShieldIcon size={16} weight="duotone" className="text-kumo-subtle" />
-				<span className="text-sm font-medium text-kumo-default">Security</span>
+				<ShieldIcon size={16} weight="duotone" className="text-ink-3" />
+				<span className="text-sm font-medium text-ink">Security</span>
 				{s.enabled ? (
 					s.learning_mode
 						? <Badge variant="secondary">Learning</Badge>
@@ -57,7 +57,7 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 					checked={!!s.enabled}
 					onCheckedChange={(v) => patch({ enabled: v })}
 				/>
-				<p className="text-xs text-kumo-subtle -mt-2">
+				<p className="text-xs text-ink-3 -mt-2">
 					Runs SPF/DKIM/DMARC parse, URL heuristics, and an LLM classifier on incoming mail.
 					Disabled by default so existing mailboxes aren't affected until you opt in.
 				</p>
@@ -68,16 +68,16 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 					onCheckedChange={(v) => patch({ learning_mode: v })}
 					disabled={!s.enabled}
 				/>
-				<p className="text-xs text-kumo-subtle -mt-2">
+				<p className="text-xs text-ink-3 -mt-2">
 					Safe way to dial-in thresholds: verdicts still compute but are capped at "tag".
 					Use this for a week before flipping off to audit false-positive rate.
 				</p>
 			</div>
 
 			{/* Thresholds */}
-			<div className="border-t border-kumo-line pt-5">
-				<div className="text-xs font-medium text-kumo-default mb-2">Score thresholds</div>
-				<p className="text-xs text-kumo-subtle mb-3">
+			<div className="border-t border-line pt-5">
+				<div className="text-xs font-medium text-ink mb-2">Score thresholds</div>
+				<p className="text-xs text-ink-3 mb-3">
 					Score 0–100 aggregated from auth, URL, classifier, and reputation signals.
 					Values below take effect when the pipeline is enabled.
 				</p>
@@ -113,11 +113,11 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 			</div>
 
 			{/* Authentication-Results trust */}
-			<div className="border-t border-kumo-line pt-5">
-				<div className="text-xs font-medium text-kumo-default mb-2">Trusted authentication servers</div>
-				<p className="text-xs text-kumo-subtle mb-3">
-					Comma-separated list of authserv-id values (e.g. <code className="text-kumo-default">mx.cloudflare.net, mx.google.com</code>).
-					Only <code className="text-kumo-default">Authentication-Results</code> headers matching these authservs contribute to the SPF/DKIM/DMARC verdict —
+			<div className="border-t border-line pt-5">
+				<div className="text-xs font-medium text-ink mb-2">Trusted authentication servers</div>
+				<p className="text-xs text-ink-3 mb-3">
+					Comma-separated list of authserv-id values (e.g. <code className="text-ink">mx.cloudflare.net, mx.google.com</code>).
+					Only <code className="text-ink">Authentication-Results</code> headers matching these authservs contribute to the SPF/DKIM/DMARC verdict —
 					this prevents an attacker-controlled upstream relay from forging a pass verdict.
 					Leave empty to trust any authserv (less secure).
 				</p>
@@ -130,9 +130,9 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 			</div>
 
 			{/* Allowlists */}
-			<div className="border-t border-kumo-line pt-5">
-				<div className="text-xs font-medium text-kumo-default mb-2">Allowlists (hard-allow when DMARC passes)</div>
-				<p className="text-xs text-kumo-subtle mb-3">
+			<div className="border-t border-line pt-5">
+				<div className="text-xs font-medium text-ink mb-2">Allowlists (hard-allow when DMARC passes)</div>
+				<p className="text-xs text-ink-3 mb-3">
 					Matched senders skip the classifier and are allowed — <em>only</em> when DMARC also passes.
 					Without the DMARC requirement, the allowlist alone would let any attacker spoof a trusted From: address.
 				</p>
@@ -155,8 +155,8 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 			</div>
 
 			{/* Automations */}
-			<div className="border-t border-kumo-line pt-5">
-				<div className="text-xs font-medium text-kumo-default mb-3">Automations</div>
+			<div className="border-t border-line pt-5">
+				<div className="text-xs font-medium text-ink mb-3">Automations</div>
 				<div className="space-y-3">
 					<Switch
 						label="Hard-block on confirmed threat-intel hit"
@@ -178,7 +178,7 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 						onChange={(e) => patch({ trusted_auto_allow_min_messages: clampInt(e.target.value, 10, 0, 10_000) })}
 						disabled={!s.enabled || s.trusted_auto_allow === false}
 					/>
-					<p className="text-xs text-kumo-subtle -mt-2">
+					<p className="text-xs text-ink-3 -mt-2">
 						Senders with at least this many prior messages and an average score &lt; 20 auto-allow when DMARC passes.
 						Set to 0 to require an explicit allowlist entry.
 					</p>
@@ -186,9 +186,9 @@ export function SecuritySettingsPanel({ value, onChange }: SecuritySettingsPanel
 			</div>
 
 			{/* Business hours */}
-			<div className="border-t border-kumo-line pt-5">
-				<div className="text-xs font-medium text-kumo-default mb-2">Business hours</div>
-				<p className="text-xs text-kumo-subtle mb-3">
+			<div className="border-t border-line pt-5">
+				<div className="text-xs font-medium text-ink mb-2">Business hours</div>
+				<p className="text-xs text-ink-3 mb-3">
 					Adds a small score nudge (+10) to mail received outside your working hours —
 					BEC/wire-fraud asks disproportionately land at 3am and on weekends.
 					Scoring only; never short-circuits to quarantine on time alone.

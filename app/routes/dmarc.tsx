@@ -68,8 +68,8 @@ export default function DmarcRoute() {
 	if (reports.length === 0) {
 		return (
 			<div className="max-w-3xl px-4 py-6 md:px-8">
-				<h1 className="text-lg font-semibold text-kumo-default mb-4">DMARC Reports</h1>
-				<div className="rounded-lg border border-kumo-line p-6 text-kumo-subtle">
+				<h1 className="pp-serif text-ink mb-4">DMARC Reports</h1>
+				<div className="rounded-lg border border-line p-6 text-ink-3">
 					No DMARC reports received yet. Publish <code>rua=mailto:dmarc-reports@your-domain</code>
 					in your domain's DMARC record to start receiving them.
 				</div>
@@ -79,29 +79,29 @@ export default function DmarcRoute() {
 
 	return (
 		<div className="max-w-5xl px-4 py-6 md:px-8 h-full overflow-y-auto">
-			<h1 className="text-lg font-semibold text-kumo-default mb-4">DMARC Reports</h1>
+			<h1 className="pp-serif text-ink mb-4">DMARC Reports</h1>
 
 			<div className="mb-6 flex items-center gap-3">
-				<label className="text-sm text-kumo-subtle">Domain:</label>
+				<label className="text-sm text-ink-3">Domain:</label>
 				<select
 					value={domain ?? ""}
 					onChange={(e) => setDomain(e.target.value)}
-					className="rounded border border-kumo-line bg-kumo-elevated px-2 py-1 text-sm"
+					className="rounded border border-line bg-paper-3 px-2 py-1 text-sm"
 				>
 					{domains.map((d) => <option key={d} value={d}>{d}</option>)}
 				</select>
 			</div>
 
 			<section className="mb-8">
-				<h2 className="text-sm font-semibold text-kumo-default mb-3">Sending sources</h2>
+				<h2 className="text-sm font-semibold text-ink mb-3">Sending sources</h2>
 				{!sources ? (
-					<div className="text-kumo-subtle text-sm">Loading…</div>
+					<div className="text-ink-3 text-sm">Loading…</div>
 				) : sources.length === 0 ? (
-					<div className="text-kumo-subtle text-sm">No records for this domain.</div>
+					<div className="text-ink-3 text-sm">No records for this domain.</div>
 				) : (
-					<div className="overflow-x-auto rounded-lg border border-kumo-line">
+					<div className="overflow-x-auto rounded-lg border border-line">
 						<table className="w-full text-sm">
-							<thead className="bg-kumo-fill text-kumo-subtle text-xs uppercase">
+							<thead className="bg-paper-3 text-ink-3 text-xs uppercase">
 								<tr>
 									<th className="text-left px-3 py-2">Source IP</th>
 									<th className="text-right px-3 py-2">Messages</th>
@@ -116,14 +116,14 @@ export default function DmarcRoute() {
 									const rate = s.total_count > 0 ? s.pass_count / s.total_count : 0;
 									const suspect = rate < 0.5 && s.total_count >= 5;
 									return (
-										<tr key={s.source_ip} className={`border-t border-kumo-line ${suspect ? "bg-kumo-fill" : ""}`}>
-											<td className="px-3 py-2 font-mono text-kumo-default">{s.source_ip}</td>
+										<tr key={s.source_ip} className={`border-t border-line ${suspect ? "bg-paper-3" : ""}`}>
+											<td className="px-3 py-2 font-mono text-ink">{s.source_ip}</td>
 											<td className="px-3 py-2 text-right">{s.total_count}</td>
-											<td className="px-3 py-2 text-right text-kumo-success">{s.pass_count}</td>
-											<td className="px-3 py-2 text-right text-kumo-warning">{s.quarantine_count}</td>
-											<td className="px-3 py-2 text-right text-kumo-destructive">{s.reject_count}</td>
+											<td className="px-3 py-2 text-right text-safe">{s.pass_count}</td>
+											<td className="px-3 py-2 text-right text-suspect">{s.quarantine_count}</td>
+											<td className="px-3 py-2 text-right text-danger">{s.reject_count}</td>
 											<td className="px-3 py-2">
-												<span className={suspect ? "text-kumo-destructive" : "text-kumo-default"}>
+												<span className={suspect ? "text-danger" : "text-ink"}>
 													{Math.round(rate * 100)}%
 												</span>
 											</td>
@@ -137,10 +137,10 @@ export default function DmarcRoute() {
 			</section>
 
 			<section>
-				<h2 className="text-sm font-semibold text-kumo-default mb-3">Recent reports</h2>
-				<div className="overflow-x-auto rounded-lg border border-kumo-line">
+				<h2 className="text-sm font-semibold text-ink mb-3">Recent reports</h2>
+				<div className="overflow-x-auto rounded-lg border border-line">
 					<table className="w-full text-sm">
-						<thead className="bg-kumo-fill text-kumo-subtle text-xs uppercase">
+						<thead className="bg-paper-3 text-ink-3 text-xs uppercase">
 							<tr>
 								<th className="text-left px-3 py-2">Received</th>
 								<th className="text-left px-3 py-2">Reporter</th>
@@ -150,8 +150,8 @@ export default function DmarcRoute() {
 						</thead>
 						<tbody>
 							{reports.filter((r) => !domain || r.domain === domain).map((r) => (
-								<tr key={r.id} className="border-t border-kumo-line">
-									<td className="px-3 py-2 text-kumo-subtle">{new Date(r.received_at).toLocaleString()}</td>
+								<tr key={r.id} className="border-t border-line">
+									<td className="px-3 py-2 text-ink-3">{new Date(r.received_at).toLocaleString()}</td>
 									<td className="px-3 py-2">{r.org_name ?? "unknown"}</td>
 									<td className="px-3 py-2 font-mono">{r.domain}</td>
 									<td className="px-3 py-2">{r.policy_p ?? "none"}</td>

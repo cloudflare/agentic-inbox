@@ -75,7 +75,7 @@ export default function EmailPanelDialogs({
 					<Dialog.Title>
 						Email Source Headers
 						{sourceViewEmail && (
-							<span className="text-sm font-normal text-kumo-subtle ml-2">
+							<span className="text-sm font-normal text-ink-3 ml-2">
 								{sourceViewEmail.subject}
 							</span>
 						)}
@@ -87,12 +87,12 @@ export default function EmailPanelDialogs({
 									{sourceHeaders.map((header, idx) => (
 										<tr
 											key={`${header.key}-${idx}`}
-											className={idx % 2 === 0 ? "bg-kumo-tint/50" : ""}
+											className={idx % 2 === 0 ? "bg-paper-2/50" : ""}
 										>
-											<td className="py-1.5 px-3 font-mono font-semibold text-kumo-default whitespace-nowrap align-top w-[160px]">
+											<td className="py-1.5 px-3 font-mono font-semibold text-ink whitespace-nowrap align-top w-[160px]">
 												{header.key}
 											</td>
-											<td className="py-1.5 px-3 font-mono text-kumo-subtle break-all">
+											<td className="py-1.5 px-3 font-mono text-ink-3 break-all">
 												{header.value}
 											</td>
 										</tr>
@@ -100,7 +100,7 @@ export default function EmailPanelDialogs({
 								</tbody>
 							</table>
 							{sourceHeaders.length === 0 && (
-								<p className="text-sm text-kumo-subtle text-center py-8">
+								<p className="text-sm text-ink-3 text-center py-8">
 									No header data available for this email.
 								</p>
 							)}
@@ -125,7 +125,7 @@ export default function EmailPanelDialogs({
 				<Dialog size="lg">
 					<Dialog.Title>{previewImage?.filename}</Dialog.Title>
 					{previewImage && (
-						<div className="mt-4 flex flex-col items-center justify-center bg-kumo-tint/30 rounded-lg p-4 min-h-[200px]">
+						<div className="mt-4 flex flex-col items-center justify-center bg-paper-2/30 rounded-lg p-4 min-h-[200px]">
 							<img
 								src={previewImage.url}
 								alt={previewImage.filename}

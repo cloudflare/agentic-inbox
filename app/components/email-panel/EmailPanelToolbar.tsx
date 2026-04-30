@@ -63,7 +63,7 @@ export default function EmailPanelToolbar({
 	onDelete,
 }: EmailPanelToolbarProps) {
 	return (
-		<div className="flex items-center gap-1 px-3 py-2 border-b border-kumo-line shrink-0 md:px-4">
+		<div className="flex items-center gap-1 px-3 py-2 border-b border-line shrink-0 md:px-4">
 			<Button
 				variant="ghost"
 				shape="square"
@@ -142,7 +142,7 @@ export default function EmailPanelToolbar({
 				</>
 			)}
 
-			<div className="h-5 w-px bg-kumo-fill mx-0.5" />
+			<div className="h-5 w-px bg-paper-3 mx-0.5" />
 
 			<Tooltip content={email.starred ? "Unstar" : "Star"} side="bottom" asChild>
 				<Button
@@ -153,7 +153,7 @@ export default function EmailPanelToolbar({
 						<StarIcon
 							size={18}
 							weight={email.starred ? "fill" : "regular"}
-							className={email.starred ? "text-kumo-warning" : ""}
+							className={email.starred ? "text-suspect" : ""}
 						/>
 					}
 					onClick={onToggleStar}
@@ -239,14 +239,14 @@ function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id:
 				/>
 			</Tooltip>
 			{open && (
-				<div className="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-lg border border-kumo-line bg-kumo-elevated shadow-lg py-1">
-					<div className="px-3 py-1.5 text-xs font-medium text-kumo-subtle">Move to</div>
-					<div className="h-px bg-kumo-line my-1" />
+				<div className="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-lg border border-line bg-paper-3 shadow-lg py-1">
+					<div className="px-3 py-1.5 text-xs font-medium text-ink-3">Move to</div>
+					<div className="h-px bg-line my-1" />
 					{folders.map((f) => (
 						<button
 							key={f.id}
 							type="button"
-							className="w-full text-left px-3 py-1.5 text-sm text-kumo-default hover:bg-kumo-overlay transition-colors"
+							className="w-full text-left px-3 py-1.5 text-sm text-ink hover:bg-paper-3 transition-colors"
 							onClick={() => { onMove(f.id); setOpen(false); }}
 						>
 							{f.name}

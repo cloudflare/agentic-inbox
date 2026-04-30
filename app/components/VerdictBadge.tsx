@@ -33,19 +33,19 @@ function presentation(action: string) {
 			return {
 				icon: <ShieldWarningIcon size={12} weight="fill" />,
 				label: action === "block" ? "Blocked" : "Quarantined",
-				className: "text-kumo-destructive bg-kumo-fill",
+				className: "text-danger bg-paper-3",
 			};
 		case "tag":
 			return {
 				icon: <ShieldIcon size={12} weight="bold" />,
 				label: "Suspicious",
-				className: "text-kumo-warning bg-kumo-fill",
+				className: "text-suspect bg-paper-3",
 			};
 		default:
 			return {
 				icon: <ShieldCheckIcon size={12} />,
 				label: "Safe",
-				className: "text-kumo-subtle",
+				className: "text-ink-3",
 			};
 	}
 }

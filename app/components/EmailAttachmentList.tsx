@@ -32,8 +32,8 @@ export default function EmailAttachmentList({
 		<div className={className}>
 			{showHeading && (
 				<div className="flex items-center gap-2 mb-2">
-					<PaperclipIcon size={14} className="text-kumo-subtle" />
-					<span className="text-sm font-medium text-kumo-default">
+					<PaperclipIcon size={14} className="text-ink-3" />
+					<span className="text-sm font-medium text-ink">
 						{files.length} attachment{files.length !== 1 ? "s" : ""}
 					</span>
 				</div>
@@ -49,13 +49,13 @@ export default function EmailAttachmentList({
 								key={attachment.id}
 								type="button"
 								onClick={() => onPreviewImage(url, attachment.filename)}
-								className="flex items-center gap-2 rounded-md border border-kumo-line px-3 py-2 transition-colors hover:bg-kumo-tint text-sm text-left"
+								className="flex items-center gap-2 rounded-md border border-line px-3 py-2 transition-colors hover:bg-paper-2 text-sm text-left"
 							>
-								<ImageIcon size={16} className="text-kumo-subtle shrink-0" />
-								<span className="text-kumo-default font-medium truncate max-w-[140px]">
+								<ImageIcon size={16} className="text-ink-3 shrink-0" />
+								<span className="text-ink font-medium truncate max-w-[140px]">
 									{attachment.filename}
 								</span>
-								<span className="text-kumo-subtle">{formatBytes(attachment.size)}</span>
+								<span className="text-ink-3">{formatBytes(attachment.size)}</span>
 							</button>
 						);
 					}
@@ -66,13 +66,13 @@ export default function EmailAttachmentList({
 							href={url}
 							target="_blank"
 							rel="noopener noreferrer"
-							className="flex items-center gap-2 rounded-md border border-kumo-line px-3 py-2 no-underline transition-colors hover:bg-kumo-tint text-sm"
+							className="flex items-center gap-2 rounded-md border border-line px-3 py-2 no-underline transition-colors hover:bg-paper-2 text-sm"
 						>
-							<FileIcon size={16} className="text-kumo-subtle shrink-0" />
-							<span className="text-kumo-default font-medium truncate max-w-[140px]">
+							<FileIcon size={16} className="text-ink-3 shrink-0" />
+							<span className="text-ink font-medium truncate max-w-[140px]">
 								{attachment.filename}
 							</span>
-							<span className="text-kumo-subtle">{formatBytes(attachment.size)}</span>
+							<span className="text-ink-3">{formatBytes(attachment.size)}</span>
 						</a>
 					);
 				})}

@@ -10,12 +10,13 @@ import {
 	Loader,
 	Select,
 	Text,
-	useKumoToastManager,
 } from "@cloudflare/kumo";
 import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
+import Logo from "~/components/phishsoc/Logo";
+import { useFeedback } from "~/lib/feedback";
 import api from "~/services/api";
 import {
 	useCreateMailbox,
@@ -29,7 +30,7 @@ export function meta() {
 }
 
 export default function HomeRoute() {
-	const toastManager = useKumoToastManager();
+	const feedback = useFeedback();
 	const { data: mailboxes = [], refetch: refetchMailboxes, isFetched: mailboxesFetched } = useMailboxes();
 	const createMailbox = useCreateMailbox();
 	const deleteMailbox = useDeleteMailbox();
@@ -101,7 +102,7 @@ export default function HomeRoute() {
 		setIsCreating(true);
 		try {
 			await createMailbox.mutateAsync({ email, name });
-			toastManager.add({ title: "Mailbox created successfully!" });
+			feedback.success("Mailbox created successfully!");
 			setIsCreateOpen(false);
 			setNewPrefix("");
 			setNewName("");
@@ -118,11 +119,11 @@ export default function HomeRoute() {
 		setIsDeleting(true);
 		try {
 			await deleteMailbox.mutateAsync(mailboxToDelete.id);
-			toastManager.add({ title: "Mailbox deleted" });
+			feedback.info("Mailbox deleted");
 			setIsDeleteOpen(false);
 			setMailboxToDelete(null);
 		} catch {
-			toastManager.add({ title: "Failed to delete mailbox", variant: "error" });
+			feedback.error("Failed to delete mailbox");
 		} finally {
 			setIsDeleting(false);
 		}
@@ -140,11 +141,14 @@ export default function HomeRoute() {
 	const isLoading = !configData;
 
 	return (
-		<div className="min-h-screen bg-kumo-recessed">
+		<div className="min-h-screen bg-paper-2">
+			<header className="px-6 md:px-10 pt-6 pb-4">
+				<Logo />
+			</header>
 			<div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
 				<div className="mb-8">
 					<div className="flex items-center justify-between">
-						<h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
+						<h1 className="pp-serif text-[40px] leading-none text-ink">Mailboxes</h1>
 						{!isConfigured && (
 							<Button
 								variant="primary"
@@ -156,7 +160,7 @@ export default function HomeRoute() {
 						)}
 					</div>
 					{domains.length > 0 && (
-						<p className="text-sm text-kumo-subtle mt-1">
+						<p className="text-sm text-ink-3 mt-1">
 							{domains.join(", ")}
 						</p>
 					)}
@@ -167,23 +171,23 @@ export default function HomeRoute() {
 						<Loader size="lg" />
 					</div>
 				) : accounts.length > 0 ? (
-					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
+					<div className="pp-card overflow-hidden">
 						{accounts.map((account, idx) => (
 							<RouterLink
 								key={account.id}
 								to={`/mailbox/${account.id}`}
-								className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
-									idx > 0 ? "border-t border-kumo-line" : ""
+								className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-paper-2 ${
+									idx > 0 ? "border-t border-line" : ""
 								}`}
 							>
-								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
+								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper-3 text-sm font-bold text-ink">
 									{account.name.charAt(0).toUpperCase()}
 								</div>
 								<div className="min-w-0 flex-1">
-									<div className="text-sm font-medium text-kumo-default truncate">
+									<div className="text-sm font-medium text-ink truncate">
 										{account.name}
 									</div>
-									<div className="text-sm text-kumo-subtle">
+									<div className="text-sm text-ink-3">
 										{account.email}
 									</div>
 								</div>
@@ -209,19 +213,19 @@ export default function HomeRoute() {
 						))}
 					</div>
 				) : (
-					<div className="rounded-xl border border-kumo-line bg-kumo-base py-16 px-6">
+					<div className="pp-card py-16 px-6">
 						<div className="flex flex-col items-center text-center">
 							<div className="mb-4">
 								<EnvelopeIcon
 									size={48}
 									weight="thin"
-									className="text-kumo-subtle"
+									className="text-ink-3"
 								/>
 							</div>
-							<h3 className="text-base font-semibold text-kumo-default mb-1.5">
+							<h3 className="text-base font-semibold text-ink mb-1.5">
 								No mailboxes yet
 							</h3>
-							<p className="text-sm text-kumo-subtle max-w-sm mb-5">
+							<p className="text-sm text-ink-3 max-w-sm mb-5">
 								{isConfigured
 									? "Your email routing is configured but no mailboxes have been created yet. They will appear here automatically."
 									: "Create a mailbox to start sending and receiving emails with your domain."}
@@ -253,7 +257,7 @@ export default function HomeRoute() {
 							</Text>
 						)}
 						<div>
-							<span className="text-sm font-medium text-kumo-default mb-1.5 block">
+							<span className="text-sm font-medium text-ink mb-1.5 block">
 								Email Address
 							</span>
 							<div className="flex items-center gap-2">
@@ -267,7 +271,7 @@ export default function HomeRoute() {
 										required
 									/>
 								</div>
-								<span className="text-sm text-kumo-subtle">@</span>
+								<span className="text-sm text-ink-3">@</span>
 								{domains.length > 1 ? (
 									<div className="flex-1">
 							<Select
@@ -285,7 +289,7 @@ export default function HomeRoute() {
 										</Select>
 									</div>
 								) : (
-									<span className="text-sm text-kumo-subtle">
+									<span className="text-sm text-ink-3">
 										{selectedDomain || "no domain"}
 									</span>
 								)}
@@ -332,9 +336,9 @@ export default function HomeRoute() {
 					<Dialog.Title className="text-base font-semibold mb-2">
 						Delete Mailbox
 					</Dialog.Title>
-					<Dialog.Description className="text-kumo-subtle text-sm mb-5">
+					<Dialog.Description className="text-ink-3 text-sm mb-5">
 						Are you sure you want to delete{" "}
-						<strong className="text-kumo-default">
+						<strong className="text-ink">
 							{mailboxToDelete?.email}
 						</strong>
 						? This action cannot be undone.

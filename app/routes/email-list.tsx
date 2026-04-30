@@ -24,6 +24,7 @@ import { Folders } from "shared/folders";
 import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
 import VerdictBadge from "~/components/VerdictBadge";
+import { useFeedback } from "~/lib/feedback";
 import { getSnippetText } from "~/lib/utils";
 import {
 	useDeleteEmail,
@@ -48,7 +49,7 @@ const FOLDER_EMPTY_STATES: Record<
 	}
 > = {
 	[Folders.INBOX]: {
-		icon: <TrayIcon size={48} weight="thin" className="text-kumo-subtle" />,
+		icon: <TrayIcon size={48} weight="thin" className="text-ink-3" />,
 		title: "Your inbox is empty",
 		description:
 			"New emails will appear here when they arrive. Send an email to get the conversation started.",
@@ -56,32 +57,32 @@ const FOLDER_EMPTY_STATES: Record<
 	},
 	[Folders.SENT]: {
 		icon: (
-			<PaperPlaneTiltIcon size={48} weight="thin" className="text-kumo-subtle" />
+			<PaperPlaneTiltIcon size={48} weight="thin" className="text-ink-3" />
 		),
 		title: "No sent emails",
 		description: "Emails you send will show up here.",
 		showCompose: true,
 	},
 	[Folders.DRAFT]: {
-		icon: <FileIcon size={48} weight="thin" className="text-kumo-subtle" />,
+		icon: <FileIcon size={48} weight="thin" className="text-ink-3" />,
 		title: "No drafts",
 		description: "Emails you're still working on will be saved here.",
 		showCompose: true,
 	},
 	[Folders.ARCHIVE]: {
-		icon: <ArchiveIcon size={48} weight="thin" className="text-kumo-subtle" />,
+		icon: <ArchiveIcon size={48} weight="thin" className="text-ink-3" />,
 		title: "Archive is empty",
 		description:
 			"Move emails here to keep your inbox clean without deleting them.",
 	},
 	[Folders.TRASH]: {
-		icon: <TrashIcon size={48} weight="thin" className="text-kumo-subtle" />,
+		icon: <TrashIcon size={48} weight="thin" className="text-ink-3" />,
 		title: "Trash is empty",
 		description:
 			"Deleted emails will appear here. You can restore them or permanently delete them.",
 	},
 	[Folders.QUARANTINE]: {
-		icon: <ShieldWarningIcon size={48} weight="thin" className="text-kumo-subtle" />,
+		icon: <ShieldWarningIcon size={48} weight="thin" className="text-ink-3" />,
 		title: "No quarantined emails",
 		description:
 			"Emails the security pipeline classifies as high-risk appear here. Review and release to inbox if safe.",
@@ -93,16 +94,16 @@ function EmailListSkeleton() {
 		<div className="animate-pulse space-y-1 p-2">
 			{Array.from({ length: 8 }).map((_, i) => (
 				<div key={i} className="flex items-center gap-3 px-3 py-3">
-					<div className="w-4 h-4 rounded bg-kumo-fill" />
-					<div className="w-5 h-5 rounded bg-kumo-fill" />
+					<div className="w-4 h-4 rounded bg-paper-3" />
+					<div className="w-5 h-5 rounded bg-paper-3" />
 					<div className="flex-1 space-y-2">
 						<div className="flex items-center gap-2">
-							<div className="h-3 w-24 rounded bg-kumo-fill" />
-							<div className="h-3 w-4 rounded bg-kumo-fill" />
-							<div className="h-3 flex-1 rounded bg-kumo-fill" />
-							<div className="h-3 w-12 rounded bg-kumo-fill" />
+							<div className="h-3 w-24 rounded bg-paper-3" />
+							<div className="h-3 w-4 rounded bg-paper-3" />
+							<div className="h-3 flex-1 rounded bg-paper-3" />
+							<div className="h-3 w-12 rounded bg-paper-3" />
 						</div>
-						<div className="h-2.5 w-3/4 rounded bg-kumo-fill" />
+						<div className="h-2.5 w-3/4 rounded bg-paper-3" />
 					</div>
 				</div>
 			))}
@@ -119,7 +120,7 @@ function FolderEmptyState({
 }) {
 	const config = (folder && FOLDER_EMPTY_STATES[folder]) || {
 		icon: (
-			<EnvelopeSimpleIcon size={48} weight="thin" className="text-kumo-subtle" />
+			<EnvelopeSimpleIcon size={48} weight="thin" className="text-ink-3" />
 		),
 		title: "No emails",
 		description: "This folder is empty.",
@@ -128,10 +129,10 @@ function FolderEmptyState({
 	return (
 		<div className="flex flex-col items-center justify-center py-24 px-6 text-center">
 			<div className="mb-4">{config.icon}</div>
-			<h3 className="text-base font-semibold text-kumo-default mb-1.5">
+			<h3 className="text-base font-semibold text-ink mb-1.5">
 				{config.title}
 			</h3>
-			<p className="text-sm text-kumo-subtle max-w-xs mb-5">
+			<p className="text-sm text-ink-3 max-w-xs mb-5">
 				{config.description}
 			</p>
 			{"showCompose" in config && config.showCompose && (
@@ -166,6 +167,7 @@ export default function EmailListRoute() {
 	const updateEmail = useUpdateEmail();
 	const markThreadRead = useMarkThreadRead();
 	const deleteEmail = useDeleteEmail();
+	const feedback = useFeedback();
 
 	const params = useMemo(
 		() => ({
@@ -214,11 +216,14 @@ export default function EmailListRoute() {
 		e.preventDefault();
 		e.stopPropagation();
 		if (mailboxId)
-			updateEmail.mutate({
-				mailboxId,
-				id: email.id,
-				data: { starred: !email.starred },
-			});
+			updateEmail.mutate(
+				{
+					mailboxId,
+					id: email.id,
+					data: { starred: !email.starred },
+				},
+				{ onError: () => feedback.error("Couldn't update email.") },
+			);
 	};
 
 	const handleDelete = (e: React.MouseEvent, emailId: string) => {
@@ -227,7 +232,10 @@ export default function EmailListRoute() {
 		if (mailboxId) {
 			const confirmed = window.confirm("Are you sure you want to delete this email?");
 			if (!confirmed) return;
-			deleteEmail.mutate({ mailboxId, id: emailId });
+			deleteEmail.mutate(
+				{ mailboxId, id: emailId },
+				{ onError: () => feedback.error("Couldn't delete email.") },
+			);
 			if (selectedEmailId === emailId) closePanel();
 		}
 	};
@@ -253,16 +261,22 @@ export default function EmailListRoute() {
 		selectEmail(email.id);
 		if (mailboxId && hasUnread(email)) {
 			if (email.thread_id && email.thread_count && email.thread_count > 1) {
-				markThreadRead.mutate({
-					mailboxId,
-					threadId: email.thread_id,
-				});
+				markThreadRead.mutate(
+					{
+						mailboxId,
+						threadId: email.thread_id,
+					},
+					{ onError: () => feedback.error("Couldn't mark thread read.") },
+				);
 			} else {
-				updateEmail.mutate({
-					mailboxId,
-					id: email.id,
-					data: { read: true },
-				});
+				updateEmail.mutate(
+					{
+						mailboxId,
+						id: email.id,
+						data: { read: true },
+					},
+					{ onError: () => feedback.error("Couldn't update email.") },
+				);
 			}
 		}
 	};
@@ -285,13 +299,13 @@ export default function EmailListRoute() {
 			isComposing={isComposing}
 		>
 				{/* Folder header */}
-				<div className="flex items-center justify-between px-4 py-3.5 border-b border-kumo-line shrink-0 md:px-5">
-					<h1 className="text-lg font-semibold text-kumo-default">
+				<div className="flex items-center justify-between px-4 py-3.5 border-b border-line shrink-0 md:px-5">
+					<h1 className="pp-serif text-ink">
 						{folderName}
 					</h1>
 					<div className="flex items-center gap-1">
 						{totalCount > 0 && (
-							<span className="text-sm text-kumo-subtle mr-2 hidden sm:inline">
+							<span className="text-sm text-ink-3 mr-2 hidden sm:inline">
 								{totalCount} conversation{totalCount !== 1 ? "s" : ""}
 							</span>
 						)}
@@ -339,14 +353,14 @@ export default function EmailListRoute() {
 												handleRowClick(email);
 											}
 										}}
-										className={`group flex items-center gap-3 w-full text-left cursor-pointer transition-colors border-b border-kumo-line px-4 py-2.5 md:px-6 md:py-3 ${
+										className={`group flex items-center gap-3 w-full text-left cursor-pointer transition-colors border-b border-line px-4 py-2.5 md:px-6 md:py-3 ${
 											isPanelOpen ? "md:px-4 md:py-2.5" : ""
-										} ${isSelected ? "bg-kumo-tint" : "hover:bg-kumo-tint"}`}
+										} ${isSelected ? "bg-paper-3" : "hover:bg-paper-2"}`}
 									>
 										{/* Unread dot */}
 										<div className="w-2.5 shrink-0 flex justify-center">
 											{hasUnread(email) && (
-												<div className="h-2 w-2 rounded-full bg-kumo-brand" />
+												<div className="h-2 w-2 rounded-full bg-accent" />
 											)}
 										</div>
 
@@ -364,8 +378,8 @@ export default function EmailListRoute() {
 												weight={email.starred ? "fill" : "regular"}
 												className={
 													email.starred
-														? "text-kumo-warning"
-														: "text-kumo-subtle hover:text-kumo-warning"
+														? "text-suspect"
+														: "text-ink-3 hover:text-suspect"
 												}
 											/>
 										</button>
@@ -374,40 +388,40 @@ export default function EmailListRoute() {
 										<div className="min-w-0 flex-1">
 											<div className="flex items-center gap-2">
 												<span
-													className={`truncate text-sm ${hasUnread(email) ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}
+													className={`truncate text-sm ${hasUnread(email) ? "font-semibold text-ink" : "text-ink"}`}
 												>
 													{formatParticipants(email)}
 												</span>
 												{(email.thread_count ?? 1) > 1 && (
-													<span className="shrink-0 text-xs text-kumo-subtle bg-kumo-fill rounded-full px-1.5 py-0.5 font-medium">
+													<span className="shrink-0 text-xs text-ink-3 bg-paper-3 rounded-full px-1.5 py-0.5 font-medium">
 														{email.thread_count}
 													</span>
 												)}
 												{email.has_draft && (
-													<span className="shrink-0 text-xs text-kumo-destructive font-medium">
+													<span className="shrink-0 text-xs text-danger font-medium">
 														Draft
 													</span>
 												)}
 												{email.needs_reply && !email.has_draft && (
 													<Tooltip content="Needs reply" asChild>
-														<span className="shrink-0 text-kumo-warning">
+														<span className="shrink-0 text-suspect">
 															<ArrowBendUpLeftIcon size={14} weight="bold" />
 														</span>
 													</Tooltip>
 												)}
 												<VerdictBadge email={email} />
-												<span className="text-sm text-kumo-subtle shrink-0 ml-auto">
+												<span className="text-sm text-ink-3 shrink-0 ml-auto">
 													{formatListDate(email.date)}
 												</span>
 											</div>
 											<div className="truncate text-sm mt-0.5">
 												<span
-													className={hasUnread(email) ? "font-medium text-kumo-default" : "text-kumo-subtle"}
+													className={hasUnread(email) ? "font-medium text-ink" : "text-ink-3"}
 												>
 													{email.subject}
 												</span>
 											{snippet && (
-												<span className="text-kumo-subtle font-normal">
+												<span className="text-ink-3 font-normal">
 													{" "}&mdash; {snippet}
 												</span>
 											)}
@@ -425,11 +439,14 @@ export default function EmailListRoute() {
 													onClick={(e) => {
 														e.stopPropagation();
 														if (mailboxId)
-															updateEmail.mutate({
-																mailboxId,
-																id: email.id,
-																data: { read: !email.read },
-															});
+															updateEmail.mutate(
+																{
+																	mailboxId,
+																	id: email.id,
+																	data: { read: !email.read },
+																},
+																{ onError: () => feedback.error("Couldn't update email.") },
+															);
 													}}
 													aria-label={email.read ? "Mark unread" : "Mark read"}
 												/>
@@ -459,7 +476,7 @@ export default function EmailListRoute() {
 
 				{/* Pagination */}
 				{totalCount > PAGE_SIZE && (
-					<div className="flex justify-center py-3 border-t border-kumo-line shrink-0">
+					<div className="flex justify-center py-3 border-t border-line shrink-0">
 						<Pagination
 							page={page}
 							setPage={setPage}

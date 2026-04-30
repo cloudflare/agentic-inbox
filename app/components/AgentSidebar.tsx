@@ -25,7 +25,7 @@ function LazyAgentPanel() {
 	if (loadError) {
 		return (
 			<div className="flex items-center justify-center h-full">
-				<span className="text-xs text-kumo-error">{loadError}</span>
+				<span className="text-xs text-danger">{loadError}</span>
 			</div>
 		);
 	}
@@ -33,7 +33,7 @@ function LazyAgentPanel() {
 		return (
 			<div className="flex flex-col items-center justify-center h-full gap-2">
 				<Loader size="base" />
-				<span className="text-xs text-kumo-subtle">Loading agent...</span>
+				<span className="text-xs text-ink-3">Loading agent...</span>
 			</div>
 		);
 	}
@@ -46,14 +46,14 @@ export default function AgentSidebar() {
 	return (
 		<div className="flex flex-col h-full">
 			{/* Tab bar */}
-			<div className="flex items-center border-b border-kumo-line shrink-0">
+			<div className="flex items-center border-b border-line shrink-0">
 				<button
 					type="button"
 					onClick={() => setActiveTab("agent")}
 					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
 						activeTab === "agent"
-							? "border-kumo-brand text-kumo-default"
-							: "border-transparent text-kumo-subtle hover:text-kumo-default"
+							? "border-accent text-ink"
+							: "border-transparent text-ink-3 hover:text-ink"
 					}`}
 				>
 					<RobotIcon size={14} weight={activeTab === "agent" ? "fill" : "regular"} />
@@ -64,8 +64,8 @@ export default function AgentSidebar() {
 					onClick={() => setActiveTab("mcp")}
 					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
 						activeTab === "mcp"
-							? "border-kumo-brand text-kumo-default"
-							: "border-transparent text-kumo-subtle hover:text-kumo-default"
+							? "border-accent text-ink"
+							: "border-transparent text-ink-3 hover:text-ink"
 					}`}
 				>
 					<PlugsIcon size={14} weight={activeTab === "mcp" ? "fill" : "regular"} />

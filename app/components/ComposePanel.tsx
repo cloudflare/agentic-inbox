@@ -38,9 +38,9 @@ export default function ComposePanel() {
 	} = useComposeForm(mailboxId, folder);
 
 	return (
-		<div className="flex flex-col h-full bg-kumo-base">
-			<div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line shrink-0 md:px-6">
-				<h2 className="text-base font-semibold text-kumo-default">
+		<div className="flex flex-col h-full bg-paper">
+			<div className="flex items-center justify-between px-4 py-3 border-b border-line shrink-0 md:px-6">
+				<h2 className="text-base font-semibold text-ink">
 					{formTitle}
 				</h2>
 				<div className="flex items-center gap-1">
@@ -65,7 +65,7 @@ export default function ComposePanel() {
 
 					<div className="space-y-3">
 						<div className="flex items-center gap-2">
-							<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
+							<label className="text-sm font-medium text-ink-3 w-14 shrink-0">
 								To
 							</label>
 							<div className="flex-1 flex items-center gap-2 min-w-0">
@@ -81,7 +81,7 @@ export default function ComposePanel() {
 									<button
 										type="button"
 										onClick={() => setShowCcBcc(true)}
-										className="shrink-0 text-xs text-kumo-link hover:text-kumo-link-hover font-medium"
+										className="shrink-0 text-xs text-accent hover:text-accent-2 font-medium"
 									>
 										CC / BCC
 									</button>
@@ -91,7 +91,7 @@ export default function ComposePanel() {
 
 						{showCcBcc && (
 							<div className="flex items-center gap-2">
-								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
+								<label className="text-sm font-medium text-ink-3 w-14 shrink-0">
 									CC
 								</label>
 								<div className="flex-1">
@@ -108,7 +108,7 @@ export default function ComposePanel() {
 
 						{showCcBcc && (
 							<div className="flex items-center gap-2">
-								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
+								<label className="text-sm font-medium text-ink-3 w-14 shrink-0">
 									BCC
 								</label>
 								<div className="flex-1">
@@ -124,7 +124,7 @@ export default function ComposePanel() {
 						)}
 
 						<div className="flex items-center gap-2">
-							<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
+							<label className="text-sm font-medium text-ink-3 w-14 shrink-0">
 								Subject
 							</label>
 							<div className="flex-1">
@@ -140,7 +140,7 @@ export default function ComposePanel() {
 						</div>
 					</div>
 
-					<div className="border border-kumo-line rounded-md overflow-hidden bg-kumo-base">
+					<div className="border border-line rounded-md overflow-hidden bg-paper">
 						<RichTextEditor
 							value={body}
 							onChange={setBody}
@@ -149,7 +149,7 @@ export default function ComposePanel() {
 				</div>
 
 				{/* Footer actions */}
-				<div className="mt-auto px-4 py-3 border-t border-kumo-line bg-kumo-fill/30 shrink-0 md:px-6">
+				<div className="mt-auto px-4 py-3 border-t border-line bg-paper-3/30 shrink-0 md:px-6">
 					<div className="flex items-center justify-between">
 						<Button type="button" variant="ghost" size="sm" onClick={closeCompose} disabled={isSending}>
 							Discard

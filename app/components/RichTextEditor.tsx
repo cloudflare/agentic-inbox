@@ -52,7 +52,7 @@ export default function RichTextEditor({
 		editorProps: {
 			attributes: {
 				class:
-					"prose prose-sm max-w-none focus:outline-none min-h-[180px] p-3 text-sm [&_blockquote]:border-l-2 [&_blockquote]:border-kumo-line [&_blockquote]:pl-3 [&_blockquote]:text-kumo-subtle [&_blockquote]:bg-kumo-tint [&_blockquote]:py-1 [&_blockquote]:my-2 [&_blockquote]:text-xs [&_blockquote]:rounded-r-sm",
+					"prose prose-sm max-w-none focus:outline-none min-h-[180px] p-3 text-sm [&_blockquote]:border-l-2 [&_blockquote]:border-line [&_blockquote]:pl-3 [&_blockquote]:text-ink-3 [&_blockquote]:bg-paper-2 [&_blockquote]:py-1 [&_blockquote]:my-2 [&_blockquote]:text-xs [&_blockquote]:rounded-r-sm",
 			},
 		},
 		onUpdate: ({ editor }) => {
@@ -88,9 +88,9 @@ export default function RichTextEditor({
 	if (!editor) return null;
 
 	return (
-		<div className="rounded-lg border border-kumo-line overflow-hidden flex flex-col h-full">
+		<div className="rounded-lg border border-line overflow-hidden flex flex-col h-full">
 			{/* Toolbar */}
-			<div className="flex flex-wrap items-center gap-0.5 bg-kumo-recessed px-2 py-1.5 border-b border-kumo-line shrink-0">
+			<div className="flex flex-wrap items-center gap-0.5 bg-paper-2 px-2 py-1.5 border-b border-line shrink-0">
 				{/* Text formatting */}
 				<Tooltip content="Bold" side="bottom" asChild>
 					<Button
@@ -133,7 +133,7 @@ export default function RichTextEditor({
 					/>
 				</Tooltip>
 
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
+				<div className="mx-1 h-5 w-px bg-paper-3" />
 
 				{/* Lists */}
 				<Tooltip content="Bullet list" side="bottom" asChild>
@@ -157,7 +157,7 @@ export default function RichTextEditor({
 					/>
 				</Tooltip>
 
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
+				<div className="mx-1 h-5 w-px bg-paper-3" />
 
 				{/* Block formatting */}
 				<Tooltip content="Blockquote" side="bottom" asChild>
@@ -203,7 +203,7 @@ export default function RichTextEditor({
 					/>
 				</Tooltip>
 
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
+				<div className="mx-1 h-5 w-px bg-paper-3" />
 
 				{/* Undo/Redo */}
 				<Tooltip content="Undo" side="bottom" asChild>

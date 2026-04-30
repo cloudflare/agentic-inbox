@@ -33,7 +33,7 @@ function CopyButton({ text }: { text: string }) {
 				size="sm"
 				icon={
 					copied ? (
-						<CheckIcon size={12} weight="bold" className="text-kumo-success" />
+						<CheckIcon size={12} weight="bold" className="text-safe" />
 					) : (
 						<CopyIcon size={12} />
 					)
@@ -71,23 +71,23 @@ export default function MCPPanel() {
 				{/* Intro */}
 				<div className="space-y-2">
 					<div className="flex items-center gap-2">
-						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-kumo-brand/10">
+						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10">
 							<PlugsIcon
 								size={20}
 								weight="duotone"
-								className="text-kumo-brand"
+								className="text-accent"
 							/>
 						</div>
 						<div>
-							<h3 className="text-sm font-semibold text-kumo-default">
+							<h3 className="text-sm font-semibold text-ink">
 								Connect via MCP
 							</h3>
-							<p className="text-xs text-kumo-subtle">
+							<p className="text-xs text-ink-3">
 								Model Context Protocol
 							</p>
 						</div>
 					</div>
-					<p className="text-xs text-kumo-subtle leading-relaxed">
+					<p className="text-xs text-ink-3 leading-relaxed">
 						This email agent exposes an MCP server so AI coding
 						assistants can manage your inbox directly — read emails,
 						search, draft replies, and send messages using natural
@@ -97,14 +97,14 @@ export default function MCPPanel() {
 
 				{/* MCP URL */}
 				<div className="space-y-1.5">
-					<label className="text-xs font-medium text-kumo-strong block">
+					<label className="text-xs font-medium text-ink block">
 						Server URL
 					</label>
 					<div className="relative group">
 						<div className="absolute right-1.5 top-1/2 -translate-y-1/2">
 							<CopyButton text={mcpUrl} />
 						</div>
-						<div className="bg-kumo-recessed text-kumo-default font-mono text-[11px] px-3 py-2.5 pr-10 rounded-lg border border-kumo-line break-all leading-relaxed">
+						<div className="bg-paper-2 text-ink font-mono text-[11px] px-3 py-2.5 pr-10 rounded-lg border border-line break-all leading-relaxed">
 							{mcpUrl}
 						</div>
 					</div>
@@ -112,10 +112,10 @@ export default function MCPPanel() {
 
 				{/* Available tools */}
 				<div className="space-y-2">
-					<h4 className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle px-0.5">
+					<h4 className="text-xs uppercase tracking-wider font-semibold text-ink-3 px-0.5">
 						Available Tools
 					</h4>
-					<div className="border border-kumo-line rounded-lg divide-y divide-kumo-line">
+					<div className="border border-line rounded-lg divide-y divide-line">
 						{TOOLS.map((tool) => (
 							<div
 								key={tool.name}
@@ -124,14 +124,14 @@ export default function MCPPanel() {
 								<WrenchIcon
 									size={12}
 									weight="bold"
-									className="text-kumo-brand shrink-0"
+									className="text-accent shrink-0"
 								/>
 								<div className="min-w-0 flex-1">
-									<span className="text-xs font-mono font-medium text-kumo-default">
+									<span className="text-xs font-mono font-medium text-ink">
 										{tool.name}
 									</span>
 								</div>
-								<span className="text-[11px] text-kumo-subtle shrink-0">
+								<span className="text-[11px] text-ink-3 shrink-0">
 									{tool.desc}
 								</span>
 							</div>

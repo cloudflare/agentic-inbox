@@ -12,7 +12,7 @@ export default function NotFoundRoute() {
 	return (
 		<div className="flex items-center justify-center min-h-screen">
 			<Empty
-				icon={<WarningIcon size={48} className="text-kumo-inactive" />}
+				icon={<WarningIcon size={48} className="text-ink-4" />}
 				title="404 -- Page Not Found"
 				description="The page you're looking for doesn't exist."
 				contents={

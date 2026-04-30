@@ -24,7 +24,7 @@ export default function MailboxSplitView({
 			<div
 				className={`flex flex-col min-w-0 shrink-0 ${
 					isPanelOpen
-						? "hidden md:flex md:w-[380px] md:border-r md:border-kumo-line"
+						? "hidden md:flex md:w-[380px] md:border-r md:border-line"
 						: "w-full"
 				}`}
 			>
@@ -37,7 +37,7 @@ export default function MailboxSplitView({
 					) : isComposing && selectedEmailId ? (
 						<div className="flex flex-col h-full overflow-y-auto">
 							<ComposePanel />
-							<div className="border-t border-kumo-line">
+							<div className="border-t border-line">
 								<EmailPanel emailId={selectedEmailId} />
 							</div>
 						</div>

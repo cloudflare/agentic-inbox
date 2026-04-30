@@ -2,8 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { useKumoToastManager } from "@cloudflare/kumo";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useFeedback } from "~/lib/feedback";
 import {
 	buildQuotedReplyBlock,
 	escapeHtml,
@@ -163,7 +163,7 @@ function buildInitialComposeFields(
 }
 
 export function useComposeForm(mailboxId?: string, _folder?: string) {
-	const toastManager = useKumoToastManager();
+	const feedback = useFeedback();
 	const { composeOptions, closePanel, closeCompose } = useUIStore();
 	const { data: currentMailbox } = useMailbox(mailboxId);
 	const sendEmailMutation = useSendEmail();
@@ -222,12 +222,12 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 				thread_id: composeOptions.originalEmail?.thread_id || composeOptions.draftEmail?.thread_id || undefined,
 				draft_id: composeOptions.draftEmail?.id || undefined,
 			} });
-			toastManager.add({ title: "Draft saved!" });
+			feedback.success("Draft saved!");
 		}
 		catch (err: unknown) {
 			const message = (err instanceof Error ? err.message : null) || "Failed to save draft.";
 			setError(message);
-			toastManager.add({ title: message, variant: "error" });
+			feedback.error(message);
 		}
 		finally { setIsSavingDraft(false); }
 	};
@@ -250,15 +250,15 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			text: htmlToPlainText(body),
 		};
 		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
-		setIsSending(true); toastManager.add({ title: "Sending email..." });
+		setIsSending(true); feedback.info("Sending email...");
 		try {
 			if ((mode === "reply" || mode === "reply-all") && originalId) await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
 			else if (mode === "forward" && originalId) await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
 			else await sendEmailMutation.mutateAsync({ mailboxId, email: emailData });
 			if (draftId) deleteEmailMutation.mutate({ mailboxId, id: draftId });
-			toastManager.add({ title: "Email sent!" });
+			feedback.success("Email sent!");
 			onClose();
-		} catch (err: unknown) { const message = (err instanceof Error ? err.message : null) || "Failed to send email."; setError(message); toastManager.add({ title: message, variant: "error" }); }
+		} catch (err: unknown) { const message = (err instanceof Error ? err.message : null) || "Failed to send email."; setError(message); feedback.error(message); }
 		finally { setIsSending(false); }
 	};
 
