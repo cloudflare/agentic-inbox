@@ -14,8 +14,43 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useDashboardSummary } from "~/queries/dashboard";
 import { useMailbox, useMailboxes } from "~/queries/mailboxes";
 import Logo from "./Logo";
+
+type PipelineTone = "safe" | "suspect" | "danger" | "muted";
+
+interface PipelineState {
+	tone: PipelineTone;
+	label: string;
+	pulse: boolean;
+}
+
+// Map the dashboard summary's pipelineSuccess (0..1, or null) to a visible
+// pill state. Thresholds match the issue spec (#86): >=0.95 healthy, >=0.5
+// degraded, otherwise failing. Null/loading shows muted "No data" — never a
+// fake-green dot.
+function computePipelineState(
+	pipelineSuccess: number | null | undefined,
+): PipelineState {
+	if (pipelineSuccess == null) {
+		return { tone: "muted", label: "No data", pulse: false };
+	}
+	if (pipelineSuccess >= 0.95) {
+		return { tone: "safe", label: "Pipeline online", pulse: true };
+	}
+	if (pipelineSuccess >= 0.5) {
+		return { tone: "suspect", label: "Degraded", pulse: false };
+	}
+	return { tone: "danger", label: "Pipeline failing", pulse: false };
+}
+
+const PIPELINE_DOT_BG: Record<PipelineTone, string> = {
+	safe: "bg-safe",
+	suspect: "bg-suspect",
+	danger: "bg-danger",
+	muted: "bg-ink-4",
+};
 
 interface NavItemProps {
 	to: string;
@@ -78,6 +113,9 @@ export default function Shell({ children }: { children: ReactNode }) {
 	const orgInitial = (mailbox?.name || mailbox?.email || "?")[0]?.toUpperCase();
 
 	const base = mailboxId ? `/mailbox/${encodeURIComponent(mailboxId)}` : "";
+
+	const { data: dashboardSummary } = useDashboardSummary(mailboxId);
+	const pipelineState = computePipelineState(dashboardSummary?.pipelineSuccess);
 
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -170,16 +208,36 @@ export default function Shell({ children }: { children: ReactNode }) {
 					)}
 				</nav>
 
-				{/* Pipeline status pill — static for POC; real data lands with the
-				    dashboard work. Kept in to anchor the visual language. */}
-				<div className="mx-3 mb-3 flex items-center gap-2 rounded-md border border-line bg-paper px-2.5 py-1.5">
-					<span className="relative flex h-2 w-2">
-						<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-safe opacity-60" />
-						<span className="relative inline-flex h-2 w-2 rounded-full bg-safe" />
-					</span>
-					<span className="text-[11px] text-ink-2">Pipeline online</span>
-					<span className="pp-mono text-[10.5px] text-ink-3 ml-auto">p50 —</span>
-				</div>
+				{/* Pipeline status pill. State derives from the dashboard summary's
+				    `pipelineSuccess` (#86). Real p50/p95 latency is tracked in #71
+				    and isn't surfaced here yet — the previous static "p50 —"
+				    placeholder was misleading and has been removed. */}
+				{mailboxId && (
+					<button
+						type="button"
+						role="status"
+						aria-live="polite"
+						aria-label={`Pipeline status: ${pipelineState.label}`}
+						onClick={() => navigate(`${base}/dashboard`)}
+						className="mx-3 mb-3 flex items-center gap-2 rounded-md border border-line bg-paper px-2.5 py-1.5 text-left hover:border-line-strong transition-colors"
+					>
+						<span className="relative flex h-2 w-2">
+							{pipelineState.pulse && (
+								<span
+									aria-hidden
+									className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${PIPELINE_DOT_BG[pipelineState.tone]}`}
+								/>
+							)}
+							<span
+								aria-hidden
+								className={`relative inline-flex h-2 w-2 rounded-full ${PIPELINE_DOT_BG[pipelineState.tone]}`}
+							/>
+						</span>
+						<span className="text-[11px] text-ink-2">
+							{pipelineState.label}
+						</span>
+					</button>
+				)}
 
 				<div className="border-t border-line px-3 py-2.5 flex items-center gap-2">
 					<div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-tint text-accent-ink text-[11px] font-medium">
