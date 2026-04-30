@@ -11,7 +11,7 @@ import {
 	SunIcon,
 	TrayIcon,
 } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useMailbox, useMailboxes } from "~/queries/mailboxes";
@@ -78,6 +78,31 @@ export default function Shell({ children }: { children: ReactNode }) {
 	const orgInitial = (mailbox?.name || mailbox?.email || "?")[0]?.toUpperCase();
 
 	const base = mailboxId ? `/mailbox/${encodeURIComponent(mailboxId)}` : "";
+
+	const searchInputRef = useRef<HTMLInputElement>(null);
+	const [searchQuery, setSearchQuery] = useState("");
+
+	useEffect(() => {
+		// Cmd/Ctrl+K from anywhere focuses the search input.
+		const onKey = (e: KeyboardEvent) => {
+			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+				e.preventDefault();
+				searchInputRef.current?.focus();
+				searchInputRef.current?.select();
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
+
+	const handleSearchSubmit = (e: FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		const q = searchQuery.trim();
+		if (!q || !mailboxId) return;
+		navigate(
+			`/mailbox/${encodeURIComponent(mailboxId)}/search?q=${encodeURIComponent(q)}`,
+		);
+	};
 
 	return (
 		<div className="flex h-screen overflow-hidden bg-paper text-ink">
@@ -178,15 +203,22 @@ export default function Shell({ children }: { children: ReactNode }) {
 			{/* Main column. Topbar pinned, content scrolls. */}
 			<div className="flex-1 flex flex-col min-w-0">
 				<header className="flex items-center gap-3 h-[52px] px-4 md:px-6 border-b border-line bg-paper">
-					<div className="flex items-center gap-2 flex-1 max-w-xl">
+					<form
+						role="search"
+						onSubmit={handleSearchSubmit}
+						className="flex items-center gap-2 flex-1 max-w-xl"
+					>
 						<MagnifyingGlassIcon size={14} className="text-ink-3 shrink-0" />
 						<input
+							ref={searchInputRef}
 							type="search"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
 							className="flex-1 bg-transparent border-0 outline-none text-[13px] text-ink placeholder:text-ink-4"
-							placeholder="Search messages, indicators, cases…  ⌘K"
+							placeholder="Search emails…  ⌘K"
 							aria-label="Search"
 						/>
-					</div>
+					</form>
 					<div className="ml-auto flex items-center gap-1.5 shrink-0">
 						<button
 							type="button"
