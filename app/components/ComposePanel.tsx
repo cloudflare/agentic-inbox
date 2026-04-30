@@ -60,7 +60,7 @@ export default function ComposePanel() {
 				onSubmit={(e) => handleSend(e, closePanel)}
 				className="flex flex-col flex-1 min-h-0 overflow-y-auto"
 			>
-				<div className="p-4 md:p-6 space-y-4">
+				<div className="p-4 sm:p-5 md:p-6 space-y-4">
 					{error && <Banner variant="error" text={error} />}
 
 					<div className="space-y-3">
