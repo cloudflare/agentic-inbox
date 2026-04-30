@@ -126,3 +126,20 @@ export interface Folder {
 	name: string;
 	unreadCount: number;
 }
+
+export interface DashboardCase {
+	id: string;
+	title: string;
+	status: string;
+	updated_at: string;
+}
+
+export interface DashboardSummary {
+	now: string;
+	threatsBlocked: number;
+	openCases: number;
+	hubContributions: number;
+	pipelineSuccess: number | null;
+	threatPressure: number[];
+	recentCases: DashboardCase[];
+}

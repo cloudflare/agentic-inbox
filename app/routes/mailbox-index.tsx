@@ -4,6 +4,8 @@
 
 import { Navigate } from "react-router";
 
+// SOC framing: the dashboard is the default landing for a selected mailbox.
+// Inbox is still reachable via the topbar mailbox section.
 export default function MailboxIndexRoute() {
-  return <Navigate to="emails/inbox" replace />;
+  return <Navigate to="dashboard" replace />;
 }

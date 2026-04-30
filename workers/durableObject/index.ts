@@ -1360,4 +1360,99 @@ export class MailboxDO extends DurableObject<Env> {
 		}>;
 		return rows;
 	}
+
+	/**
+	 * Aggregate the operations dashboard payload in one round-trip from the
+	 * UI. Each card lives in its own indexed query — see
+	 * `migrations.ts/11_dashboard_indexes` for the supporting indexes.
+	 *
+	 * Pipeline-success is derived from `emails.deep_scan_status` because we
+	 * don't yet log per-run latency; tracked as a follow-up. Hub
+	 * "contributions" is the local proxy `cases.shared_to_hub`; real
+	 * cross-org corroboration would require a hub-side query and is also
+	 * tracked separately.
+	 */
+	async getDashboardSummary(opts: { now?: string } = {}) {
+		const nowIso = opts.now ?? new Date().toISOString();
+		const dayAgoIso = new Date(
+			new Date(nowIso).getTime() - 24 * 60 * 60 * 1000,
+		).toISOString();
+
+		const threatsBlocked = (
+			this.db
+				.select({ count: sql<number>`COUNT(*)` })
+				.from(schema.cases)
+				.where(
+					and(
+						eq(schema.cases.status, "closed-tp"),
+						sql`${schema.cases.updated_at} >= ${dayAgoIso}`,
+					),
+				)
+				.get() ?? { count: 0 }
+		).count;
+
+		const openCases = (
+			this.db
+				.select({ count: sql<number>`COUNT(*)` })
+				.from(schema.cases)
+				.where(eq(schema.cases.status, "open"))
+				.get() ?? { count: 0 }
+		).count;
+
+		const hubContributions = (
+			this.db
+				.select({ count: sql<number>`COUNT(*)` })
+				.from(schema.cases)
+				.where(
+					and(
+						eq(schema.cases.shared_to_hub, 1),
+						sql`${schema.cases.updated_at} >= ${dayAgoIso}`,
+					),
+				)
+				.get() ?? { count: 0 }
+		).count;
+
+		const scanStatusRows = this.db
+			.select({
+				status: schema.emails.deep_scan_status,
+				count: sql<number>`COUNT(*)`,
+			})
+			.from(schema.emails)
+			.where(sql`${schema.emails.date} >= ${dayAgoIso}`)
+			.groupBy(schema.emails.deep_scan_status)
+			.all();
+		const completed = scanStatusRows.find((r) => r.status === "completed")?.count ?? 0;
+		const failed = scanStatusRows.find((r) => r.status === "failed")?.count ?? 0;
+
+		const verdictRows = this.db
+			.select({
+				date: schema.emails.date,
+				security_verdict: schema.emails.security_verdict,
+			})
+			.from(schema.emails)
+			.where(sql`${schema.emails.date} >= ${dayAgoIso}`)
+			.all();
+
+		const recentCases = this.db
+			.select({
+				id: schema.cases.id,
+				title: schema.cases.title,
+				status: schema.cases.status,
+				updated_at: schema.cases.updated_at,
+			})
+			.from(schema.cases)
+			.orderBy(desc(schema.cases.updated_at))
+			.limit(5)
+			.all();
+
+		return {
+			now: nowIso,
+			threatsBlocked,
+			openCases,
+			hubContributions,
+			pipelineScan: { completed, failed },
+			verdictRows,
+			recentCases,
+		};
+	}
 }

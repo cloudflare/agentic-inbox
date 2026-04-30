@@ -27,6 +27,10 @@ import { getSecuritySettings } from "./security/settings";
 import { isDmarcReport, ingestDmarcReport } from "./dmarc/ingest";
 import { dmarcRoutes } from "./routes/dmarc";
 import { caseRoutes } from "./routes/cases";
+import {
+	bucketThreatPressure,
+	pipelineSuccessRate,
+} from "./lib/dashboard-aggregation";
 
 type AppContext = Context<MailboxContext>;
 
@@ -131,6 +135,21 @@ app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const obj = await c.env.BUCKET.get(`mailboxes/${mailboxId}.json`);
 	if (!obj) return c.json({ error: "Not found" }, 404);
 	return c.json({ id: mailboxId, name: mailboxId, email: mailboxId, settings: await obj.json() });
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/dashboard", async (c: AppContext) => {
+	const raw = await c.var.mailboxStub.getDashboardSummary();
+	const threatPressure = bucketThreatPressure(raw.verdictRows);
+	const pipelineSuccess = pipelineSuccessRate(raw.pipelineScan);
+	return c.json({
+		now: raw.now,
+		threatsBlocked: raw.threatsBlocked,
+		openCases: raw.openCases,
+		hubContributions: raw.hubContributions,
+		pipelineSuccess,
+		threatPressure,
+		recentCases: raw.recentCases,
+	});
 });
 
 // Realtime event stream. Browsers can't set custom headers on `new

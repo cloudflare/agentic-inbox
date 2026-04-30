@@ -286,4 +286,13 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_case_observables_case_id ON case_observables(case_id);
         `,
 	},
+	{
+		// Speeds up the dashboard aggregation queries that scan recent cases
+		// (`updated_at >= now-24h`) and order recent activity by `updated_at`.
+		// `idx_cases_status` is already in place from migration 10.
+		name: "11_dashboard_indexes",
+		sql: `
+            CREATE INDEX IF NOT EXISTS idx_cases_updated_at ON cases(updated_at);
+        `,
+	},
 ];
