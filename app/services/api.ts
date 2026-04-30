@@ -2,7 +2,15 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { DashboardSummary, Email, Folder, Mailbox } from "~/types";
+import type {
+	DashboardSummary,
+	Email,
+	Folder,
+	HubContributionsResponse,
+	HubDestroylistResponse,
+	HubSharingGroupsResponse,
+	Mailbox,
+} from "~/types";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -164,6 +172,20 @@ const api = {
 	// Dashboard
 	getDashboardSummary: (mailboxId: string, opts?: { signal?: AbortSignal }) =>
 		get<DashboardSummary>(`/api/v1/mailboxes/${mailboxId}/dashboard`, { signal: opts?.signal }),
+
+	// Hub
+	getHubContributions: (mailboxId: string, opts?: { signal?: AbortSignal }) =>
+		get<HubContributionsResponse>(`/api/v1/mailboxes/${mailboxId}/hub/contributions`, {
+			signal: opts?.signal,
+		}),
+	getHubDestroylist: (mailboxId: string, opts?: { signal?: AbortSignal }) =>
+		get<HubDestroylistResponse>(`/api/v1/mailboxes/${mailboxId}/hub/destroylist`, {
+			signal: opts?.signal,
+		}),
+	getHubSharingGroups: (mailboxId: string, opts?: { signal?: AbortSignal }) =>
+		get<HubSharingGroupsResponse>(`/api/v1/mailboxes/${mailboxId}/hub/sharing-groups`, {
+			signal: opts?.signal,
+		}),
 };
 
 export default api;

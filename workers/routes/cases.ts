@@ -20,6 +20,7 @@ import { extractUrls } from "../security/urls";
 import { stripHtmlToText } from "../lib/email-helpers";
 import { buildMispEvent } from "../intel/report";
 import { MispClient } from "../intel/misp-client";
+import { loadHubConfig } from "../lib/hub-config";
 
 export const caseRoutes = new Hono<MailboxContext>();
 
@@ -112,10 +113,10 @@ caseRoutes.post("/report-phish", async (c) => {
 	try {
 		const mailboxId = c.req.param("mailboxId");
 		if (mailboxId) {
-			const hub = await loadHubSettings(c.env.BUCKET, mailboxId);
+			const hub = await loadHubConfig(c.env.BUCKET, mailboxId);
 			if (hub?.auto_report) {
 				const apiKey = (c.env as unknown as Record<string, string | undefined>)[hub.api_key_secret_name];
-				if (apiKey && hub.url && hub.org_uuid) {
+				if (apiKey) {
 					const event = await buildMispEvent({
 						orgUuid: hub.org_uuid,
 						sharingGroupUuid: hub.default_sharing_group_uuid,
@@ -144,23 +145,3 @@ caseRoutes.post("/report-phish", async (c) => {
 
 	return c.json({ caseId: id, hubEventUuid: hubUuid }, 201);
 });
-
-async function loadHubSettings(
-	bucket: R2Bucket,
-	mailboxId: string,
-): Promise<{
-	url: string;
-	org_uuid: string;
-	api_key_secret_name: string;
-	auto_report: boolean;
-	default_sharing_group_uuid?: string;
-} | null> {
-	const obj = await bucket.get(`mailboxes/${mailboxId}.json`);
-	if (!obj) return null;
-	try {
-		const json = (await obj.json()) as { intel?: { hub?: unknown } } | null;
-		return (json?.intel?.hub as ReturnType<typeof loadHubSettings> extends Promise<infer T> ? T : never) ?? null;
-	} catch {
-		return null;
-	}
-}

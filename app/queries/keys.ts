@@ -24,5 +24,10 @@ export const queryKeys = {
 			["search", mailboxId, query, page] as const,
 	},
 	dashboard: (mailboxId: string) => ["dashboard", mailboxId] as const,
+	hub: {
+		contributions: (mailboxId: string) => ["hub", mailboxId, "contributions"] as const,
+		destroylist: (mailboxId: string) => ["hub", mailboxId, "destroylist"] as const,
+		sharingGroups: (mailboxId: string) => ["hub", mailboxId, "sharing-groups"] as const,
+	},
 	config: ["config"] as const,
 };

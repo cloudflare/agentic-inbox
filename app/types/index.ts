@@ -143,3 +143,30 @@ export interface DashboardSummary {
 	threatPressure: number[];
 	recentCases: DashboardCase[];
 }
+
+export interface HubContribution {
+	uuid: string;
+	info: string;
+	date: string;
+	timestamp: string;
+	sharing_group_uuid?: string;
+	attribute_count: number;
+}
+
+export interface HubSharingGroup {
+	uuid: string;
+	name: string;
+	description?: string;
+	role?: string;
+}
+
+/**
+ * Every hub UI endpoint returns this envelope. `configured: false` is the
+ * normal state for a mailbox without `intel.hub` set; the UI renders one
+ * "Configure hub credentials" panel and stops querying.
+ */
+export type HubEnvelope<T> = { configured: true; data: T } | { configured: false };
+
+export type HubContributionsResponse = HubEnvelope<HubContribution[]>;
+export type HubDestroylistResponse = HubEnvelope<{ values: string[]; count: number }>;
+export type HubSharingGroupsResponse = HubEnvelope<{ groups: HubSharingGroup[] }>;

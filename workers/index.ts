@@ -27,6 +27,7 @@ import { getSecuritySettings } from "./security/settings";
 import { isDmarcReport, ingestDmarcReport } from "./dmarc/ingest";
 import { dmarcRoutes } from "./routes/dmarc";
 import { caseRoutes } from "./routes/cases";
+import { hubUiRoutes } from "./routes/hub-ui";
 import {
 	bucketThreatPressure,
 	pipelineSuccessRate,
@@ -98,6 +99,7 @@ app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
 app.route("/api/v1/mailboxes/:mailboxId/dmarc", dmarcRoutes);
 app.route("/api/v1/mailboxes/:mailboxId/cases", caseRoutes);
+app.route("/api/v1/mailboxes/:mailboxId/hub", hubUiRoutes);
 
 app.get("/api/v1/config", (c) => {
 	const domainsRaw = c.env.DOMAINS || "";
