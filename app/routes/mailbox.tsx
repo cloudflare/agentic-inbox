@@ -20,7 +20,7 @@ export default function MailboxRoute() {
 	useMailbox(mailboxId);
 	const prevMailboxIdRef = useRef<string | undefined>(undefined);
 	const queryClient = useQueryClient();
-	const { closeSidebar, isAgentPanelOpen, closePanel, closeComposeModal } = useUIStore();
+	const { closeSidebar, closePanel, closeComposeModal, closeAgentPanel } = useUIStore();
 
 	const handleMailboxEvent = useCallback(
 		(event: MailboxEvent) => {
@@ -58,26 +58,19 @@ export default function MailboxRoute() {
 			closePanel();
 			closeComposeModal();
 			closeSidebar();
+			// Close the slide-over too — switching mailboxes mid-conversation
+			// would otherwise leave a dialog open over a fresh mailbox context.
+			closeAgentPanel();
 		}
 
 		prevMailboxIdRef.current = mailboxId;
-	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
+	}, [mailboxId, closeComposeModal, closePanel, closeSidebar, closeAgentPanel]);
 
 	return (
 		<>
-			<Shell>
+			<Shell rightPanel={<AgentSidebar />}>
 				<Outlet />
 			</Shell>
-
-			{/* Agent + MCP sidebar -- togglable on desktop. Rendered as a fixed
-			    overlay so it composes with the new Shell layout without forcing
-			    Shell to know about it. */}
-			{isAgentPanelOpen && (
-				<div className="hidden lg:flex fixed top-0 right-0 bottom-0 w-[380px] z-20 border-l border-line flex-col bg-paper overflow-hidden">
-					<AgentSidebar />
-				</div>
-			)}
-
 			<ComposeEmail />
 		</>
 	);

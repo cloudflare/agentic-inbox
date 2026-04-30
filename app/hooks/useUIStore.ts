@@ -83,6 +83,8 @@ interface UIState {
 
 	// Agent panel
 	isAgentPanelOpen: boolean;
+	openAgentPanel: () => void;
+	closeAgentPanel: () => void;
 	toggleAgentPanel: () => void;
 
 	// Legacy dialog support (kept for non-split views)
@@ -110,7 +112,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 	composeOptions: { mode: "new", originalEmail: null },
 	isComposeModalOpen: false,
 	isSidebarOpen: false,
-	isAgentPanelOpen: true,
+	// Closed by default. After #82 the panel is reachable on narrow viewports
+	// via a slide-over; auto-popping that on every page load would be hostile.
+	// Users summon the panel via the topbar "Ask co-pilot" toggle.
+	isAgentPanelOpen: false,
 
 	theme: "dark",
 	hue: 35,
@@ -146,6 +151,8 @@ export const useUIStore = create<UIState>((set, get) => ({
 	closeSidebar: () => set({ isSidebarOpen: false }),
 	toggleSidebar: () => set({ isSidebarOpen: !get().isSidebarOpen }),
 
+	openAgentPanel: () => set({ isAgentPanelOpen: true }),
+	closeAgentPanel: () => set({ isAgentPanelOpen: false }),
 	toggleAgentPanel: () => set({ isAgentPanelOpen: !get().isAgentPanelOpen }),
 
 	openComposeModal: (options) =>

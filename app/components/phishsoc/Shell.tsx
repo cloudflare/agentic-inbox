@@ -16,6 +16,7 @@ import { NavLink, useNavigate, useParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useDashboardSummary } from "~/queries/dashboard";
 import { useMailbox, useMailboxes } from "~/queries/mailboxes";
+import AgentPanelSlot from "./AgentPanelSlot";
 import Logo from "./Logo";
 
 type PipelineTone = "safe" | "suspect" | "danger" | "muted";
@@ -102,10 +103,20 @@ function SectionLabel({ children }: { children: ReactNode }) {
 	);
 }
 
-export default function Shell({ children }: { children: ReactNode }) {
+interface ShellProps {
+	children: ReactNode;
+	/**
+	 * Optional right-hand content that shares the main column. Today this hosts
+	 * the agent + MCP panel (#82); the slot is responsible for choosing
+	 * in-flow (xl+) vs slide-over (<xl) rendering based on viewport.
+	 */
+	rightPanel?: ReactNode;
+}
+
+export default function Shell({ children, rightPanel }: ShellProps) {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
 	const navigate = useNavigate();
-	const { theme, toggleTheme } = useUIStore();
+	const { theme, toggleTheme, isAgentPanelOpen, toggleAgentPanel } = useUIStore();
 	const { data: mailbox } = useMailbox(mailboxId);
 	const { data: mailboxes } = useMailboxes();
 	const mailboxCount = mailboxes?.length ?? 0;
@@ -287,15 +298,33 @@ export default function Shell({ children }: { children: ReactNode }) {
 						</button>
 						<button
 							type="button"
-							className="flex items-center gap-1.5 rounded-md bg-accent-tint border border-[color-mix(in_oklch,var(--accent)_25%,transparent)] px-2.5 py-1.5 text-[12px] font-medium text-accent-ink hover:bg-[color-mix(in_oklch,var(--accent-tint)_70%,var(--paper))] transition-colors"
+							onClick={() => toggleAgentPanel()}
+							aria-expanded={isAgentPanelOpen}
+							aria-controls="agent-panel"
+							className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+								isAgentPanelOpen
+									? "bg-accent text-accent-ink border-accent hover:bg-[color-mix(in_oklch,var(--accent)_85%,black)]"
+									: "bg-accent-tint text-accent-ink border-[color-mix(in_oklch,var(--accent)_25%,transparent)] hover:bg-[color-mix(in_oklch,var(--accent-tint)_70%,var(--paper))]"
+							}`}
 						>
-							<SparkleIcon size={13} weight="fill" className="text-accent" />
+							<SparkleIcon
+								size={13}
+								weight="fill"
+								className={isAgentPanelOpen ? "text-accent-ink" : "text-accent"}
+							/>
 							Ask co-pilot
 						</button>
 					</div>
 				</header>
 
-				<main className="flex-1 overflow-y-auto">{children}</main>
+				{/* Main + optional right panel share a flex row so the in-flow
+				    panel (xl+) shrinks the children's column instead of overlaying.
+				    Below xl the slot renders a slide-over that owns its own
+				    positioning and doesn't push the main column. */}
+				<div className="flex-1 flex min-h-0 overflow-hidden">
+					<main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
+					{rightPanel && <AgentPanelSlot rightPanel={rightPanel} />}
+				</div>
 			</div>
 		</div>
 	);
