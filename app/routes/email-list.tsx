@@ -12,6 +12,7 @@ import {
 	FileIcon,
 	PaperPlaneTiltIcon,
 	PencilSimpleIcon,
+	ShieldIcon,
 	ShieldWarningIcon,
 	StarIcon,
 	TrashIcon,
@@ -23,7 +24,28 @@ import { useParams } from "react-router";
 import { Folders } from "shared/folders";
 import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
-import VerdictBadge from "~/components/VerdictBadge";
+import VerdictPill from "~/components/phishsoc/VerdictPill";
+import { verdictActionToPill } from "~/components/phishsoc/verdict";
+import { parseVerdict, type Email as EmailType } from "~/types";
+
+function EmailVerdictPill({
+	email,
+}: { email: Pick<EmailType, "security_verdict"> }) {
+	const verdict = parseVerdict(email.security_verdict);
+	const pill = verdictActionToPill(verdict?.action);
+	if (!pill || !verdict) return null;
+	const icon =
+		pill.tone === "danger" ? (
+			<ShieldWarningIcon size={12} weight="fill" />
+		) : (
+			<ShieldIcon size={12} weight="bold" />
+		);
+	return (
+		<VerdictPill tone={pill.tone} icon={icon} title={verdict.explanation}>
+			{pill.label}
+		</VerdictPill>
+	);
+}
 import { useFeedback } from "~/lib/feedback";
 import { getSnippetText } from "~/lib/utils";
 import {
@@ -409,7 +431,7 @@ export default function EmailListRoute() {
 														</span>
 													</Tooltip>
 												)}
-												<VerdictBadge email={email} />
+												<EmailVerdictPill email={email} />
 												<span className="text-sm text-ink-3 shrink-0 ml-auto">
 													{formatListDate(email.date)}
 												</span>

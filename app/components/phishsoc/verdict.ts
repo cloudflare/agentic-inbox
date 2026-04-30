@@ -50,3 +50,23 @@ export function scoreToneClass(score: number): string {
 	if (score >= 60) return "text-suspect/70";
 	return "text-ink-3";
 }
+
+/**
+ * Maps a security pipeline `verdict.action` to the tone + label used in the
+ * email-list pill. Returns null for `allow` (the row stays clean — no pill)
+ * and for unknown actions.
+ */
+export function verdictActionToPill(
+	action: string | null | undefined,
+): { tone: VerdictTone; label: string } | null {
+	switch (action) {
+		case "block":
+			return { tone: "danger", label: "Blocked" };
+		case "quarantine":
+			return { tone: "suspect", label: "Quarantined" };
+		case "tag":
+			return { tone: "suspect", label: "Suspicious" };
+		default:
+			return null;
+	}
+}

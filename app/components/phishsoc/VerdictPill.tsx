@@ -6,6 +6,7 @@ interface VerdictPillProps {
 	icon?: ReactNode;
 	children: ReactNode;
 	className?: string;
+	title?: string;
 }
 
 const TONE_CLASS: Record<VerdictTone, string> = {
@@ -17,9 +18,18 @@ const TONE_CLASS: Record<VerdictTone, string> = {
 	accent: "pp-pill-accent",
 };
 
-export default function VerdictPill({ tone, icon, children, className }: VerdictPillProps) {
+export default function VerdictPill({
+	tone,
+	icon,
+	children,
+	className,
+	title,
+}: VerdictPillProps) {
 	return (
-		<span className={`pp-pill ${TONE_CLASS[tone]}${className ? ` ${className}` : ""}`}>
+		<span
+			title={title}
+			className={`pp-pill ${TONE_CLASS[tone]}${className ? ` ${className}` : ""}`}
+		>
 			{icon}
 			{children}
 		</span>

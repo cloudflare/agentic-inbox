@@ -86,6 +86,11 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 
 		// Use srcdoc so the iframe is truly sandboxed (no same-origin access).
 		// We can't use doc.write() because that requires allow-same-origin.
+		//
+		// The hex colors below render the email body, which is a separate
+		// document from the SOC chrome — the PhishSOC oklch tokens are not
+		// reachable past the CSP boundary. Treat these as the email-body
+		// design system, intentionally distinct from the app tokens.
 		iframe.srcdoc = `<!DOCTYPE html>
 <html>
 <head>
