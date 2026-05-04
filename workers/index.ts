@@ -290,8 +290,12 @@ app.put("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => {
 });
 
 app.delete("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => {
-	const ok = await c.var.mailboxStub.deleteFolder(c.req.param("id")!);
-	return ok ? c.body(null, 204) : c.json({ error: "Folder not found or cannot be deleted" }, 400);
+	const attachments = await c.var.mailboxStub.deleteFolder(c.req.param("id")!);
+	if (attachments === false) return c.json({ error: "Folder not found or cannot be deleted" }, 400);
+	if (attachments.length > 0) {
+		await c.env.BUCKET.delete(attachments.map((att: any) => `attachments/${att.email_id}/${att.id}/${att.filename}`));
+	}
+	return c.body(null, 204);
 });
 
 // -- Search ---------------------------------------------------------
