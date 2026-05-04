@@ -17,7 +17,7 @@ import {
 import { useMemo, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
-import { useCreateFolder, useFolders } from "~/queries/folders";
+import { useCreateFolder, useDeleteFolder, useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 
@@ -73,15 +73,66 @@ function FolderLink({
 	);
 }
 
+interface CustomFolderLinkProps extends FolderLinkProps {
+	onDelete: () => void;
+}
+
+function CustomFolderLink({
+	to,
+	icon,
+	label,
+	unreadCount,
+	onClick,
+	onDelete,
+}: CustomFolderLinkProps) {
+	return (
+		<div className="group flex items-stretch rounded-md text-sm transition-colors hover:bg-kumo-tint overflow-hidden relative">
+			<NavLink
+				to={to}
+				onClick={onClick}
+				className={({ isActive }) =>
+					`flex items-center gap-3 py-2 px-3 flex-1 overflow-hidden transition-colors ${
+						isActive
+							? "bg-kumo-fill font-semibold text-kumo-default"
+							: "text-kumo-strong"
+					}`
+				}
+			>
+				<span className="shrink-0">{icon}</span>
+				<span className="truncate flex-1">{label}</span>
+				{unreadCount != null && unreadCount > 0 && (
+					<Badge variant="secondary">{unreadCount}</Badge>
+				)}
+			</NavLink>
+			<button
+				type="button"
+				onClick={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					onDelete();
+				}}
+				className="hidden group-hover:flex items-center justify-center px-2 text-kumo-subtle hover:text-kumo-danger hover:bg-kumo-fill transition-colors absolute right-0 top-0 bottom-0"
+				aria-label="Delete folder"
+			>
+				<TrashIcon size={14} />
+			</button>
+		</div>
+	);
+}
+
 export default function Sidebar() {
-	const { mailboxId } = useParams<{ mailboxId: string }>();
+	const { mailboxId, folderId: currentFolderId } = useParams<{ mailboxId: string; folderId?: string }>();
 	const navigate = useNavigate();
 	const { data: folders = [] } = useFolders(mailboxId);
 	const createFolderMutation = useCreateFolder();
+	const deleteFolderMutation = useDeleteFolder();
 	const { startCompose, closeSidebar } = useUIStore();
 	const { data: currentMailbox } = useMailbox(mailboxId);
+	
 	const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
 	const [newFolderName, setNewFolderName] = useState("");
+
+	const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
 
 	const customFolders = useMemo(
 		() =>
@@ -100,6 +151,16 @@ export default function Sidebar() {
 			createFolderMutation.mutate({ mailboxId, name: newFolderName.trim() });
 			setNewFolderName("");
 			setIsCreateFolderOpen(false);
+		}
+	};
+
+	const handleDeleteFolder = () => {
+		if (folderToDelete && mailboxId) {
+			deleteFolderMutation.mutate({ mailboxId, id: folderToDelete.id });
+			if (currentFolderId === folderToDelete.id) {
+				navigate(`/mailbox/${mailboxId}/emails/inbox`);
+			}
+			setFolderToDelete(null);
 		}
 	};
 
@@ -189,13 +250,14 @@ export default function Sidebar() {
 							</Tooltip>
 						</div>
 						{customFolders.map((folder) => (
-							<FolderLink
+							<CustomFolderLink
 								key={folder.id}
 								to={`/mailbox/${mailboxId}/emails/${folder.id}`}
 								icon={<FolderIcon size={18} />}
 								label={folder.name}
 								unreadCount={folder.unreadCount}
 								onClick={handleNavClick}
+								onDelete={() => setFolderToDelete({ id: folder.id, name: folder.name })}
 							/>
 						))}
 					</div>
@@ -257,6 +319,39 @@ export default function Sidebar() {
 							</Button>
 						</div>
 					</form>
+				</Dialog>
+			</Dialog.Root>
+
+			{/* Delete folder dialog */}
+			<Dialog.Root
+				open={!!folderToDelete}
+				onOpenChange={(open) => {
+					if (!open) setFolderToDelete(null);
+				}}
+			>
+				<Dialog size="sm" className="p-6">
+					<Dialog.Title className="text-base font-semibold text-kumo-danger mb-4">
+						Delete folder
+					</Dialog.Title>
+					<p className="text-kumo-subtle text-sm mb-6">
+						Are you sure you want to delete the folder "{folderToDelete?.name}"? All emails in this folder will be permanently deleted. This action cannot be undone.
+					</p>
+					<div className="flex justify-end gap-2">
+						<Dialog.Close
+							render={(props) => (
+								<Button {...props} variant="secondary">
+									Cancel
+								</Button>
+							)}
+						/>
+						<Button
+							variant="destructive"
+							onClick={handleDeleteFolder}
+							disabled={deleteFolderMutation.isPending}
+						>
+							{deleteFolderMutation.isPending ? "Deleting..." : "Delete"}
+						</Button>
+					</div>
 				</Dialog>
 			</Dialog.Root>
 		</aside>

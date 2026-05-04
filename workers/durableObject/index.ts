@@ -623,12 +623,24 @@ export class MailboxDO extends DurableObject<Env> {
 			return false;
 		}
 
+		// Fetch all attachments for emails in this folder before cascade deletion
+		const attachmentsToDelete = this.db
+			.select({
+				id: schema.attachments.id,
+				email_id: schema.attachments.email_id,
+				filename: schema.attachments.filename,
+			})
+			.from(schema.attachments)
+			.innerJoin(schema.emails, eq(schema.attachments.email_id, schema.emails.id))
+			.where(eq(schema.emails.folder_id, id))
+			.all();
+
 		this.db
 			.delete(schema.folders)
 			.where(eq(schema.folders.id, id))
 			.run();
 
-		return true;
+		return attachmentsToDelete;
 	}
 
 	async moveEmail(id: string, folderId: string) {
