@@ -329,6 +329,12 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId"
 
 const MAX_EMAIL_SIZE = 25 * 1024 * 1024;
 
+type InboundEmailEvent = {
+	raw: ReadableStream;
+	rawSize: number;
+	to?: string;
+};
+
 async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	if (streamSize > MAX_EMAIL_SIZE) throw new Error(`Email too large: ${streamSize} bytes exceeds ${MAX_EMAIL_SIZE} byte limit`);
 	if (streamSize <= 0) throw new Error(`Invalid stream size: ${streamSize}`);
@@ -345,22 +351,27 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	return result;
 }
 
-async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
+function normalizeEmailAddress(address?: string | null) {
+	return address?.trim().toLowerCase() || undefined;
+}
+
+async function receiveEmail(event: InboundEmailEvent, env: Env, ctx: ExecutionContext) {
 	const rawEmail = await streamToArrayBuffer(event.raw, event.rawSize);
 	const parsedEmail = await new PostalMime().parse(rawEmail);
 
-	if (!parsedEmail.to?.length || !parsedEmail.to[0].address) throw new Error("received email with empty to");
-
 	const allowedAddresses = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
-	const allRecipients = parsedEmail.to.map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
-	const ccRecipients = (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
-	const bccRecipients = (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
+	const envelopeRecipient = normalizeEmailAddress(event.to);
+	const headerRecipients = (parsedEmail.to || []).map((t) => normalizeEmailAddress(t.address)).filter(Boolean) as string[];
+	const routingRecipients = envelopeRecipient ? [envelopeRecipient] : headerRecipients;
+	const allRecipients = headerRecipients.length > 0 ? headerRecipients : routingRecipients;
+	const ccRecipients = (parsedEmail.cc || []).map((e) => normalizeEmailAddress(e.address)).filter(Boolean) as string[];
+	const bccRecipients = (parsedEmail.bcc || []).map((e) => normalizeEmailAddress(e.address)).filter(Boolean) as string[];
 
 	let mailboxId: string | undefined;
 	if (allowedAddresses.length > 0) {
-		mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
+		mailboxId = routingRecipients.find((addr) => allowedAddresses.includes(addr));
 		if (!mailboxId) { console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`); return; }
-	} else { mailboxId = allRecipients[0]; }
+	} else { mailboxId = routingRecipients[0]; }
 	if (!mailboxId) throw new Error("received email with no valid recipient address");
 
 	const messageId = crypto.randomUUID();
