@@ -35,6 +35,9 @@ const ALLOWED_SORT_COLUMNS = [
 
 type SortColumn = (typeof ALLOWED_SORT_COLUMNS)[number];
 
+const MAX_SQLITE_LIKE_PATTERN_LENGTH = 50;
+const MAX_LIKE_TERM_LENGTH = MAX_SQLITE_LIKE_PATTERN_LENGTH - 2; // Account for the surrounding % wildcards.
+
 /**
  * Map SortColumn string names to Drizzle column references for safe
  * ORDER BY construction (no string interpolation into SQL).
@@ -671,20 +674,41 @@ export class MailboxDO extends DurableObject<Env> {
 			return `?${paramIdx}`;
 		};
 
+		const addLikeParam = (value: string) => addParam(`%${value}%`);
+		const chunkLikeTerm = (value: string) => {
+			const chunks: string[] = [];
+			for (let i = 0; i < value.length; i += MAX_LIKE_TERM_LENGTH) {
+				chunks.push(value.slice(i, i + MAX_LIKE_TERM_LENGTH));
+			}
+			return chunks;
+		};
+
+		const buildLikeCondition = (columns: string[], value: string) => {
+			const chunks = chunkLikeTerm(value);
+			const columnConditions = columns.map((column) => {
+				const chunkConditions = chunks.map((chunk) => `${column} LIKE ${addLikeParam(chunk)}`);
+				return chunkConditions.length > 1 ? `(${chunkConditions.join(" AND ")})` : chunkConditions[0];
+			});
+			return columnConditions.length > 1 ? `(${columnConditions.join(" OR ")})` : columnConditions[0];
+		};
+
 		if (query) {
-			const p1 = addParam(`%${query}%`);
-			const p2 = addParam(`%${query}%`);
-			const p3 = addParam(`%${query}%`);
-			const p4 = addParam(`%${query}%`);
-			conditions.push(`(${prefix}subject LIKE ${p1} OR ${prefix}body LIKE ${p2} OR ${prefix}sender LIKE ${p3} OR ${prefix}recipient LIKE ${p4} OR ${prefix}cc LIKE ${p4} OR ${prefix}bcc LIKE ${p4})`);
+			conditions.push(buildLikeCondition([
+				`${prefix}subject`,
+				`${prefix}body`,
+				`${prefix}sender`,
+				`${prefix}recipient`,
+				`${prefix}cc`,
+				`${prefix}bcc`,
+			], query));
 		}
 		if (folder) {
 			const p = addParam(folder);
 			conditions.push(`${prefix}folder_id = (SELECT id FROM folders WHERE name = ${p} OR id = ${p} LIMIT 1)`);
 		}
-		if (from) { const p = addParam(`%${from}%`); conditions.push(`${prefix}sender LIKE ${p}`); }
-		if (to) { const p = addParam(`%${to}%`); conditions.push(`(${prefix}recipient LIKE ${p} OR ${prefix}cc LIKE ${p} OR ${prefix}bcc LIKE ${p})`); }
-		if (subject) { const p = addParam(`%${subject}%`); conditions.push(`${prefix}subject LIKE ${p}`); }
+		if (from) { conditions.push(buildLikeCondition([`${prefix}sender`], from)); }
+		if (to) { conditions.push(buildLikeCondition([`${prefix}recipient`, `${prefix}cc`, `${prefix}bcc`], to)); }
+		if (subject) { conditions.push(buildLikeCondition([`${prefix}subject`], subject)); }
 		if (date_start) { const p = addParam(date_start); conditions.push(`${prefix}date >= ${p}`); }
 		if (date_end) { const p = addParam(date_end); conditions.push(`${prefix}date <= ${p}`); }
 		if (is_read !== undefined) { const p = addParam(is_read ? 1 : 0); conditions.push(`${prefix}read = ${p}`); }
