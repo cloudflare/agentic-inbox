@@ -27,6 +27,7 @@ import {
 	buildThreadingHeaders,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
+import { logSendRateLimitHit } from "./rate-limit";
 import { sendEmail } from "../email-sender";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
@@ -408,6 +409,7 @@ export async function toolSendReply(
 	// Check send rate limit
 	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
 	if (rateLimitError) {
+		logSendRateLimitHit(mailboxId, "tool.sendReply", rateLimitError);
 		return { error: rateLimitError };
 	}
 
@@ -486,6 +488,7 @@ export async function toolSendEmail(
 	// Check send rate limit
 	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
 	if (rateLimitError) {
+		logSendRateLimitHit(mailboxId, "tool.sendEmail", rateLimitError);
 		return { error: rateLimitError };
 	}
 

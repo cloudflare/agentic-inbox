@@ -17,6 +17,7 @@ import {
 import { SendEmailRequestSchema } from "../lib/schemas";
 import { Folders } from "../../shared/folders";
 import type { MailboxContext } from "../lib/mailbox";
+import { logSendRateLimitHit } from "../lib/rate-limit";
 
 type AppContext = Context<MailboxContext>;
 type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
@@ -50,6 +51,7 @@ export async function handleReplyEmail(c: AppContext) {
 	const rateLimitError = await (stub as unknown as RateLimitStub)
 		.checkSendRateLimit();
 	if (rateLimitError) {
+		logSendRateLimitHit(mailboxId, "api.replyEmail", rateLimitError);
 		return c.json({ error: rateLimitError }, 429);
 	}
 
@@ -140,6 +142,7 @@ export async function handleForwardEmail(c: AppContext) {
 	const rateLimitError = await (stub as unknown as RateLimitStub)
 		.checkSendRateLimit();
 	if (rateLimitError) {
+		logSendRateLimitHit(mailboxId, "api.forwardEmail", rateLimitError);
 		return c.json({ error: rateLimitError }, 429);
 	}
 
