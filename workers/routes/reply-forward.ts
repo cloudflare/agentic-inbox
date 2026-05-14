@@ -17,6 +17,7 @@ import {
 import { SendEmailRequestSchema } from "../lib/schemas";
 import { Folders } from "../../shared/folders";
 import type { MailboxContext } from "../lib/mailbox";
+import { parseJsonBody } from "../lib/validation";
 
 type AppContext = Context<MailboxContext>;
 type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
@@ -24,7 +25,9 @@ type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
 export async function handleReplyEmail(c: AppContext) {
 	const mailboxId = c.req.param("mailboxId") ?? "";
 	const id = c.req.param("id") ?? "";
-	const body = SendEmailRequestSchema.parse(await c.req.json());
+	const parsed = await parseJsonBody(c, SendEmailRequestSchema);
+	if (!parsed.success) return parsed.response;
+	const body = parsed.data;
 	const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
 	const stub = c.var.mailboxStub;
@@ -115,7 +118,9 @@ export async function handleReplyEmail(c: AppContext) {
 export async function handleForwardEmail(c: AppContext) {
 	const mailboxId = c.req.param("mailboxId") ?? "";
 	const id = c.req.param("id") ?? "";
-	const body = SendEmailRequestSchema.parse(await c.req.json());
+	const parsed = await parseJsonBody(c, SendEmailRequestSchema);
+	if (!parsed.success) return parsed.response;
+	const body = parsed.data;
 	const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
 	const stub = c.var.mailboxStub;
