@@ -62,10 +62,18 @@ npm run dev
 1. Set your domain in `wrangler.jsonc`
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
 
+For production-specific values, keep a local `wrangler.production.jsonc` file. This file is ignored by git so real domains, mailbox addresses, Access values, and other deployment-specific settings are not committed. Use `wrangler.jsonc` as the shared example, copy it locally to `wrangler.production.jsonc`, then set production-only values such as `DOMAINS`, `EMAIL_ADDRESSES`, `POLICY_AUD`, and `TEAM_DOMAIN`.
+
 ### Deploy
 
 ```bash
 npm run deploy
+```
+
+To deploy with the local production config:
+
+```bash
+npm run deploy:production
 ```
 
 ## Prerequisites

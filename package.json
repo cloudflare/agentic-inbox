@@ -14,8 +14,11 @@
 	},
 	"scripts": {
 		"build": "react-router build",
+		"build:production": "CLOUDFLARE_CONFIG_PATH=wrangler.production.jsonc react-router build",
 		"cf-typegen": "wrangler types",
+		"cf-typegen:production": "wrangler types --config wrangler.production.jsonc",
 		"deploy": "npm run build && wrangler deploy",
+		"deploy:production": "npm run build:production && wrangler deploy",
 		"dev": "react-router dev",
 		"preview": "npm run build && vite preview",
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
