@@ -14,7 +14,9 @@
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
 		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": []
+		"EMAIL_ADDRESSES": [],
+		// When true, the new-email automation sends verified replies instead of saving drafts.
+		"AUTOMATED_SENDING_ENABLED": false
 	},
 	"send_email": [
 		{

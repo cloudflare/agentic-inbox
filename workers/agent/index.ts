@@ -25,6 +25,7 @@ import {
 	toolSearchEmails,
 	toolDraftReply,
 	toolDraftEmail,
+	toolSendReply,
 	toolMarkEmailRead,
 	toolMoveEmail,
 	toolDiscardDraft,
@@ -44,6 +45,15 @@ function defineTool(def: {
 		inputSchema: def.parameters,
 		execute: def.execute,
 	};
+}
+
+function isAutomatedSendingEnabled(env: Env): boolean {
+	const value = (env as unknown as Record<string, unknown>).AUTOMATED_SENDING_ENABLED;
+
+	if (typeof value === "boolean") return value;
+	if (typeof value !== "string") return false;
+
+	return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 /**
@@ -107,7 +117,11 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
 	return DEFAULT_SYSTEM_PROMPT;
 }
 
-function createEmailTools(env: Env, mailboxId: string) {
+function createEmailTools(
+	env: Env,
+	mailboxId: string,
+	options: { automatedReplySending?: boolean } = {},
+) {
 	return {
 		list_emails: defineTool({
 			description:
@@ -202,7 +216,9 @@ function createEmailTools(env: Env, mailboxId: string) {
 
 		draft_reply: defineTool({
 			description:
-				"Draft a reply to an existing email and save it to the Drafts folder. This does NOT send — it saves a draft for the operator to review and send from the UI. Write the body as plain text — no HTML tags.",
+				options.automatedReplySending
+					? "Create a verified reply to an existing email and send it automatically because automated sending is enabled. Write the body as plain text — no HTML tags."
+					: "Draft a reply to an existing email and save it to the Drafts folder. This does NOT send — it saves a draft for the operator to review and send from the UI. Write the body as plain text — no HTML tags.",
 			parameters: z.object({
 				originalEmailId: z
 					.string()
@@ -218,6 +234,15 @@ function createEmailTools(env: Env, mailboxId: string) {
 					),
 			}),
 			execute: async ({ originalEmailId, to, subject, body }): Promise<unknown> => {
+				if (options.automatedReplySending) {
+					return toolSendReply(env, mailboxId, {
+						originalEmailId,
+						to,
+						subject,
+						bodyHtml: textToHtml(body),
+					});
+				}
+
 				return toolDraftReply(env, mailboxId, {
 					originalEmailId,
 					to,
@@ -335,8 +360,17 @@ export class EmailAgent extends AIChatAgent<any> {
 	}) {
 		const env = this.env as Env;
 		const workersai = createWorkersAI({ binding: env.AI });
-		const tools = createEmailTools(env, emailData.mailboxId);
+		const automatedSendingEnabled = isAutomatedSendingEnabled(env);
+		const tools = createEmailTools(env, emailData.mailboxId, {
+			automatedReplySending: automatedSendingEnabled,
+		});
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
+		const automationSystemPrompt = automatedSendingEnabled
+			? `${systemPrompt}
+
+## Automated Sending
+Automated sending is enabled for this new-email workflow. Use draft_reply to create exactly one verified reply. In this workflow, draft_reply sends the reply automatically instead of saving a draft.`
+			: systemPrompt;
 
 		// Pre-read the email and thread so the agent has full context
 		// without needing to waste tool calls discovering it
@@ -450,6 +484,12 @@ This is the first message in the thread (no prior conversation).`;
 
 Based on the email content and thread context above, draft a reply using draft_reply. If you need more context, use get_thread with thread ID "${emailData.threadId}".`;
 
+		if (automatedSendingEnabled) {
+			autoPrompt += `
+
+Automated sending is enabled for this workflow. Calling draft_reply will send the verified reply automatically instead of saving it as a draft.`;
+		}
+
 		// Fresh context for auto-draft -- don't include prior chat history
 		// to avoid confusing the model with old messages and tool calls
 		const messages = [
@@ -464,7 +504,7 @@ Based on the email content and thread context above, draft a reply using draft_r
 		try {
 			const result = await generateText({
 				model: workersai("@cf/moonshotai/kimi-k2.5"),
-				system: systemPrompt,
+				system: automationSystemPrompt,
 				messages: await convertToModelMessages(messages),
 				tools,
 				stopWhen: stepCountIs(5),
@@ -472,6 +512,9 @@ Based on the email content and thread context above, draft a reply using draft_r
 
 			// Check if draft_reply was called (saves to Drafts as side effect).
 			// If NOT, save the agent's text response as a draft directly.
+			const draftReplyToolCalled = result.steps.some((step) =>
+				step.toolCalls.some((tc) => tc.toolName === "draft_reply"),
+			);
 			const draftToolCalled = result.steps.some((step) =>
 				step.toolCalls.some((tc) => tc.toolName === "draft_reply" || tc.toolName === "draft_email"),
 			);
@@ -487,33 +530,45 @@ Based on the email content and thread context above, draft a reply using draft_r
 					const reSubject = emailData.subject.startsWith("Re:")
 						? emailData.subject
 						: `Re: ${emailData.subject}`;
-					await draftStub.createEmail(
-						Folders.DRAFT,
-						{
-							id: draftId,
+					const bodyHtml = /<[a-z][\s\S]*>/i.test(sanitizedText)
+						? sanitizedText
+						: textToHtml(sanitizedText);
+
+					if (automatedSendingEnabled) {
+						await toolSendReply(env, emailData.mailboxId, {
+							originalEmailId: emailData.emailId,
+							to: emailData.sender.toLowerCase(),
 							subject: reSubject,
-							sender: emailData.mailboxId.toLowerCase(),
-							recipient: emailData.sender.toLowerCase(),
-							date: new Date().toISOString(),
-						// verifyDraft may return plain text or HTML depending on its
-						// code path. Only wrap in textToHtml if it's plain text.
-						body: /<[a-z][\s\S]*>/i.test(sanitizedText)
-							? sanitizedText
-							: textToHtml(sanitizedText),
-						in_reply_to: emailData.emailId,
-							email_references: null,
-							thread_id: emailData.threadId,
-						},
-						[],
-					);
-					// Inline text saved as draft
+							bodyHtml,
+						});
+						// Inline text sent as an automated reply
+					} else {
+						await draftStub.createEmail(
+							Folders.DRAFT,
+							{
+								id: draftId,
+								subject: reSubject,
+								sender: emailData.mailboxId.toLowerCase(),
+								recipient: emailData.sender.toLowerCase(),
+								date: new Date().toISOString(),
+								body: bodyHtml,
+								in_reply_to: emailData.emailId,
+								email_references: null,
+								thread_id: emailData.threadId,
+							},
+							[],
+						);
+						// Inline text saved as draft
+					}
 				}
 			}
 
 			// Persist the conversation into the agent's chat history
 			// If it called the tool, we just log a simple success message so the chat isn't cluttered
 			// with conversational slop.
-			const assistantText = draftToolCalled 
+			const assistantText = draftReplyToolCalled && automatedSendingEnabled
+				? `Sent automated reply to ${emailData.sender}.`
+				: draftToolCalled
 				? `Created draft reply to ${emailData.sender}.`
 				: result.text;
 
@@ -546,7 +601,10 @@ Based on the email content and thread context above, draft a reply using draft_r
 
 			await this.persistMessages([...this.messages, ...newMessages]);
 
-			return { status: "draft_generated", text: result.text };
+			return {
+				status: automatedSendingEnabled ? "reply_sent" : "draft_generated",
+				text: result.text,
+			};
 		} catch (e) {
 			console.error("Auto-draft failed:", (e as Error).message);
 			return { status: "error", error: (e as Error).message };
