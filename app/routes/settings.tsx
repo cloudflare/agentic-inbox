@@ -4,6 +4,7 @@
 
 import { Badge, Button, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
 import { RobotIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
+import DOMPurify from "dompurify";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
@@ -20,12 +21,16 @@ export default function SettingsRoute() {
 
 	const [displayName, setDisplayName] = useState("");
 	const [agentPrompt, setAgentPrompt] = useState("");
+	const [signatureEnabled, setSignatureEnabled] = useState(false);
+	const [signatureHtml, setSignatureHtml] = useState("");
 	const [isSaving, setIsSaving] = useState(false);
 
 	useEffect(() => {
 		if (mailbox) {
 			setDisplayName(mailbox.settings?.fromName || mailbox.name || "");
 			setAgentPrompt(mailbox.settings?.agentSystemPrompt || "");
+			setSignatureEnabled(mailbox.settings?.signature?.enabled || false);
+			setSignatureHtml(mailbox.settings?.signature?.html || "");
 		}
 	}, [mailbox]);
 
@@ -36,6 +41,12 @@ export default function SettingsRoute() {
 			...mailbox.settings,
 			fromName: displayName,
 			agentSystemPrompt: agentPrompt.trim() || undefined,
+			signature: {
+				...mailbox.settings?.signature,
+				enabled: signatureEnabled,
+				text: mailbox.settings?.signature?.text || "",
+				html: signatureHtml.trim() || undefined,
+			},
 		};
 		try {
 			await updateMailboxMutation.mutateAsync({ mailboxId, settings });
@@ -63,6 +74,7 @@ export default function SettingsRoute() {
 	}
 
 	const isCustomPrompt = agentPrompt.trim().length > 0;
+	const signaturePreviewHtml = DOMPurify.sanitize(signatureHtml);
 
 	return (
 		<div className="max-w-2xl px-4 py-4 md:px-8 md:py-6 h-full overflow-y-auto">
@@ -81,6 +93,47 @@ export default function SettingsRoute() {
 							onChange={(e) => setDisplayName(e.target.value)}
 						/>
 						<Input label="Email" type="email" value={mailbox.email} disabled />
+					</div>
+				</div>
+
+				{/* Signature */}
+				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
+					<div className="text-sm font-medium text-kumo-default mb-4">
+						Signature
+					</div>
+					<div className="space-y-4">
+						<label className="flex items-center gap-2 text-sm text-kumo-default">
+							<input
+								type="checkbox"
+								checked={signatureEnabled}
+								onChange={(e) => setSignatureEnabled(e.target.checked)}
+								className="h-4 w-4 rounded border-kumo-line text-kumo-brand focus:ring-kumo-ring"
+							/>
+							<span>Use signature</span>
+						</label>
+						<div>
+							<label className="mb-2 block text-xs font-medium text-kumo-subtle">
+								HTML
+							</label>
+							<textarea
+								value={signatureHtml}
+								onChange={(e) => setSignatureHtml(e.target.value)}
+								placeholder="<p>Best Regards,<br><strong>Your Name</strong></p>"
+								rows={7}
+								className="w-full resize-y rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring font-mono leading-relaxed"
+							/>
+						</div>
+						{signatureHtml.trim() ? (
+							<div>
+								<div className="mb-2 text-xs font-medium text-kumo-subtle">
+									Preview
+								</div>
+								<div
+									className="rounded-lg border border-kumo-line bg-kumo-recessed p-3 text-sm text-kumo-default"
+									dangerouslySetInnerHTML={{ __html: signaturePreviewHtml }}
+								/>
+							</div>
+						) : null}
 					</div>
 				</div>
 
