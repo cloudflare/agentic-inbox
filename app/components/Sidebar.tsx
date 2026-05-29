@@ -11,6 +11,7 @@ import {
 	PaperPlaneTiltIcon,
 	PencilSimpleIcon,
 	PlusIcon,
+	ShieldWarningIcon,
 	TrashIcon,
 	TrayIcon,
 } from "@phosphor-icons/react";
@@ -26,6 +27,7 @@ const FOLDER_ICONS: Record<string, React.ReactNode> = {
 	[Folders.SENT]: <PaperPlaneTiltIcon size={18} weight="regular" />,
 	[Folders.DRAFT]: <FileIcon size={18} weight="regular" />,
 	[Folders.ARCHIVE]: <ArchiveIcon size={18} weight="regular" />,
+	[Folders.SPAM]: <ShieldWarningIcon size={18} weight="regular" />,
 	[Folders.TRASH]: <TrashIcon size={18} weight="regular" />,
 };
 
@@ -34,6 +36,7 @@ const SYSTEM_FOLDER_LINKS = [
 	{ id: Folders.SENT, label: "Sent" },
 	{ id: Folders.DRAFT, label: "Drafts" },
 	{ id: Folders.ARCHIVE, label: "Archive" },
+	{ id: Folders.SPAM, label: "Spam" },
 	{ id: Folders.TRASH, label: "Trash" },
 ];
 

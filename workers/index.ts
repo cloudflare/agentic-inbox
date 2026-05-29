@@ -20,6 +20,7 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import { classifyEmailForSpam } from "./lib/spam";
 
 type AppContext = Context<MailboxContext>;
 
@@ -61,6 +62,20 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	const v = c.req.query(key);
 	if (v === undefined || v === "") return undefined;
 	return v === "true" || v === "1";
+}
+
+function parseCatchAllMailboxes(raw: unknown): Record<string, string> {
+	if (!raw || typeof raw !== "string") return {};
+	try {
+		const parsed = JSON.parse(raw) as Record<string, unknown>;
+		return Object.fromEntries(
+			Object.entries(parsed)
+				.filter((entry): entry is [string, string] => typeof entry[1] === "string")
+				.map(([domain, mailbox]) => [domain.toLowerCase(), mailbox.toLowerCase()]),
+		);
+	} catch {
+		return {};
+	}
 }
 
 // -- App & middleware -----------------------------------------------
@@ -255,6 +270,56 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) =
 	return success ? c.json({ status: "moved" }) : c.json({ error: "Folder not found" }, 400);
 });
 
+app.post("/api/v1/mailboxes/:mailboxId/emails/:id/classify-spam", async (c: AppContext) => {
+	const id = c.req.param("id")!;
+	const email = await c.var.mailboxStub.getEmail(id) as any;
+	if (!email) return c.json({ error: "Email not found" }, 404);
+	const classification = await classifyEmailForSpam({
+		sender: email.sender || "",
+		subject: email.subject || "",
+		bodyHtml: email.body || "",
+		rawHeaders: email.raw_headers,
+	});
+	const targetFolder = classification.verdict === "spam" ? Folders.SPAM : undefined;
+	const updated = await (c.var.mailboxStub as any).setSpamClassification(
+		id,
+		JSON.stringify(classification),
+		targetFolder,
+	);
+	return c.json({ email: updated, classification });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/spam/classify", async (c: AppContext) => {
+	const { folder = Folders.INBOX, limit = 100 } = (await c.req.json().catch(() => ({}))) as {
+		folder?: string;
+		limit?: number;
+	};
+	const stub = c.var.mailboxStub as any;
+	const emails = await stub.getEmails({ folder, limit, page: 1 });
+	const results: Array<Record<string, unknown>> = [];
+	for (const row of emails) {
+		const email = await stub.getEmail(row.id);
+		if (!email) continue;
+		const classification = await classifyEmailForSpam({
+			sender: email.sender || "",
+			subject: email.subject || "",
+			bodyHtml: email.body || "",
+			rawHeaders: email.raw_headers,
+		});
+		const targetFolder = classification.verdict === "spam" ? Folders.SPAM : undefined;
+		await stub.setSpamClassification(row.id, JSON.stringify(classification), targetFolder);
+		results.push({
+			id: row.id,
+			subject: email.subject || "",
+			sender: email.sender || "",
+			fromFolder: folder,
+			toFolder: targetFolder || email.folder_id,
+			classification,
+		});
+	}
+	return c.json({ processed: results.length, results });
+});
+
 // -- Threads --------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) => {
@@ -360,7 +425,12 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	if (allowedAddresses.length > 0) {
 		mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
 		if (!mailboxId) { console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`); return; }
-	} else { mailboxId = allRecipients[0]; }
+	} else {
+		const catchAllMailboxes = parseCatchAllMailboxes(env.CATCH_ALL_MAILBOXES);
+		mailboxId = allRecipients
+			.map((addr) => catchAllMailboxes[addr.split("@")[1] || ""] || addr)
+			.find(Boolean);
+	}
 	if (!mailboxId) throw new Error("received email with no valid recipient address");
 
 	const messageId = crypto.randomUUID();
@@ -391,8 +461,15 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	}
 
 	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
+	const spamClassification = await classifyEmailForSpam({
+		sender: (parsedEmail.from?.address || "").toLowerCase(),
+		subject: parsedEmail.subject || "",
+		bodyHtml: parsedEmail.html || parsedEmail.text || "",
+		rawHeaders: parsedEmail.headers,
+	});
+	const folder = spamClassification.verdict === "spam" ? Folders.SPAM : Folders.INBOX;
 
-	await stub.createEmail(Folders.INBOX, {
+	await stub.createEmail(folder, {
 		id: messageId, subject: parsedEmail.subject || "",
 		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", "),
 		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
@@ -400,7 +477,13 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		body: parsedEmail.html || parsedEmail.text || "",
 		in_reply_to: inReplyTo, email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
+		spam_classification: JSON.stringify(spamClassification),
 	}, attachmentData);
+
+	if (spamClassification.verdict === "spam") {
+		console.log(`Spam classified for ${mailboxId}: ${spamClassification.score} ${parsedEmail.subject || ""}`);
+		return;
+	}
 
 	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
 	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {

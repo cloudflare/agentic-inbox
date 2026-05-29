@@ -4,6 +4,7 @@
 
 import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
+import SpamClassificationBanner from "~/components/email-panel/SpamClassificationBanner";
 import { formatDetailDate, rewriteInlineImages } from "~/lib/utils";
 import type { Email } from "~/types";
 
@@ -38,6 +39,8 @@ export default function SingleMessageView({
 					</span>
 				</div>
 			</div>
+
+			<SpamClassificationBanner email={email} />
 
 			<div className="flex-1 min-h-0">
 				<EmailIframe

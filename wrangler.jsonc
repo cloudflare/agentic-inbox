@@ -9,12 +9,19 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"routes": [
+		{
+			"pattern": "mail.nicholasjohnston.com",
+			"custom_domain": true
+		}
+	],
 	"vars": {
 		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
-		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": []
+		"DOMAINS": "nicholasjohnston.com,threepeakschallenge.uk,globaladventureclub.com,charityevents.uk,surreycomputing.com",
+		"EMAIL_ADDRESSES": [],
+		"CATCH_ALL_MAILBOXES": "{\"globaladventureclub.com\":\"nick@globaladventureclub.com\",\"charityevents.uk\":\"nick@charityevents.uk\",\"surreycomputing.com\":\"nick@surreycomputing.com\"}"
 	},
 	"send_email": [
 		{
