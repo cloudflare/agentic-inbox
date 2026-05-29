@@ -10,6 +10,7 @@
  */
 
 import { escapeHtml, stripHtmlToText, textToHtml } from "./email-helpers";
+import { WORKERS_AI_MODELS } from "./models";
 
 // ── Prompt Injection Scanner ───────────────────────────────────────
 
@@ -29,8 +30,7 @@ export async function isPromptInjection(ai: Ai, bodyHtml: string | null | undefi
 
 	try {
 		const response = (await ai.run(
-			// @ts-expect-error — model string not in generated union
-			"@cf/meta/llama-3.1-8b-instruct-fast",
+			WORKERS_AI_MODELS.promptInjectionScanner,
 			{
 				messages: [
 					{ role: "system", content: INJECTION_PROMPT },
@@ -136,7 +136,7 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
 
 	try {
 		const response = (await ai.run(
-			"@cf/meta/llama-4-scout-17b-16e-instruct",
+			WORKERS_AI_MODELS.draftVerifier,
 			{
 				messages: [
 					{ role: "system", content: VERIFIER_PROMPT },
