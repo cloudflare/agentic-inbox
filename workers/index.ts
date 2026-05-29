@@ -107,11 +107,75 @@ app.get("/api/v1/config", (c) => {
 	return c.json({ domains, emailAddresses });
 });
 
+// -- Native app support ---------------------------------------------
+
+app.get("/api/v1/native/session", (c) => {
+	return c.json({
+		status: "ok",
+		apiBaseURL: new URL(c.req.url).origin,
+		serverTime: new Date().toISOString(),
+	});
+});
+
+app.get("/api/v1/native/sync", async (c) => {
+	const mailboxes = await listMailboxes(c.env.BUCKET);
+	const unreadByMailbox: Array<{ mailboxId: string; unreadCount: number }> = [];
+	let totalUnread = 0;
+
+	for (const mailbox of mailboxes) {
+		const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailbox.id));
+		const folders = await stub.getFolders();
+		const inbox = folders.find((folder: any) => folder.id === Folders.INBOX);
+		const unreadCount = Number(inbox?.unreadCount || 0);
+		unreadByMailbox.push({ mailboxId: mailbox.id, unreadCount });
+		totalUnread += unreadCount;
+	}
+
+	return c.json({
+		serverTime: new Date().toISOString(),
+		unreadByMailbox,
+		totalUnread,
+	});
+});
+
 // -- Mailboxes ------------------------------------------------------
 
 app.get("/api/v1/mailboxes", async (c) => {
 	const allMailboxes = await listMailboxes(c.env.BUCKET);
 	return c.json(allMailboxes.map((m) => ({ ...m, name: m.id })));
+});
+
+app.get("/api/v1/emails", async (c) => {
+	const folder = c.req.query("folder") || Folders.INBOX;
+	const page = intQuery(c as AppContext, "page") || 1;
+	const limit = intQuery(c as AppContext, "limit") || 50;
+	const mailboxes = await listMailboxes(c.env.BUCKET);
+	const emails: Array<Record<string, unknown>> = [];
+
+	for (const mailbox of mailboxes) {
+		const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailbox.id));
+		const rows = await stub.getEmails({
+			folder,
+			page: 1,
+			limit,
+			sortColumn: "date",
+			sortDirection: "DESC",
+		});
+		for (const row of rows) {
+			emails.push({
+				...row,
+				mailboxId: mailbox.id,
+				mailboxEmail: mailbox.email,
+			});
+		}
+	}
+
+	emails.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+	const offset = (page - 1) * limit;
+	return c.json({
+		emails: emails.slice(offset, offset + limit),
+		totalCount: emails.length,
+	});
 });
 
 app.post("/api/v1/mailboxes", async (c) => {
