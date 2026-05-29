@@ -14,6 +14,7 @@ export function useFolders(mailboxId: string | undefined) {
 			: ["folders", "_disabled"],
 		queryFn: () => api.listFolders(mailboxId!) as Promise<Folder[]>,
 		enabled: !!mailboxId,
+		refetchInterval: 30_000,
 	});
 }
 

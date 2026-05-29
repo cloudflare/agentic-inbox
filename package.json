@@ -5,7 +5,12 @@
 	"type": "module",
 	"cloudflare": {
 		"label": "Agentic Inbox",
-		"products": ["Workers", "Durable Objects", "R2", "Workers AI"],
+		"products": [
+			"Workers",
+			"Durable Objects",
+			"R2",
+			"Workers AI"
+		],
 		"bindings": {
 			"DOMAINS": {
 				"description": "Your domain with [Email Routing](https://developers.cloudflare.com/email-routing/) enabled (e.g. `example.com`). After deploying, create a catch-all Email Routing rule pointing to this Worker."
@@ -21,7 +26,7 @@
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
 	},
 	"dependencies": {
-		"@cloudflare/ai-chat": "^0.1.8",
+		"@cloudflare/ai-chat": "^0.7.2",
 		"@cloudflare/kumo": "^1.13.0",
 		"@phosphor-icons/react": "^2.1.10",
 		"@tanstack/react-query": "^5.99.0",
@@ -34,7 +39,7 @@
 		"@tiptap/extension-underline": "3.20.2",
 		"@tiptap/react": "3.20.2",
 		"@tiptap/starter-kit": "3.20.2",
-		"agents": "^0.7.6",
+		"agents": "^0.13.3",
 		"ai": "^6.0.116",
 		"dompurify": "^3.3.3",
 		"drizzle-orm": "^0.45.1",
@@ -47,8 +52,8 @@
 		"react-markdown": "^10.1.0",
 		"react-router": "^7.5.3",
 		"remark-gfm": "^4.0.1",
-		"workers-ai-provider": "^3.1.2",
-		"zod": "^3.25.76",
+		"workers-ai-provider": "^3.1.14",
+		"zod": "^4.4.3",
 		"zustand": "^5.0.12"
 	},
 	"overrides": {
@@ -81,8 +86,8 @@
 		"@tiptap/extension-text": "3.20.2"
 	},
 	"devDependencies": {
-		"@cloudflare/vite-plugin": "^1.0.12",
-		"@cloudflare/workers-types": "^4.20251128.0",
+		"@cloudflare/vite-plugin": "^1.39.0",
+		"@cloudflare/workers-types": "^4.20260529.1",
 		"@react-router/dev": "^7.5.3",
 		"@tailwindcss/vite": "^4.1.4",
 		"@types/dompurify": "^3.0.5",
@@ -91,8 +96,8 @@
 		"@types/react-dom": "^19.1.2",
 		"tailwindcss": "^4.1.4",
 		"typescript": "^5.8.3",
-		"vite": "^6.3.3",
+		"vite": "6.4.2",
 		"vite-tsconfig-paths": "^5.1.4",
-		"wrangler": "^4.74.0"
+		"wrangler": "^4.95.0"
 	}
 }

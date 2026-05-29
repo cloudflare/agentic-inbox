@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
+import SpamClassificationBanner from "~/components/email-panel/SpamClassificationBanner";
 import {
 	formatDetailDate,
 	formatShortDate,
@@ -155,6 +156,8 @@ export default function ThreadMessage({
 						</button>
 					</div>
 				</div>
+
+				<SpamClassificationBanner email={email} />
 
 				<div className="md:ml-[42px]">
 					<EmailIframe

@@ -87,6 +87,7 @@ interface EmailData {
 	thread_id?: string | null;
 	message_id?: string | null;
 	raw_headers?: string | null;
+	spam_classification?: string | null;
 }
 
 interface AttachmentData {
@@ -160,6 +161,7 @@ export class MailboxDO extends DurableObject<Env> {
 				email_references: schema.emails.email_references,
 				thread_id: schema.emails.thread_id,
 				folder_id: schema.emails.folder_id,
+				spam_classification: schema.emails.spam_classification,
 				snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
 			})
 			.from(schema.emails)
@@ -354,7 +356,7 @@ export class MailboxDO extends DurableObject<Env> {
 			SELECT
 				lif.id, lif.subject, lif.sender, lif.recipient, lif.date,
 				lif.read, lif.starred, lif.thread_id, lif.folder_id,
-				lif.in_reply_to, lif.email_references,
+				lif.in_reply_to, lif.email_references, lif.spam_classification,
 				SUBSTR(lif.body, 1, 300) as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
 				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
@@ -649,6 +651,21 @@ export class MailboxDO extends DurableObject<Env> {
 		return true;
 	}
 
+	async setSpamClassification(id: string, spamClassification: string, folderId?: string) {
+		const data: { spam_classification: string; folder_id?: string } = {
+			spam_classification: spamClassification,
+		};
+		if (folderId) data.folder_id = folderId;
+
+		this.db
+			.update(schema.emails)
+			.set(data)
+			.where(eq(schema.emails.id, id))
+			.run();
+
+		return this.getEmail(id);
+	}
+
 	// ── Search (raw SQL — dynamic condition builder) ───────────────
 
 	/**
@@ -705,7 +722,7 @@ export class MailboxDO extends DurableObject<Env> {
 		const query = `
 			SELECT e.id, e.subject, e.sender, e.recipient, e.cc, e.bcc, e.date,
 				e.read, e.starred, e.in_reply_to, e.email_references,
-				e.thread_id, e.folder_id,
+				e.thread_id, e.folder_id, e.spam_classification,
 				SUBSTR(e.body, 1, 300) as snippet,
 				f.name as folder_name
 			FROM emails e
@@ -862,6 +879,7 @@ export class MailboxDO extends DurableObject<Env> {
 				thread_id: email.thread_id ?? null,
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
+				spam_classification: email.spam_classification ?? null,
 			})
 			.run();
 

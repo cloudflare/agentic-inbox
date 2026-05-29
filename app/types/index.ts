@@ -40,6 +40,7 @@ export interface Email {
 	email_references?: string | null;
 	message_id?: string | null;
 	raw_headers?: string | null;
+	spam_classification?: string | null;
 	attachments?: Attachment[];
 	snippet?: string | null;
 	// Thread aggregate fields (only present in threaded list view)
@@ -48,6 +49,33 @@ export interface Email {
 	participants?: string;
 	needs_reply?: boolean;
 	has_draft?: boolean;
+}
+
+export interface SpamClassification {
+	version: 1;
+	classifiedAt: string;
+	verdict: "clean" | "suspicious" | "spam";
+	score: number;
+	reasons: string[];
+	checks?: {
+		senderDomain?: string | null;
+		dns?: {
+			hasMx?: boolean | null;
+			hasSpfRecord?: boolean | null;
+			hasDmarcRecord?: boolean | null;
+			dkimRecordFound?: boolean | null;
+		};
+		authentication?: {
+			spf?: string | null;
+			dkim?: string | null;
+			dmarc?: string | null;
+			dkimSignature?: { domain: string; selector: string } | null;
+		};
+		content?: {
+			spamTerms?: string[];
+			linkCount?: number;
+		};
+	};
 }
 
 export interface Attachment {

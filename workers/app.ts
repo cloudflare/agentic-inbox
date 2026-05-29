@@ -110,6 +110,9 @@ app.all("*", (c) => {
 // Export the Hono app as the default export with an email handler
 export default {
 	fetch: app.fetch,
+	async scheduled(_event: ScheduledEvent, _env: Env, _ctx: ExecutionContext) {
+		// Keep the scheduled handler shape used by the deployed Worker.
+	},
 	async email(
 		event: { raw: ReadableStream; rawSize: number },
 		env: Env,

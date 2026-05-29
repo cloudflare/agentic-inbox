@@ -123,6 +123,10 @@ const api = {
 		del<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`),
 	moveEmail: (mailboxId: string, id: string, folderId: string) =>
 		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}/move`, { folderId }),
+	classifyEmailSpam: (mailboxId: string, id: string) =>
+		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}/classify-spam`),
+	classifyMailboxSpam: (mailboxId: string, folder = "inbox") =>
+		post<void>(`/api/v1/mailboxes/${mailboxId}/spam/classify`, { folder }),
 	getThread: (mailboxId: string, threadId: string, opts?: { signal?: AbortSignal }) =>
 		get<Email[]>(`/api/v1/mailboxes/${mailboxId}/threads/${threadId}`, { signal: opts?.signal }),
 	markThreadRead: (mailboxId: string, threadId: string) =>
