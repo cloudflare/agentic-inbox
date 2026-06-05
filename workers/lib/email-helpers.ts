@@ -3,10 +3,10 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 /**
- * Shared email helpers to eliminate duplication across API routes, MCP, and agent.
+ * Shared email helpers to eliminate duplication across API routes.
  *
  * Includes: DO stub helpers, sender validation, message-ID generation,
- * threading, HTML utilities, and tool-logic (getFullEmail / getFullThread).
+ * threading, and HTML utilities.
  */
 import type { MailboxDO } from "../durableObject";
 import type { EmailFull } from "./schemas";
@@ -164,17 +164,6 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Convert plain text to a simple HTML block with preserved whitespace.
- * Uses both `white-space:pre-wrap` (modern clients) and `<br>` tags
- * (clients that strip inline styles, e.g. Outlook) as a belt-and-suspenders approach.
- */
-export function textToHtml(text: string): string {
-	if (!text) return "";
-	const escaped = escapeHtml(text).replace(/\n/g, "<br>");
-	return `<div style="white-space:pre-wrap">${escaped}</div>`;
-}
-
-/**
  * Strip HTML tags and normalize whitespace to produce plain text.
  * Removes <style> and <script> blocks first to avoid injecting their
  * content into the output.
@@ -219,48 +208,3 @@ export function buildQuotedReplyBlock(original: {
 	return `<br><blockquote style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${originalDate}, ${originalSender} wrote:<br><br>${bodyToQuote}</blockquote>`;
 }
 
-// ── Tool Logic (getFullEmail / getFullThread) ──────────────────────
-
-type MailboxThreadReaderStub = {
-	getThreadEmails: (threadId: string) => Promise<EmailFull[]>;
-};
-
-/**
- * Fetch a single email and return it with both HTML and plain-text body.
- * Returns null if the email is not found.
- */
-export async function getFullEmail(
-	stub: DurableObjectStub<MailboxDO>,
-	emailId: string,
-) {
-	const email = (await stub.getEmail(emailId)) as EmailFull | null;
-	if (!email) return null;
-
-	const textBody = email.body ? stripHtmlToText(email.body) : "";
-	return { ...email, body_text: textBody, body_html: email.body };
-}
-
-/**
- * Fetch all emails in a thread with full bodies in a single DO call.
- * Uses `getThreadEmails` which runs 2 SQL queries (emails + attachments)
- * instead of the previous N+1 pattern (1 list query + N getEmail calls).
- */
-export async function getFullThread(
-	stub: DurableObjectStub<MailboxDO>,
-	threadId: string,
-) {
-	const threadStub = stub as unknown as MailboxThreadReaderStub;
-	const emails = await threadStub.getThreadEmails(threadId);
-
-	const enriched = emails.map((email) => {
-		const textBody = email.body ? stripHtmlToText(email.body) : "";
-		return { ...email, body_text: textBody };
-	});
-
-	// Already sorted ASC by the DO query, but ensure consistency
-	enriched.sort(
-		(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-	);
-
-	return { thread_id: threadId, message_count: enriched.length, messages: enriched };
-}

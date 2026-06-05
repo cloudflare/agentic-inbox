@@ -1,11 +1,11 @@
 {
-	"name": "agentic-inbox",
+	"name": "dumb-inbox",
 	"private": true,
 	"license": "Apache-2.0",
 	"type": "module",
 	"cloudflare": {
-		"label": "Agentic Inbox",
-		"products": ["Workers", "Durable Objects", "R2", "Workers AI"],
+		"label": "Dumb Inbox",
+		"products": ["Workers", "Durable Objects", "R2"],
 		"bindings": {
 			"DOMAINS": {
 				"description": "Your domain with [Email Routing](https://developers.cloudflare.com/email-routing/) enabled (e.g. `example.com`). After deploying, create a catch-all Email Routing rule pointing to this Worker."
@@ -15,16 +15,16 @@
 	"scripts": {
 		"build": "react-router build",
 		"cf-typegen": "wrangler types",
-		"deploy": "npm run build && wrangler deploy",
+		"deploy": "bun run build && wrangler deploy",
 		"dev": "react-router dev",
-		"preview": "npm run build && vite preview",
-		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
+		"preview": "bun run build && vite preview",
+		"test:privacy": "bun test tests/no-ai-mail.test.ts",
+		"typecheck": "bun run cf-typegen && react-router typegen && tsc -b"
 	},
 	"dependencies": {
-		"@cloudflare/ai-chat": "^0.1.8",
-		"@cloudflare/kumo": "^1.13.0",
-		"@phosphor-icons/react": "^2.1.10",
-		"@tanstack/react-query": "^5.99.0",
+		"@cloudflare/kumo": "1.13.1",
+		"@phosphor-icons/react": "2.1.10",
+		"@tanstack/react-query": "5.99.0",
 		"@tiptap/extension-color": "3.20.2",
 		"@tiptap/extension-highlight": "3.20.2",
 		"@tiptap/extension-image": "3.20.2",
@@ -34,22 +34,17 @@
 		"@tiptap/extension-underline": "3.20.2",
 		"@tiptap/react": "3.20.2",
 		"@tiptap/starter-kit": "3.20.2",
-		"agents": "^0.7.6",
-		"ai": "^6.0.116",
-		"dompurify": "^3.3.3",
-		"drizzle-orm": "^0.45.1",
-		"hono": "^4.7.11",
-		"isbot": "^5.1.27",
-		"jose": "^6.2.1",
-		"postal-mime": "^2.6.1",
-		"react": "^19.1.0",
-		"react-dom": "^19.1.0",
-		"react-markdown": "^10.1.0",
-		"react-router": "^7.5.3",
-		"remark-gfm": "^4.0.1",
-		"workers-ai-provider": "^3.1.2",
-		"zod": "^3.25.76",
-		"zustand": "^5.0.12"
+		"dompurify": "3.3.3",
+		"drizzle-orm": "0.45.1",
+		"hono": "4.12.8",
+		"isbot": "5.1.36",
+		"jose": "6.2.1",
+		"postal-mime": "2.7.3",
+		"react": "19.2.4",
+		"react-dom": "19.2.4",
+		"react-router": "7.13.1",
+		"zod": "3.25.76",
+		"zustand": "5.0.12"
 	},
 	"overrides": {
 		"@cloudflare/kumo": {
@@ -81,18 +76,18 @@
 		"@tiptap/extension-text": "3.20.2"
 	},
 	"devDependencies": {
-		"@cloudflare/vite-plugin": "^1.0.12",
-		"@cloudflare/workers-types": "^4.20251128.0",
-		"@react-router/dev": "^7.5.3",
-		"@tailwindcss/vite": "^4.1.4",
-		"@types/dompurify": "^3.0.5",
-		"@types/node": "^20.19.37",
-		"@types/react": "^19.1.2",
-		"@types/react-dom": "^19.1.2",
-		"tailwindcss": "^4.1.4",
-		"typescript": "^5.8.3",
-		"vite": "^6.3.3",
-		"vite-tsconfig-paths": "^5.1.4",
-		"wrangler": "^4.74.0"
+		"@cloudflare/vite-plugin": "1.29.0",
+		"@cloudflare/workers-types": "4.20260316.1",
+		"@react-router/dev": "7.13.1",
+		"@tailwindcss/vite": "4.2.1",
+		"@types/dompurify": "3.0.5",
+		"@types/node": "20.19.37",
+		"@types/react": "19.2.14",
+		"@types/react-dom": "19.2.3",
+		"tailwindcss": "4.2.1",
+		"typescript": "5.9.3",
+		"vite": "6.4.1",
+		"vite-tsconfig-paths": "5.1.4",
+		"wrangler": "4.74.0"
 	}
 }

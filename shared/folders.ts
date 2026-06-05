@@ -5,8 +5,7 @@
 /**
  * Canonical folder ID constants.
  *
- * Every part of the stack — API routes, Durable Object, MCP, agent,
- * frontend sidebar — references folder IDs. This module is the single
+ * Every part of the stack references folder IDs. This module is the single
  * source of truth so we don't scatter magic strings everywhere.
  */
 
@@ -35,7 +34,7 @@ export const SYSTEM_FOLDER_IDS: readonly FolderId[] = [
 
 /**
  * Human-readable display names for folder IDs.
- * Used in the sidebar, search result badges, and tool descriptions.
+ * Used in the sidebar and search result badges.
  */
 export const FOLDER_DISPLAY_NAMES: Record<string, string> = {
 	[Folders.INBOX]: "Inbox",
@@ -45,14 +44,6 @@ export const FOLDER_DISPLAY_NAMES: Record<string, string> = {
 	[Folders.TRASH]: "Trash",
 	[Folders.SPAM]: "Spam",
 };
-
-/** Formatted string for tool parameter descriptions (agent + MCP). */
-export const FOLDER_TOOL_DESCRIPTION =
-	"Folder to list: inbox, sent, draft, archive, trash";
-
-/** Formatted string for move-email tool descriptions. */
-export const MOVE_FOLDER_TOOL_DESCRIPTION =
-	"Target folder: inbox, sent, draft, archive, trash";
 
 /**
  * Look up a display name for a folder ID, falling back to the raw ID

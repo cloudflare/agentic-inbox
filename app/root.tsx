@@ -16,7 +16,6 @@ import { forwardRef, useState } from "react";
 import {
 	isRouteErrorResponse,
 	Links,
-	Meta,
 	Outlet,
 	Link as RouterLink,
 	Scripts,
@@ -88,8 +87,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 					sizes="48x48 32x32 16x16"
 				/>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-				<title>Agentic Inbox</title>
-				<Meta />
+				<title>Dumb Inbox</title>
 				<Links />
 			</head>
 			<body className="bg-kumo-recessed text-kumo-default antialiased">
