@@ -3,10 +3,11 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Hono } from "hono";
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import { jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import type { Env } from "./types";
+import type { AppContext } from "./lib/auth";
 
 export { MailboxDO } from "./durableObject";
 
@@ -35,13 +36,28 @@ function getAccessUrls(teamDomain: string) {
 	return { issuer, certsUrl };
 }
 
+function identityFromPayload(payload: JWTPayload) {
+	if (typeof payload.sub !== "string" || !payload.sub) return null;
+	if (typeof payload.email !== "string" || !payload.email) return null;
+	return {
+		sub: payload.sub,
+		email: payload.email.toLowerCase(),
+	};
+}
+
 // Main app that wraps the API and adds React Router fallback
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppContext>();
 
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
 	// Skip validation in development
 	if (import.meta.env.DEV) {
+		const email = (
+			c.req.header("x-dev-user-email")
+			|| c.env.DEV_ACCESS_EMAIL
+			|| "dev@example.com"
+		).toLowerCase();
+		c.set("accessIdentity", { sub: `dev:${email}`, email });
 		return next();
 	}
 
@@ -63,16 +79,17 @@ app.use("*", async (c, next) => {
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
 		const JWKS = createRemoteJWKSet(certsUrl);
-		await jwtVerify(token, JWKS, {
+		const { payload } = await jwtVerify(token, JWKS, {
 			issuer,
 			audience: POLICY_AUD,
 		});
+		const identity = identityFromPayload(payload);
+		if (!identity) return c.text("Access JWT is missing user email identity", 403);
+		c.set("accessIdentity", identity);
 	} catch {
 		return c.text("Invalid or expired Access token", 403);
 	}
 
-	// Authorization model note: once a teammate passes the shared Cloudflare
-	// Access policy, they can access all mailboxes in this app by design.
 	return next();
 });
 

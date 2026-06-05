@@ -5,40 +5,70 @@
 import {
 	Button,
 	Dialog,
-	Empty,
 	Input,
 	Loader,
 	Select,
 	Text,
 	useKumoToastManager,
 } from "@cloudflare/kumo";
-import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { EnvelopeIcon, PlusIcon, ShieldCheckIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Link as RouterLink } from "react-router";
-import api from "~/services/api";
+import { type FormEvent, useEffect, useState } from "react";
+import { Link as RouterLink, useNavigate } from "react-router";
+import { useMe, useRegister } from "~/queries/auth";
 import {
 	useCreateMailbox,
 	useDeleteMailbox,
 	useMailboxes,
 } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
+import api from "~/services/api";
+
+function AccessStateCard({
+	title,
+	description,
+	action,
+}: {
+	title: string;
+	description: string;
+	action?: React.ReactNode;
+}) {
+	return (
+		<div className="rounded-lg border border-kumo-line bg-kumo-base py-14 px-6">
+			<div className="flex flex-col items-center text-center">
+				<div className="mb-4">
+					<ShieldCheckIcon size={44} weight="thin" className="text-kumo-subtle" />
+				</div>
+				<h1 className="text-lg font-semibold text-kumo-default mb-2">
+					{title}
+				</h1>
+				<p className="text-sm text-kumo-subtle max-w-sm mb-5">
+					{description}
+				</p>
+				{action}
+			</div>
+		</div>
+	);
+}
 
 export default function HomeRoute() {
 	const toastManager = useKumoToastManager();
-	const { data: mailboxes = [], refetch: refetchMailboxes, isFetched: mailboxesFetched } = useMailboxes();
+	const navigate = useNavigate();
+	const { data: me, isLoading: isMeLoading } = useMe();
+	const isAdmin = me?.user?.globalRole === "admin" && me.user.status === "active";
+	const isActive = me?.user?.status === "active";
+	const register = useRegister();
+	const { data: mailboxes = [], refetch: refetchMailboxes } = useMailboxes(isActive);
 	const createMailbox = useCreateMailbox();
 	const deleteMailbox = useDeleteMailbox();
 
 	const { data: configData } = useQuery({
 		queryKey: queryKeys.config,
 		queryFn: () => api.getConfig(),
-		staleTime: Infinity, // config rarely changes
+		staleTime: Infinity,
 	});
 
 	const domains = configData?.domains ?? [];
-	const emailAddresses = configData?.emailAddresses ?? [];
-
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [newPrefix, setNewPrefix] = useState("");
 	const [selectedDomain, setSelectedDomain] = useState("");
@@ -52,44 +82,25 @@ export default function HomeRoute() {
 	} | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
 
-	// Set default domain when config loads
 	useEffect(() => {
-		if (domains.length > 0 && !selectedDomain) {
-			setSelectedDomain(domains[0]);
-		}
+		if (domains.length > 0 && !selectedDomain) setSelectedDomain(domains[0]);
 	}, [domains, selectedDomain]);
 
-	// Auto-create mailboxes from config (run once when both data sources are ready)
-	const autoCreateDone = useRef(false);
-	useEffect(() => {
-		if (autoCreateDone.current) return;
-		if (emailAddresses.length === 0 || !mailboxesFetched) return;
-		const existingEmails = new Set(
-			mailboxes.map((m) => m.email.toLowerCase()),
-		);
-		const toCreate = emailAddresses.filter(
-			(addr) => !existingEmails.has(addr.toLowerCase()),
-		);
-		if (toCreate.length === 0) {
-			autoCreateDone.current = true;
-			return;
+	const handleRegister = async () => {
+		try {
+			await register.mutateAsync();
+			toastManager.add({ title: "Registration submitted" });
+		} catch (err: unknown) {
+			const message = (err instanceof Error ? err.message : null) || "Registration failed";
+			toastManager.add({ title: message, variant: "error" });
 		}
-		autoCreateDone.current = true;
-		let cancelled = false;
-		Promise.all(
-			toCreate.map((addr) => {
-				const localPart = addr.split("@")[0] || addr;
-				return api.createMailbox(addr, localPart).catch(() => {});
-			}),
-		).then(() => { if (!cancelled) refetchMailboxes(); });
-		return () => { cancelled = true; };
-	}, [emailAddresses, mailboxes, refetchMailboxes]);
+	};
 
 	const handleCreate = async (e: FormEvent) => {
 		e.preventDefault();
 		setCreateError(null);
 		if (!newPrefix || !selectedDomain) {
-			setCreateError("Please fill in all fields");
+			setCreateError("Fill in the email address");
 			return;
 		}
 		const email = `${newPrefix}@${selectedDomain}`;
@@ -97,10 +108,11 @@ export default function HomeRoute() {
 		setIsCreating(true);
 		try {
 			await createMailbox.mutateAsync({ email, name });
-			toastManager.add({ title: "Mailbox created successfully!" });
+			toastManager.add({ title: "Mailbox created" });
 			setIsCreateOpen(false);
 			setNewPrefix("");
 			setNewName("");
+			refetchMailboxes();
 		} catch (err: unknown) {
 			const message = (err instanceof Error ? err.message : null) || "Failed to create mailbox";
 			setCreateError(message);
@@ -124,32 +136,89 @@ export default function HomeRoute() {
 		}
 	};
 
-	const isConfigured = emailAddresses.length > 0;
-	const accounts = isConfigured
-		? emailAddresses.map((addr) => ({
-				id: addr,
-				email: addr,
-				name: addr.split("@")[0] || addr,
-			}))
-		: mailboxes;
+	if (isMeLoading || !me) {
+		return (
+			<div className="min-h-screen bg-kumo-recessed flex items-center justify-center">
+				<Loader size="lg" />
+			</div>
+		);
+	}
 
-	const isLoading = !configData;
+	if (me.registrationStatus === "unregistered") {
+		return (
+			<div className="min-h-screen bg-kumo-recessed">
+				<div className="mx-auto max-w-xl px-4 py-12 md:py-20">
+					<AccessStateCard
+						title="Register this email"
+						description={`Cloudflare Access identified ${me.identity.email}. Register it here so an admin can approve mailbox access.`}
+						action={
+							<Button
+								variant="primary"
+								loading={register.isPending}
+								onClick={handleRegister}
+							>
+								Register
+							</Button>
+						}
+					/>
+				</div>
+			</div>
+		);
+	}
+
+	if (me.registrationStatus === "pending") {
+		return (
+			<div className="min-h-screen bg-kumo-recessed">
+				<div className="mx-auto max-w-xl px-4 py-12 md:py-20">
+					<AccessStateCard
+						title="Approval pending"
+						description="Your account is registered. A global admin needs to activate it and grant mailbox access."
+					/>
+				</div>
+			</div>
+		);
+	}
+
+	if (me.registrationStatus === "disabled") {
+		return (
+			<div className="min-h-screen bg-kumo-recessed">
+				<div className="mx-auto max-w-xl px-4 py-12 md:py-20">
+					<AccessStateCard
+						title="Account disabled"
+						description="This account cannot access Dumb Inbox. Contact a global admin."
+					/>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="min-h-screen bg-kumo-recessed">
 			<div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
 				<div className="mb-8">
-					<div className="flex items-center justify-between">
-						<h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
-						{!isConfigured && (
-							<Button
-								variant="primary"
-								icon={<PlusIcon size={16} />}
-								onClick={() => setIsCreateOpen(true)}
-							>
-								New Mailbox
-							</Button>
-						)}
+					<div className="flex items-center justify-between gap-3">
+						<div>
+							<h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
+							<p className="text-sm text-kumo-subtle mt-1">
+								{me.user?.email}
+							</p>
+						</div>
+						<div className="flex items-center gap-2">
+							{isAdmin && (
+								<Button variant="secondary" onClick={() => navigate("/admin")}>
+									Admin
+								</Button>
+							)}
+							{isAdmin && (
+								<Button
+									variant="primary"
+									icon={<PlusIcon size={16} />}
+									onClick={() => setIsCreateOpen(true)}
+								>
+									New Mailbox
+								</Button>
+							)}
+						</div>
 					</div>
 					{domains.length > 0 && (
 						<p className="text-sm text-kumo-subtle mt-1">
@@ -158,13 +227,9 @@ export default function HomeRoute() {
 					)}
 				</div>
 
-				{isLoading ? (
-					<div className="flex justify-center py-20">
-						<Loader size="lg" />
-					</div>
-				) : accounts.length > 0 ? (
-					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
-						{accounts.map((account, idx) => (
+				{mailboxes.length > 0 ? (
+					<div className="rounded-lg border border-kumo-line bg-kumo-base overflow-hidden">
+						{mailboxes.map((account, idx) => (
 							<RouterLink
 								key={account.id}
 								to={`/mailbox/${account.id}`}
@@ -183,7 +248,7 @@ export default function HomeRoute() {
 										{account.email}
 									</div>
 								</div>
-								{!isConfigured && (
+								{isAdmin && (
 									<Button
 										variant="ghost"
 										size="sm"
@@ -205,7 +270,7 @@ export default function HomeRoute() {
 						))}
 					</div>
 				) : (
-					<div className="rounded-xl border border-kumo-line bg-kumo-base py-16 px-6">
+					<div className="rounded-lg border border-kumo-line bg-kumo-base py-16 px-6">
 						<div className="flex flex-col items-center text-center">
 							<div className="mb-4">
 								<EnvelopeIcon
@@ -215,14 +280,14 @@ export default function HomeRoute() {
 								/>
 							</div>
 							<h3 className="text-base font-semibold text-kumo-default mb-1.5">
-								No mailboxes yet
+								No mailboxes available
 							</h3>
 							<p className="text-sm text-kumo-subtle max-w-sm mb-5">
-								{isConfigured
-									? "Your email routing is configured but no mailboxes have been created yet. They will appear here automatically."
-									: "Create a mailbox to start sending and receiving emails with your domain."}
+								{isAdmin
+									? "Create a mailbox or grant access to an existing one."
+									: "A mailbox manager or global admin needs to grant access."}
 							</p>
-							{!isConfigured && (
+							{isAdmin && (
 								<Button
 									variant="primary"
 									icon={<PlusIcon size={16} />}
@@ -236,11 +301,10 @@ export default function HomeRoute() {
 				)}
 			</div>
 
-			{/* Create Dialog */}
 			<Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<Dialog size="sm" className="p-6">
 					<Dialog.Title className="text-base font-semibold mb-5">
-						Create New Mailbox
+						Create mailbox
 					</Dialog.Title>
 					<form onSubmit={handleCreate} className="space-y-4">
 						{createError && (
@@ -250,7 +314,7 @@ export default function HomeRoute() {
 						)}
 						<div>
 							<span className="text-sm font-medium text-kumo-default mb-1.5 block">
-								Email Address
+								Email address
 							</span>
 							<div className="flex items-center gap-2">
 								<div className="flex-1">
@@ -266,13 +330,13 @@ export default function HomeRoute() {
 								<span className="text-sm text-kumo-subtle">@</span>
 								{domains.length > 1 ? (
 									<div className="flex-1">
-							<Select
-								aria-label="Domain"
-								value={selectedDomain}
-								onValueChange={(value) => {
-									if (value) setSelectedDomain(value);
-								}}
-							>
+										<Select
+											aria-label="Domain"
+											value={selectedDomain}
+											onValueChange={(value) => {
+												if (value) setSelectedDomain(value);
+											}}
+										>
 											{domains.map((d) => (
 												<Select.Option key={d} value={d}>
 													{d}
@@ -288,7 +352,7 @@ export default function HomeRoute() {
 							</div>
 						</div>
 						<Input
-							label="Display Name (optional)"
+							label="Display name"
 							placeholder="Info"
 							size="sm"
 							value={newName}
@@ -316,7 +380,6 @@ export default function HomeRoute() {
 				</Dialog>
 			</Dialog.Root>
 
-			{/* Delete Dialog */}
 			<Dialog.Root
 				open={isDeleteOpen}
 				onOpenChange={(open) => {
@@ -326,14 +389,14 @@ export default function HomeRoute() {
 			>
 				<Dialog size="sm" className="p-6">
 					<Dialog.Title className="text-base font-semibold mb-2">
-						Delete Mailbox
+						Delete mailbox
 					</Dialog.Title>
 					<Dialog.Description className="text-kumo-subtle text-sm mb-5">
-						Are you sure you want to delete{" "}
+						Delete{" "}
 						<strong className="text-kumo-default">
 							{mailboxToDelete?.email}
 						</strong>
-						? This action cannot be undone.
+						? Mail rows and attachment blobs are not purged yet.
 					</Dialog.Description>
 					<div className="flex justify-end gap-2">
 						<Dialog.Close

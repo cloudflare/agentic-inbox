@@ -5,7 +5,7 @@
 	"type": "module",
 	"cloudflare": {
 		"label": "Dumb Inbox",
-		"products": ["Workers", "Durable Objects", "R2"],
+		"products": ["Workers", "Durable Objects", "R2", "D1", "Workers AI"],
 		"bindings": {
 			"DOMAINS": {
 				"description": "Your domain with [Email Routing](https://developers.cloudflare.com/email-routing/) enabled (e.g. `example.com`). After deploying, create a catch-all Email Routing rule pointing to this Worker."

@@ -30,6 +30,7 @@ import {
 	useUpdateEmail,
 } from "~/queries/emails";
 import { useFolders } from "~/queries/folders";
+import { useMailbox } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email } from "~/types";
@@ -105,9 +106,11 @@ function EmailListSkeleton() {
 function FolderEmptyState({
 	folder,
 	onCompose,
+	canCompose,
 }: {
 	folder?: string;
 	onCompose: () => void;
+	canCompose: boolean;
 }) {
 	const config = (folder && FOLDER_EMPTY_STATES[folder]) || {
 		icon: (
@@ -126,7 +129,7 @@ function FolderEmptyState({
 			<p className="text-sm text-kumo-subtle max-w-xs mb-5">
 				{config.description}
 			</p>
-			{"showCompose" in config && config.showCompose && (
+			{"showCompose" in config && config.showCompose && canCompose && (
 				<Button
 					variant="primary"
 					size="sm"
@@ -177,6 +180,9 @@ export default function EmailListRoute() {
 	const totalCount = emailData?.totalCount ?? 0;
 
 	const { data: folders = [] } = useFolders(mailboxId);
+	const { data: currentMailbox } = useMailbox(mailboxId);
+	const canMutateMail = !!currentMailbox?.capabilities?.mutateMail;
+	const canSendMail = !!currentMailbox?.capabilities?.sendMail;
 
 	const folderName = useMemo(() => {
 		const found = folders.find((f) => f.id === folder);
@@ -240,7 +246,7 @@ export default function EmailListRoute() {
 
 	const handleRowClick = (email: Email) => {
 		selectEmail(email.id);
-		if (mailboxId && hasUnread(email)) {
+		if (mailboxId && canMutateMail && hasUnread(email)) {
 			if (email.thread_id && email.thread_count && email.thread_count > 1) {
 				markThreadRead.mutate({
 					mailboxId,
@@ -340,24 +346,28 @@ export default function EmailListRoute() {
 										</div>
 
 										{/* Star */}
-										<button
-											type="button"
-											className="shrink-0 p-0.5 bg-transparent border-0 cursor-pointer"
-											onClick={(e) => {
-												e.stopPropagation();
-												toggleStar(e, email);
-											}}
-										>
-											<StarIcon
-												size={16}
-												weight={email.starred ? "fill" : "regular"}
-												className={
-													email.starred
-														? "text-kumo-warning"
-														: "text-kumo-subtle hover:text-kumo-warning"
-												}
-											/>
-										</button>
+										{canMutateMail ? (
+											<button
+												type="button"
+												className="shrink-0 p-0.5 bg-transparent border-0 cursor-pointer"
+												onClick={(e) => {
+													e.stopPropagation();
+													toggleStar(e, email);
+												}}
+											>
+												<StarIcon
+													size={16}
+													weight={email.starred ? "fill" : "regular"}
+													className={
+														email.starred
+															? "text-kumo-warning"
+															: "text-kumo-subtle hover:text-kumo-warning"
+													}
+												/>
+											</button>
+										) : (
+											<div className="w-5 shrink-0" />
+										)}
 
 										{/* Content */}
 										<div className="min-w-0 flex-1">
@@ -403,6 +413,7 @@ export default function EmailListRoute() {
 									</div>
 
 										{/* Hover actions */}
+										{canMutateMail && (
 										<div className="hidden group-hover:flex items-center shrink-0">
 											<Tooltip content={email.read ? "Mark unread" : "Mark read"} asChild>
 												<Button
@@ -433,6 +444,7 @@ export default function EmailListRoute() {
 												/>
 											</Tooltip>
 										</div>
+										)}
 									</div>
 								);
 							})}
@@ -441,6 +453,7 @@ export default function EmailListRoute() {
 						<FolderEmptyState
 							folder={folder}
 							onCompose={() => startCompose()}
+							canCompose={canSendMail}
 						/>
 					)}
 				</div>

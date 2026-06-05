@@ -51,6 +51,8 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
 	const [previewImage, setPreviewImage] = useState<{ url: string; filename: string } | null>(null);
 	const isDraftFolder = folder === Folders.DRAFT;
+	const canSendMail = !!currentMailbox?.capabilities?.sendMail;
+	const canMutateMail = !!currentMailbox?.capabilities?.mutateMail;
 
 	const threadReplies = useMemo(() => {
 		if (!threadRepliesRaw || !email) return [];
@@ -108,7 +110,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
 	const handleSendDraft = async (draftMsg?: Email) => {
 		let target = draftMsg || email;
-		if (!mailboxId || !currentMailbox) return;
+		if (!mailboxId || !currentMailbox || !canSendMail) return;
 		setIsSending(true);
 		try {
 			if (!target.recipient || !target.subject) { try { const fresh = await api.getEmail(mailboxId, target.id) as Email; if (fresh) target = fresh; } catch {} }
@@ -146,6 +148,8 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				mailboxId={mailboxId}
 				isDraftFolder={isDraftFolder}
 				isSending={isSending}
+				canSendMail={canSendMail}
+				canMutateMail={canMutateMail}
 				moveToFolders={moveToFolders}
 				onBack={closePanel}
 				onSendDraft={() => handleSendDraft()}
@@ -196,9 +200,9 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								isSending={isDraft ? isSending : false}
 								isExpanded={expandedMessages.has(msg.id)}
 								onToggleExpand={() => toggleExpand(msg.id)}
-								onSendDraft={isDraft ? () => handleSendDraft(msg) : undefined}
-								onEditDraft={isDraft ? () => handleEditDraft(msg) : undefined}
-								onDeleteDraft={isDraft ? () => handleDeleteDraft(msg) : undefined}
+								onSendDraft={isDraft && canSendMail ? () => handleSendDraft(msg) : undefined}
+								onEditDraft={isDraft && canSendMail ? () => handleEditDraft(msg) : undefined}
+								onDeleteDraft={isDraft && canMutateMail ? () => handleDeleteDraft(msg) : undefined}
 								onViewSource={() => setSourceViewEmail(msg)}
 								onPreviewImage={(url, filename) =>
 									setPreviewImage({ url, filename })

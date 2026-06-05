@@ -26,6 +26,8 @@ interface EmailPanelToolbarProps {
 	mailboxId?: string;
 	isDraftFolder: boolean;
 	isSending: boolean;
+	canSendMail: boolean;
+	canMutateMail: boolean;
 	moveToFolders: Folder[];
 	lastReceivedMessage?: Email;
 	onBack: () => void;
@@ -46,6 +48,8 @@ export default function EmailPanelToolbar({
 	mailboxId,
 	isDraftFolder,
 	isSending,
+	canSendMail,
+	canMutateMail,
 	moveToFolders,
 	onBack,
 	onSendDraft,
@@ -71,7 +75,7 @@ export default function EmailPanelToolbar({
 				className="md:hidden shrink-0"
 			/>
 
-			{isDraftFolder ? (
+			{isDraftFolder && canSendMail ? (
 				<>
 					<Button
 						variant="primary"
@@ -91,7 +95,7 @@ export default function EmailPanelToolbar({
 						Edit
 					</Button>
 				</>
-			) : (
+			) : canSendMail ? (
 				<>
 					<Tooltip content="Reply" side="bottom" asChild>
 						<Button
@@ -124,39 +128,43 @@ export default function EmailPanelToolbar({
 						/>
 					</Tooltip>
 				</>
-			)}
+			) : null}
 
 			<div className="h-5 w-px bg-kumo-fill mx-0.5" />
 
-			<Tooltip content={email.starred ? "Unstar" : "Star"} side="bottom" asChild>
-				<Button
-					variant="ghost"
-					shape="square"
-					size="sm"
-					icon={
-						<StarIcon
-							size={18}
-							weight={email.starred ? "fill" : "regular"}
-							className={email.starred ? "text-kumo-warning" : ""}
+			{canMutateMail && (
+				<>
+					<Tooltip content={email.starred ? "Unstar" : "Star"} side="bottom" asChild>
+						<Button
+							variant="ghost"
+							shape="square"
+							size="sm"
+							icon={
+								<StarIcon
+									size={18}
+									weight={email.starred ? "fill" : "regular"}
+									className={email.starred ? "text-kumo-warning" : ""}
+								/>
+							}
+							onClick={onToggleStar}
+							aria-label={email.starred ? "Unstar" : "Star"}
 						/>
-					}
-					onClick={onToggleStar}
-					aria-label={email.starred ? "Unstar" : "Star"}
-				/>
-			</Tooltip>
+					</Tooltip>
 
-			<Tooltip content={email.read ? "Mark as unread" : "Mark as read"} side="bottom" asChild>
-				<Button
-					variant="ghost"
-					shape="square"
-					size="sm"
-					icon={email.read ? <EnvelopeSimpleIcon size={18} /> : <EnvelopeOpenIcon size={18} />}
-					onClick={onToggleRead}
-					aria-label={email.read ? "Mark as unread" : "Mark as read"}
-				/>
-			</Tooltip>
+					<Tooltip content={email.read ? "Mark as unread" : "Mark as read"} side="bottom" asChild>
+						<Button
+							variant="ghost"
+							shape="square"
+							size="sm"
+							icon={email.read ? <EnvelopeSimpleIcon size={18} /> : <EnvelopeOpenIcon size={18} />}
+							onClick={onToggleRead}
+							aria-label={email.read ? "Mark as unread" : "Mark as read"}
+						/>
+					</Tooltip>
 
-			<MoveToFolderMenu folders={moveToFolders} onMove={onMove} />
+					<MoveToFolderMenu folders={moveToFolders} onMove={onMove} />
+				</>
+			)}
 
 			<div className="ml-auto flex items-center gap-0.5">
 				<Tooltip content="View source" side="bottom" asChild>
@@ -169,16 +177,18 @@ export default function EmailPanelToolbar({
 						aria-label="View source"
 					/>
 				</Tooltip>
-				<Tooltip content="Delete" side="bottom" asChild>
-					<Button
-						variant="ghost"
-						shape="square"
-						size="sm"
-						icon={<TrashIcon size={18} />}
-						onClick={onDelete}
-						aria-label="Delete"
-					/>
-				</Tooltip>
+				{canMutateMail && (
+					<Tooltip content="Delete" side="bottom" asChild>
+						<Button
+							variant="ghost"
+							shape="square"
+							size="sm"
+							icon={<TrashIcon size={18} />}
+							onClick={onDelete}
+							aria-label="Delete"
+						/>
+					</Tooltip>
+				)}
 				<Tooltip content="Close" side="bottom" asChild>
 					<Button
 						variant="ghost"

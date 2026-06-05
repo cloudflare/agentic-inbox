@@ -6,6 +6,7 @@ import { Banner, Button, Input } from "@cloudflare/kumo";
 import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
+import ComposeAssist from "./ComposeAssist";
 import RichTextEditor from "./RichTextEditor";
 
 export default function ComposePanel() {
@@ -31,6 +32,12 @@ export default function ComposePanel() {
 		isSavingDraft,
 		isSending,
 		formTitle,
+		templates,
+		canUseTemplates,
+		canUseAiDraft,
+		isGeneratingAiDraft,
+		handleInsertTemplate,
+		handleGenerateAiDraft,
 		handleSaveDraft,
 		handleSend,
 		closeCompose,
@@ -70,6 +77,7 @@ export default function ComposePanel() {
 							</label>
 							<div className="flex-1 flex items-center gap-2 min-w-0">
 								<Input
+									aria-label="To"
 									type="text"
 									placeholder="recipient@example.com"
 									size="sm"
@@ -96,6 +104,7 @@ export default function ComposePanel() {
 								</label>
 								<div className="flex-1">
 									<Input
+										aria-label="CC"
 										type="text"
 										size="sm"
 										value={cc}
@@ -113,6 +122,7 @@ export default function ComposePanel() {
 								</label>
 								<div className="flex-1">
 									<Input
+										aria-label="BCC"
 										type="text"
 										size="sm"
 										value={bcc}
@@ -129,6 +139,7 @@ export default function ComposePanel() {
 							</label>
 							<div className="flex-1">
 								<Input
+									aria-label="Subject"
 									type="text"
 									placeholder="Email subject"
 									size="sm"
@@ -146,6 +157,14 @@ export default function ComposePanel() {
 							onChange={setBody}
 						/>
 					</div>
+					<ComposeAssist
+						templates={templates}
+						canUseTemplates={canUseTemplates}
+						canUseAiDraft={canUseAiDraft}
+						isGeneratingAiDraft={isGeneratingAiDraft}
+						onInsertTemplate={handleInsertTemplate}
+						onGenerateAiDraft={handleGenerateAiDraft}
+					/>
 				</div>
 
 				{/* Footer actions */}

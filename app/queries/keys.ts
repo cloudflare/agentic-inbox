@@ -4,9 +4,16 @@
 
 /** Centralised query key factories for cache invalidation. */
 export const queryKeys = {
+	me: ["me"] as const,
+	users: {
+		all: ["users"] as const,
+	},
 	mailboxes: {
 		all: ["mailboxes"] as const,
 		detail: (id: string) => ["mailboxes", id] as const,
+		memberships: (id: string) => ["mailboxes", id, "memberships"] as const,
+		templates: (id: string) => ["mailboxes", id, "templates"] as const,
+		aiSettings: (id: string) => ["mailboxes", id, "ai-settings"] as const,
 	},
 	emails: {
 		list: (mailboxId: string, params: Record<string, string>) =>

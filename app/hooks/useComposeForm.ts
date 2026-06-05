@@ -15,8 +15,10 @@ import {
 	toEmailListValue,
 } from "~/lib/utils";
 import { useDeleteEmail, useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
+import { useAiSettings, useGenerateAiDraft, useTemplates } from "~/queries/mailbox-access";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import type { ResponseTemplate } from "~/types";
 
 function appendUniqueAddress(
 	addresses: string[],
@@ -171,6 +173,9 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const replyMutation = useReplyToEmail();
 	const forwardMutation = useForwardEmail();
 	const deleteEmailMutation = useDeleteEmail();
+	const { data: templates = [] } = useTemplates(mailboxId, !!currentMailbox?.capabilities?.useTemplates);
+	const { data: aiSettings } = useAiSettings(mailboxId, !!currentMailbox?.capabilities?.useAi);
+	const generateAiDraftMutation = useGenerateAiDraft();
 
 	const [to, setTo] = useState("");
 	const [cc, setCc] = useState("");
@@ -188,6 +193,10 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		if (isDraftEdit) return "Edit Draft";
 		switch (composeOptions.mode) { case "reply": return "Reply"; case "reply-all": return "Reply All"; case "forward": return "Forward"; default: return "New Message"; }
 	}, [composeOptions.mode, isDraftEdit]);
+
+	const sourceEmailIdForAi = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
+	const canUseTemplates = !!currentMailbox?.capabilities?.useTemplates && templates.length > 0;
+	const canUseAiDraft = !!mailboxId && !!sourceEmailIdForAi && !!currentMailbox?.capabilities?.useAi && !!aiSettings?.enabled;
 
 	const sigBlock = useMemo(() => getSignatureBlock(currentMailbox?.settings), [currentMailbox]);
 
@@ -232,6 +241,29 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		finally { setIsSavingDraft(false); }
 	};
 
+	const handleInsertTemplate = (template: ResponseTemplate) => {
+		if (!subject && template.subject) setSubject(template.subject);
+		setBody((prev) => `${prev}${prev ? "<p><br></p>" : ""}${template.bodyHtml}`);
+	};
+
+	const handleGenerateAiDraft = async (templateId?: string) => {
+		if (!mailboxId || !sourceEmailIdForAi) return;
+		setError(null);
+		try {
+			const draft = await generateAiDraftMutation.mutateAsync({
+				mailboxId,
+				emailId: sourceEmailIdForAi,
+				templateId,
+			});
+			setBody(draft.bodyHtml);
+			toastManager.add({ title: "AI draft inserted" });
+		} catch (err: unknown) {
+			const message = (err instanceof Error ? err.message : null) || "Failed to generate AI draft.";
+			setError(message);
+			toastManager.add({ title: message, variant: "error" });
+		}
+	};
+
 	const handleSend = async (e: FormEvent, onClose: () => void) => {
 		e.preventDefault(); if (isSending) return; setError(null);
 		if (!currentMailbox || !mailboxId) { setError("No mailbox selected."); return; }
@@ -262,5 +294,33 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		finally { setIsSending(false); }
 	};
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel };
+	return {
+		to,
+		setTo,
+		cc,
+		setCc,
+		bcc,
+		setBcc,
+		showCcBcc,
+		setShowCcBcc,
+		subject,
+		setSubject,
+		body,
+		setBody,
+		error,
+		setError,
+		isSavingDraft,
+		isSending,
+		formTitle,
+		templates,
+		canUseTemplates,
+		canUseAiDraft,
+		isGeneratingAiDraft: generateAiDraftMutation.isPending,
+		handleInsertTemplate,
+		handleGenerateAiDraft,
+		handleSaveDraft,
+		handleSend,
+		closeCompose,
+		closePanel,
+	};
 }

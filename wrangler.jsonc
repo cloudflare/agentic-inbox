@@ -14,8 +14,21 @@
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
 		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": []
+		"EMAIL_ADDRESSES": [],
+		"AI_DEFAULT_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+		"DEV_ACCESS_EMAIL": "dev@example.com"
 	},
+	"ai": {
+		"binding": "AI"
+	},
+	"d1_databases": [
+		{
+			"binding": "APP_DB",
+			"database_name": "dumb-inbox-app",
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
 	"send_email": [
 		{
 			"name": "EMAIL",

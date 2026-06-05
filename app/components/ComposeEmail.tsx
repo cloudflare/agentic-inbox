@@ -6,6 +6,7 @@ import { Banner, Button, Dialog, Input, Text } from "@cloudflare/kumo";
 import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
+import ComposeAssist from "./ComposeAssist";
 import RichTextEditor from "./RichTextEditor";
 import { useUIStore } from "~/hooks/useUIStore";
 
@@ -34,6 +35,12 @@ export default function ComposeEmail() {
 		isSavingDraft,
 		isSending,
 		formTitle,
+		templates,
+		canUseTemplates,
+		canUseAiDraft,
+		isGeneratingAiDraft,
+		handleInsertTemplate,
+		handleGenerateAiDraft,
 		handleSaveDraft,
 		handleSend,
 	} = useComposeForm(mailboxId, folder);
@@ -106,6 +113,14 @@ export default function ComposeEmail() {
 						</Text>
 						<RichTextEditor value={body} onChange={setBody} />
 					</div>
+					<ComposeAssist
+						templates={templates}
+						canUseTemplates={canUseTemplates}
+						canUseAiDraft={canUseAiDraft}
+						isGeneratingAiDraft={isGeneratingAiDraft}
+						onInsertTemplate={handleInsertTemplate}
+						onGenerateAiDraft={handleGenerateAiDraft}
+					/>
 					<div className="flex justify-between items-center pt-2">
 						<Button
 							type="button"

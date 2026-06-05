@@ -16,9 +16,9 @@ import {
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
 import { Folders } from "../../shared/folders";
-import type { MailboxContext } from "../lib/mailbox";
+import type { AppContext as HonoAppContext } from "../lib/auth";
 
-type AppContext = Context<MailboxContext>;
+type AppContext = Context<HonoAppContext>;
 type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
 
 export async function handleReplyEmail(c: AppContext) {

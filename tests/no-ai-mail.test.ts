@@ -15,7 +15,14 @@ function expectNoText(path: string, forbidden: string[]): void {
 	}
 }
 
-test("runtime has no AI, agent, or MCP mail access paths", () => {
+function expectText(path: string, required: string[]): void {
+	const source = read(path);
+	for (const text of required) {
+		expect(source, `${path} must contain ${text}`).toContain(text);
+	}
+}
+
+test("runtime has no agent, MCP, or automatic AI mail access paths", () => {
 	for (const path of [
 		"workers/agent/index.ts",
 		"workers/mcp/index.ts",
@@ -35,8 +42,10 @@ test("runtime has no AI, agent, or MCP mail access paths", () => {
 		'"/mcp"',
 	]);
 	expectNoText("workers/index.ts", ["EMAIL_AGENT", "onNewEmail", "Auto-draft"]);
+	if (existsSync(join(root, "workers/lib/ai-draft.ts"))) {
+		expectNoText("workers/lib/ai-draft.ts", ["onNewEmail", "Auto-draft"]);
+	}
 	expectNoText("wrangler.jsonc", [
-		'"ai"',
 		'"name": "EMAIL_AGENT"',
 		'"class_name": "EmailAgent"',
 		'"name": "EMAIL_MCP"',
@@ -44,7 +53,16 @@ test("runtime has no AI, agent, or MCP mail access paths", () => {
 	]);
 });
 
-test("project metadata has no AI products, AI dependencies, or agentic branding", () => {
+test("explicit opt-in AI draft route is the only model-backed mail path", () => {
+	expect(existsSync(join(root, "workers/lib/ai-draft.ts"))).toBe(true);
+	expectText("workers/lib/ai-draft.ts", ["env.AI.run"]);
+	expectText("workers/index.ts", [
+		'"/api/v1/mailboxes/:mailboxId/emails/:id/ai-draft"',
+	]);
+	expectNoText("workers/app.ts", ["env.AI.run"]);
+});
+
+test("project metadata has no agentic branding or agent dependencies", () => {
 	const packageJson = JSON.parse(read("package.json")) as {
 		name: string;
 		cloudflare?: { label?: string; products?: string[] };
@@ -53,7 +71,6 @@ test("project metadata has no AI products, AI dependencies, or agentic branding"
 	};
 	expect(packageJson.name).not.toContain("agentic");
 	expect(packageJson.cloudflare?.label ?? "").not.toContain("Agentic");
-	expect(packageJson.cloudflare?.products ?? []).not.toContain("Workers AI");
 
 	for (const dependency of [
 		"@cloudflare/ai-chat",
@@ -72,7 +89,6 @@ test("project metadata has no AI products, AI dependencies, or agentic branding"
 		"AI-powered",
 		"AI agent",
 		"Auto-draft",
-		"Workers AI",
 		"/mcp",
 		"/agents",
 	]);

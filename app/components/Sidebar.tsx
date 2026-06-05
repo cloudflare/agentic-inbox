@@ -115,6 +115,9 @@ export default function Sidebar() {
 		return currentMailbox.email.split("@")[0] || currentMailbox.name;
 	}, [currentMailbox, mailboxId]);
 
+	const canSendMail = !!currentMailbox?.capabilities?.sendMail;
+	const canManageMailbox = !!currentMailbox?.capabilities?.manageMailbox;
+
 	const handleNavClick = () => {
 		// Close mobile sidebar on navigation
 		closeSidebar();
@@ -151,6 +154,7 @@ export default function Sidebar() {
 					variant="primary"
 					icon={<PencilSimpleIcon size={16} />}
 					onClick={() => startCompose()}
+					disabled={!canSendMail}
 					className="w-full"
 				>
 					Compose
@@ -177,16 +181,18 @@ export default function Sidebar() {
 							<span className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle">
 								Folders
 							</span>
-							<Tooltip content="New folder" asChild>
-								<Button
-									variant="ghost"
-									shape="square"
-									size="sm"
-									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
-									aria-label="Create new folder"
-								/>
-							</Tooltip>
+							{canManageMailbox && (
+								<Tooltip content="New folder" asChild>
+									<Button
+										variant="ghost"
+										shape="square"
+										size="sm"
+										icon={<PlusIcon size={16} />}
+										onClick={() => setIsCreateFolderOpen(true)}
+										aria-label="Create new folder"
+									/>
+								</Tooltip>
+							)}
 						</div>
 						{customFolders.map((folder) => (
 							<FolderLink
@@ -208,16 +214,18 @@ export default function Sidebar() {
 							<span className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle">
 								Folders
 							</span>
-							<Tooltip content="New folder" asChild>
-								<Button
-									variant="ghost"
-									shape="square"
-									size="sm"
-									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
-									aria-label="Create new folder"
-								/>
-							</Tooltip>
+							{canManageMailbox && (
+								<Tooltip content="New folder" asChild>
+									<Button
+										variant="ghost"
+										shape="square"
+										size="sm"
+										icon={<PlusIcon size={16} />}
+										onClick={() => setIsCreateFolderOpen(true)}
+										aria-label="Create new folder"
+									/>
+								</Tooltip>
+							)}
 						</div>
 					</div>
 				)}

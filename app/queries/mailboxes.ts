@@ -7,10 +7,11 @@ import api from "~/services/api";
 import type { Mailbox } from "~/types";
 import { queryKeys } from "./keys";
 
-export function useMailboxes() {
+export function useMailboxes(enabled = true) {
 	return useQuery<Mailbox[]>({
 		queryKey: queryKeys.mailboxes.all,
 		queryFn: () => api.listMailboxes() as Promise<Mailbox[]>,
+		enabled,
 	});
 }
 

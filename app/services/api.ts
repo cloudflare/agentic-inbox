@@ -2,7 +2,17 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { Email, Folder, Mailbox } from "~/types";
+import type {
+	AiDraftResponse,
+	AiDraftSettings,
+	AppUser,
+	CurrentUser,
+	Email,
+	Folder,
+	Mailbox,
+	MailboxMembership,
+	ResponseTemplate,
+} from "~/types";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -81,6 +91,13 @@ function put<T>(url: string, body?: unknown) {
 	});
 }
 
+function patch<T>(url: string, body?: unknown) {
+	return request<T>(url, {
+		method: "PATCH",
+		body: body != null ? JSON.stringify(body) : undefined,
+	});
+}
+
 function del<T>(url: string) {
 	return request<T>(url, { method: "DELETE" });
 }
@@ -95,9 +112,20 @@ interface EmailListResponse {
 // ---------- API client ----------
 
 const api = {
+	// Current user / registration
+	getMe: () => get<CurrentUser>("/api/v1/me"),
+	register: () => post<CurrentUser>("/api/v1/register"),
+
 	// Config
 	getConfig: () =>
 		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),
+
+	// Admin
+	listUsers: () => get<AppUser[]>("/api/v1/admin/users"),
+	updateUser: (
+		userId: string,
+		data: { status?: AppUser["status"]; globalRole?: AppUser["globalRole"]; displayName?: string | null },
+	) => patch<AppUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}`, data),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
@@ -109,6 +137,47 @@ const api = {
 		put<Mailbox>(`/api/v1/mailboxes/${mailboxId}`, { settings }),
 	deleteMailbox: (mailboxId: string) =>
 		del<void>(`/api/v1/mailboxes/${mailboxId}`),
+	listMemberships: (mailboxId: string) =>
+		get<MailboxMembership[]>(`/api/v1/mailboxes/${mailboxId}/memberships`),
+	updateMembership: (
+		mailboxId: string,
+		userIdOrEmail: string,
+		role: MailboxMembership["role"],
+	) =>
+		put<MailboxMembership>(
+			`/api/v1/mailboxes/${mailboxId}/memberships/${encodeURIComponent(userIdOrEmail)}`,
+			{ role },
+		),
+	deleteMembership: (mailboxId: string, userIdOrEmail: string) =>
+		del<void>(`/api/v1/mailboxes/${mailboxId}/memberships/${encodeURIComponent(userIdOrEmail)}`),
+
+	// Templates
+	listTemplates: (mailboxId: string) =>
+		get<ResponseTemplate[]>(`/api/v1/mailboxes/${mailboxId}/templates`),
+	createTemplate: (
+		mailboxId: string,
+		template: { name: string; subject?: string; bodyHtml: string; bodyText?: string | null },
+	) => post<ResponseTemplate>(`/api/v1/mailboxes/${mailboxId}/templates`, template),
+	updateTemplate: (
+		mailboxId: string,
+		templateId: string,
+		template: { name: string; subject?: string; bodyHtml: string; bodyText?: string | null },
+	) => put<ResponseTemplate>(`/api/v1/mailboxes/${mailboxId}/templates/${templateId}`, template),
+	deleteTemplate: (mailboxId: string, templateId: string) =>
+		del<void>(`/api/v1/mailboxes/${mailboxId}/templates/${templateId}`),
+
+	// AI drafting
+	getAiSettings: (mailboxId: string) =>
+		get<AiDraftSettings>(`/api/v1/mailboxes/${mailboxId}/ai-settings`),
+	updateAiSettings: (
+		mailboxId: string,
+		settings: { enabled: boolean; model?: string | null; systemPrompt?: string | null },
+	) => put<AiDraftSettings>(`/api/v1/mailboxes/${mailboxId}/ai-settings`, settings),
+	generateAiDraft: (mailboxId: string, emailId: string, templateId?: string) =>
+		post<AiDraftResponse>(
+			`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/ai-draft`,
+			templateId ? { templateId } : {},
+		),
 
 	// Emails
 	listEmails: (mailboxId: string, params: Record<string, string>, opts?: { signal?: AbortSignal }) =>
