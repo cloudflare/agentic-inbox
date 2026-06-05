@@ -27,6 +27,7 @@ export function useUpdateMembership() {
 		}) => api.updateMembership(mailboxId, userIdOrEmail, role),
 		onSuccess: (_data, { mailboxId }) => {
 			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.memberships(mailboxId) });
+			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
 		},
 	});
 }
@@ -43,6 +44,7 @@ export function useDeleteMembership() {
 		}) => api.deleteMembership(mailboxId, userIdOrEmail),
 		onSuccess: (_data, { mailboxId }) => {
 			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.memberships(mailboxId) });
+			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
 		},
 	});
 }

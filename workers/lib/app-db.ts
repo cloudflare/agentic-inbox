@@ -113,7 +113,7 @@ interface AiSettingsRow {
 	updated_at: string | null;
 }
 
-let schemaReady: Promise<void> | null = null;
+const schemaReady = new WeakMap<D1Database, Promise<void>>();
 
 export function nowIso(): string {
 	return new Date().toISOString();
@@ -194,11 +194,14 @@ export async function ensureAppSchema(db: D1Database): Promise<void> {
 }
 
 export function ensureAppSchemaOnce(db: D1Database): Promise<void> {
-	schemaReady ??= ensureAppSchema(db).catch((error: unknown) => {
-		schemaReady = null;
+	const existing = schemaReady.get(db);
+	if (existing) return existing;
+	const ready = ensureAppSchema(db).catch((error: unknown) => {
+		schemaReady.delete(db);
 		throw error;
 	});
-	return schemaReady;
+	schemaReady.set(db, ready);
+	return ready;
 }
 
 function toUser(row: UserRow): AppUserRecord {

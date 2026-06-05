@@ -2,18 +2,20 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import { Button, Loader } from "@cloudflare/kumo";
 import { useEffect, useRef } from "react";
-import { Outlet, useParams } from "react-router";
+import { Outlet, useNavigate, useParams } from "react-router";
 import ComposeEmail from "~/components/ComposeEmail";
 import Header from "~/components/Header";
 import Sidebar from "~/components/Sidebar";
-import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useMailbox } from "~/queries/mailboxes";
 
 export default function MailboxRoute() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
+	const navigate = useNavigate();
 	// Prefetch mailbox data for child components
-	useMailbox(mailboxId);
+	const mailboxQuery = useMailbox(mailboxId);
 	const prevMailboxIdRef = useRef<string | undefined>(undefined);
 	const {
 		isSidebarOpen,
@@ -35,6 +37,34 @@ export default function MailboxRoute() {
 
 		prevMailboxIdRef.current = mailboxId;
 	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
+
+	if (mailboxQuery.isLoading) {
+		return (
+			<div className="flex h-screen items-center justify-center bg-kumo-recessed">
+				<Loader size="lg" />
+			</div>
+		);
+	}
+
+	if (mailboxQuery.isError || !mailboxQuery.data) {
+		return (
+			<div className="min-h-screen bg-kumo-recessed">
+				<div className="mx-auto max-w-xl px-4 py-12">
+					<Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mb-4">
+						Mailboxes
+					</Button>
+					<div className="rounded-lg border border-kumo-line bg-kumo-base p-6">
+						<h1 className="text-lg font-semibold text-kumo-default mb-2">
+							Mailbox unavailable
+						</h1>
+						<p className="text-sm text-kumo-subtle">
+							This mailbox does not exist or your account does not have access.
+						</p>
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex h-screen overflow-hidden">
