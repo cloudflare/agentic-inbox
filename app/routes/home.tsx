@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import {
+	Banner,
 	Button,
 	Dialog,
 	Empty,
@@ -251,6 +252,13 @@ export default function HomeRoute() {
 							<Text variant="error" size="sm">
 								{createError}
 							</Text>
+						)}
+						{selectedDomain && selectedDomain !== domains[0] && (
+							<Banner
+								variant="alert"
+								title="Email Routing required for this domain"
+								description={`Creating this mailbox does not configure email delivery. In the Cloudflare dashboard, go to ${selectedDomain} > Email Routing and add a catch-all or per-address rule that forwards to this Worker, or the mailbox will only be able to send, not receive.`}
+							/>
 						)}
 						<div>
 							<span className="text-sm font-medium text-kumo-default mb-1.5 block">

@@ -97,7 +97,7 @@ interface EmailListResponse {
 const api = {
 	// Config
 	getConfig: () =>
-		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),
+		get<{ domains: string[]; emailAddresses: string[]; openRouterConfigured: boolean }>("/api/v1/config"),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
@@ -160,6 +160,10 @@ const api = {
 	// Search
 	searchEmails: (mailboxId: string, params: Record<string, string>) =>
 		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${mailboxId}/search`, { params }),
+
+	// AI
+	rewriteEmailBody: (mailboxId: string, body: string, action: string, instruction?: string) =>
+		post<{ body: string }>(`/api/v1/mailboxes/${mailboxId}/ai/rewrite`, { body, action, instruction }),
 };
 
 export default api;

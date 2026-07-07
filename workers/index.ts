@@ -8,6 +8,7 @@ import PostalMime from "postal-mime";
 import { z } from "zod";
 import { sendEmail } from "./email-sender";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
+import { rewriteEmailBody } from "./lib/ai-rewrite";
 import {
 	validateSender,
 	SenderValidationError,
@@ -89,7 +90,8 @@ app.get("/api/v1/config", (c) => {
 	const domainsRaw = c.env.DOMAINS || "";
 	const domains = domainsRaw.split(",").map((d) => d.trim()).filter(Boolean);
 	const emailAddresses = c.env.EMAIL_ADDRESSES ?? [];
-	return c.json({ domains, emailAddresses });
+	const openRouterConfigured = Boolean(c.env.OPENROUTER_API_KEY);
+	return c.json({ domains, emailAddresses, openRouterConfigured });
 });
 
 // -- Mailboxes ------------------------------------------------------
@@ -141,6 +143,24 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
 });
 
 // -- Emails ---------------------------------------------------------
+
+// AI rewrite endpoint
+app.post("/api/v1/mailboxes/:mailboxId/ai/rewrite", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId")!;
+	const { body, action, instruction } = (await c.req.json()) as {
+		body: string;
+		action: "polish" | "formalize" | "friendly" | "shorten" | "custom";
+		instruction?: string;
+	};
+	if (!body || !action) return c.json({ error: "body and action are required" }, 400);
+	try {
+		const rewritten = await rewriteEmailBody(c.env, mailboxId, body, action, instruction);
+		return c.json({ body: rewritten });
+	} catch (err) {
+		const message = err instanceof Error ? err.message : "AI rewrite failed";
+		return c.json({ error: message }, 500);
+	}
+});
 
 app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const folder = c.req.query("folder");

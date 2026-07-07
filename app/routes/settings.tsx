@@ -6,7 +6,11 @@ import { Badge, Button, Input, Loader, useKumoToastManager } from "@cloudflare/k
 import { RobotIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import api from "~/services/api";
+import { queryKeys } from "~/queries/keys";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
+import type { AiProviderSetting } from "~/types";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -20,22 +24,38 @@ export default function SettingsRoute() {
 
 	const [displayName, setDisplayName] = useState("");
 	const [agentPrompt, setAgentPrompt] = useState("");
+	const [aiProviderType, setAiProviderType] = useState<AiProviderSetting["type"]>("workers-ai");
+	const [aiModel, setAiModel] = useState("");
 	const [isSaving, setIsSaving] = useState(false);
+
+	const { data: configData } = useQuery({
+		queryKey: queryKeys.config,
+		queryFn: () => api.getConfig(),
+		staleTime: Infinity,
+	});
+	const openRouterConfigured = configData?.openRouterConfigured ?? false;
 
 	useEffect(() => {
 		if (mailbox) {
 			setDisplayName(mailbox.settings?.fromName || mailbox.name || "");
 			setAgentPrompt(mailbox.settings?.agentSystemPrompt || "");
+			setAiProviderType(mailbox.settings?.aiProvider?.type || "workers-ai");
+			setAiModel(mailbox.settings?.aiProvider?.model || "");
 		}
 	}, [mailbox]);
 
 	const handleSave = async () => {
 		if (!mailbox || !mailboxId) return;
 		setIsSaving(true);
+		const aiProvider: AiProviderSetting | undefined =
+			aiModel.trim()
+				? { type: aiProviderType, model: aiModel.trim() }
+				: undefined;
 		const settings = {
 			...mailbox.settings,
 			fromName: displayName,
 			agentSystemPrompt: agentPrompt.trim() || undefined,
+			aiProvider,
 		};
 		try {
 			await updateMailboxMutation.mutateAsync({ mailboxId, settings });
@@ -81,6 +101,47 @@ export default function SettingsRoute() {
 							onChange={(e) => setDisplayName(e.target.value)}
 						/>
 						<Input label="Email" type="email" value={mailbox.email} disabled />
+					</div>
+				</div>
+
+				{/* AI Model Provider */}
+				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
+					<div className="flex items-center gap-2 mb-4">
+						<RobotIcon size={16} weight="duotone" className="text-kumo-subtle" />
+						<span className="text-sm font-medium text-kumo-default">
+							AI Model
+						</span>
+					</div>
+					<p className="text-xs text-kumo-subtle mb-3">
+						Choose which AI provider and model to use for this mailbox.
+					</p>
+					<div className="space-y-3">
+						<div>
+							<label className="text-xs font-medium text-kumo-default mb-1 block">
+								Provider
+							</label>
+							<select
+								value={aiProviderType}
+								onChange={(e) => setAiProviderType(e.target.value as AiProviderSetting["type"])}
+								className="w-full rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-sm text-kumo-default focus:outline-none focus:ring-1 focus:ring-kumo-ring"
+							>
+								<option value="workers-ai">Cloudflare Workers AI</option>
+								<option value="openrouter" disabled={!openRouterConfigured}>
+									OpenRouter{!openRouterConfigured ? " (API key not configured)" : ""}
+								</option>
+							</select>
+						</div>
+						<Input
+							label="Model ID"
+							value={aiModel}
+							onChange={(e) => setAiModel(e.target.value)}
+							placeholder={aiProviderType === "workers-ai" ? "@cf/moonshotai/kimi-k2.5" : "anthropic/claude-sonnet-4"}
+						/>
+						<p className="text-xs text-kumo-subtle">
+							{aiProviderType === "workers-ai"
+								? "Enter a Workers AI model ID (e.g. @cf/moonshotai/kimi-k2.5). Leave empty for the default."
+								: "Enter an OpenRouter model ID (e.g. anthropic/claude-sonnet-4, google/gemini-2.5-flash)."}
+						</p>
 					</div>
 				</div>
 

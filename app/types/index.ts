@@ -8,12 +8,18 @@ export interface SignatureSettings {
 	html?: string;
 }
 
+export interface AiProviderSetting {
+	type: "workers-ai" | "openrouter";
+	model: string;
+}
+
 export interface MailboxSettings {
 	fromName?: string;
 	forwarding?: { enabled: boolean; email: string };
 	signature?: SignatureSettings;
 	autoReply?: { enabled: boolean; subject: string; message: string };
 	agentSystemPrompt?: string;
+	aiProvider?: AiProviderSetting;
 }
 
 export interface Mailbox {
