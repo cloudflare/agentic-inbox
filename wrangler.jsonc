@@ -14,7 +14,9 @@
 		"DOMAINS": "shor.lol",
 		"EMAIL_ADDRESSES": [],
 		"POLICY_AUD": "3b60a59232bccf2b6feb66e37b4c4363493fc4b5c6dd66fd7b3e86fac33c1ec4",
-		"TEAM_DOMAIN": "https://printact.cloudflareaccess.com"
+		"TEAM_DOMAIN": "https://printact.cloudflareaccess.com",
+		// Empty string disables semantic search; memory search falls back to keyword-only.
+		"AI_SEARCH_INSTANCE_ID": ""
 	},
 	"send_email": [
 		{

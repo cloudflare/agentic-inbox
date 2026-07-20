@@ -51,6 +51,7 @@ const TOOLS = [
 	{ name: "get_email", desc: "Read a full email with body" },
 	{ name: "get_thread", desc: "Load a conversation thread" },
 	{ name: "search_emails", desc: "Search emails by query" },
+	{ name: "search_memory", desc: "Search stored memory notes" },
 	{ name: "draft_reply", desc: "Draft a reply to an email" },
 	{ name: "send_reply", desc: "Send a reply" },
 	{ name: "send_email", desc: "Send a new email" },

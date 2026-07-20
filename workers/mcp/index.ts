@@ -11,6 +11,7 @@ import {
 	toolGetEmail,
 	toolGetThread,
 	toolSearchEmails,
+	toolSearchMemory,
 	toolDraftReply,
 	toolDraftEmail,
 	toolUpdateDraft,
@@ -178,6 +179,22 @@ export class EmailMCP extends McpAgent<Env> {
 				const denied = await verifyMailbox(mailboxId);
 				if (denied) return denied;
 				const result = await toolSearchEmails(env, mailboxId, { query, folder });
+				return mcpText(result);
+			},
+		);
+
+		// ── search_memory ────────────────────────────────────────────
+		this.server.tool(
+			"search_memory",
+			"Search stored memory notes (policies, reference info) for a mailbox.",
+			{
+				mailboxId: z.string().describe("The mailbox email address"),
+				query: z.string().describe("Search query"),
+			},
+			async ({ mailboxId, query }) => {
+				const denied = await verifyMailbox(mailboxId);
+				if (denied) return denied;
+				const result = await toolSearchMemory(env, mailboxId, { query });
 				return mcpText(result);
 			},
 		);

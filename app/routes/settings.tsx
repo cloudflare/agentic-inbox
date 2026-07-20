@@ -3,9 +3,9 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Badge, Button, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
-import { RobotIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
+import { RobotIcon, ArrowCounterClockwiseIcon, BrainIcon, ShieldCheckIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import api from "~/services/api";
 import { queryKeys } from "~/queries/keys";
@@ -26,6 +26,10 @@ export default function SettingsRoute() {
 	const [agentPrompt, setAgentPrompt] = useState("");
 	const [aiProviderType, setAiProviderType] = useState<AiProviderSetting["type"]>("workers-ai");
 	const [aiModel, setAiModel] = useState("");
+	const [useAutoRag, setUseAutoRag] = useState(false);
+	const [urgentDetection, setUrgentDetection] = useState(false);
+	const [phishingDetection, setPhishingDetection] = useState(false);
+	const [sensitiveInfoWarning, setSensitiveInfoWarning] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 
 	const { data: configData } = useQuery({
@@ -41,6 +45,10 @@ export default function SettingsRoute() {
 			setAgentPrompt(mailbox.settings?.agentSystemPrompt || "");
 			setAiProviderType(mailbox.settings?.aiProvider?.type || "workers-ai");
 			setAiModel(mailbox.settings?.aiProvider?.model || "");
+			setUseAutoRag(mailbox.settings?.memory?.useAutoRag ?? false);
+			setUrgentDetection(mailbox.settings?.safety?.urgentDetection ?? false);
+			setPhishingDetection(mailbox.settings?.safety?.phishingDetection ?? false);
+			setSensitiveInfoWarning(mailbox.settings?.safety?.sensitiveInfoWarning ?? false);
 		}
 	}, [mailbox]);
 
@@ -56,6 +64,8 @@ export default function SettingsRoute() {
 			fromName: displayName,
 			agentSystemPrompt: agentPrompt.trim() || undefined,
 			aiProvider,
+			memory: { useAutoRag },
+			safety: { urgentDetection, phishingDetection, sensitiveInfoWarning },
 		};
 		try {
 			await updateMailboxMutation.mutateAsync({ mailboxId, settings });
@@ -142,6 +152,100 @@ export default function SettingsRoute() {
 								? "Enter a Workers AI model ID (e.g. @cf/moonshotai/kimi-k2.5). Leave empty for the default."
 								: "Enter an OpenRouter model ID (e.g. anthropic/claude-sonnet-4, google/gemini-2.5-flash)."}
 						</p>
+					</div>
+				</div>
+
+				{/* Memory */}
+				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
+					<div className="flex items-center gap-2 mb-4">
+						<BrainIcon size={16} weight="duotone" className="text-kumo-subtle" />
+						<span className="text-sm font-medium text-kumo-default">
+							Memory
+						</span>
+					</div>
+					<p className="text-xs text-kumo-subtle mb-3">
+						The AI agent can search stored memory notes (policies, reference info) when drafting replies.
+					</p>
+					<label className="flex items-start gap-2 cursor-pointer">
+						<input
+							type="checkbox"
+							checked={useAutoRag}
+							onChange={(e) => setUseAutoRag(e.target.checked)}
+							className="mt-0.5"
+						/>
+						<span className="text-sm text-kumo-default">
+							Enable semantic search using Cloudflare AI Search
+							<span className="block text-xs text-kumo-subtle">
+								Requires an AI Search instance to be configured for this deployment. Keyword search always works regardless of this setting.
+							</span>
+						</span>
+					</label>
+					<div className="mt-3">
+						<Link
+							to={`/mailbox/${mailboxId}/memory`}
+							className="text-xs text-kumo-brand hover:underline"
+						>
+							Manage memory notes →
+						</Link>
+					</div>
+				</div>
+
+				{/* Safety */}
+				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
+					<div className="flex items-center gap-2 mb-4">
+						<ShieldCheckIcon size={16} weight="duotone" className="text-kumo-subtle" />
+						<span className="text-sm font-medium text-kumo-default">
+							Safety
+						</span>
+					</div>
+					<p className="text-xs text-kumo-subtle mb-3">
+						AI classifiers that run on incoming and outgoing email. All are off by default — enabling
+						these may skip auto-drafting for some emails, requiring you to reply manually.
+					</p>
+					<div className="space-y-3">
+						<label className="flex items-start gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={urgentDetection}
+								onChange={(e) => setUrgentDetection(e.target.checked)}
+								className="mt-0.5"
+							/>
+							<span className="text-sm text-kumo-default">
+								Detect urgent or distressed emails
+								<span className="block text-xs text-kumo-subtle">
+									Skips auto-draft for emails that seem to need your personal, immediate attention.
+								</span>
+							</span>
+						</label>
+						<label className="flex items-start gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={phishingDetection}
+								onChange={(e) => setPhishingDetection(e.target.checked)}
+								className="mt-0.5"
+							/>
+							<span className="text-sm text-kumo-default">
+								Detect phishing or impersonation
+								<span className="block text-xs text-kumo-subtle">
+									Skips auto-draft for emails that look like phishing or impersonation attempts.
+								</span>
+							</span>
+						</label>
+						<label className="flex items-start gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={sensitiveInfoWarning}
+								onChange={(e) => setSensitiveInfoWarning(e.target.checked)}
+								className="mt-0.5"
+							/>
+							<span className="text-sm text-kumo-default">
+								Warn before sending grades or student IDs
+								<span className="block text-xs text-kumo-subtle">
+									Flags outgoing replies that mention a specific grade, GPA, score, or student ID
+									before you send — it does not block sending.
+								</span>
+							</span>
+						</label>
 					</div>
 				</div>
 

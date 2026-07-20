@@ -116,6 +116,18 @@ export function getSnippetText(
 }
 
 /**
+ * Convert plain text into simple HTML: blank-line-separated paragraphs,
+ * single newlines within a paragraph become <br>. Mirrors the backend's
+ * `textToHtml` in workers/lib/email-helpers.ts for consistent formatting.
+ */
+export function textToHtml(text: string): string {
+	return text
+		.split(/\n{2,}/)
+		.map((para) => `<p>${escapeHtml(para).replace(/\n/g, "<br>")}</p>`)
+		.join("");
+}
+
+/**
  * Escape all five OWASP-recommended HTML special characters in plain text.
  * Safe for use in both text content and attribute contexts.
  */

@@ -5,14 +5,17 @@
 import { Badge, Button, Dialog, Input, Tooltip } from "@cloudflare/kumo";
 import {
 	ArchiveIcon,
+	BrainIcon,
 	CaretLeftIcon,
 	FileIcon,
 	FolderIcon,
+	NoteIcon,
 	PaperPlaneTiltIcon,
 	PencilSimpleIcon,
 	PlusIcon,
 	TrashIcon,
 	TrayIcon,
+	UsersIcon,
 } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
@@ -169,6 +172,27 @@ export default function Sidebar() {
 						onClick={handleNavClick}
 					/>
 				))}
+
+				<FolderLink
+					to={`/mailbox/${mailboxId}/memory`}
+					icon={<BrainIcon size={18} weight="regular" />}
+					label="Memory"
+					onClick={handleNavClick}
+				/>
+
+				<FolderLink
+					to={`/mailbox/${mailboxId}/templates`}
+					icon={<NoteIcon size={18} weight="regular" />}
+					label="Templates"
+					onClick={handleNavClick}
+				/>
+
+				<FolderLink
+					to={`/mailbox/${mailboxId}/roster`}
+					icon={<UsersIcon size={18} weight="regular" />}
+					label="Rosters"
+					onClick={handleNavClick}
+				/>
 
 				{/* Custom folders */}
 				{customFolders.length > 0 && (
