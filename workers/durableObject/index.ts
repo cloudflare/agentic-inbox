@@ -649,6 +649,392 @@ export class MailboxDO extends DurableObject<Env> {
 		return true;
 	}
 
+	async bulkMarkRead(ids: string[], read: boolean) {
+		if (ids.length === 0) return { updated: 0 };
+		const placeholders = ids.map((_, i) => `?${i + 2}`).join(",");
+		this.ctx.storage.sql.exec(
+			`UPDATE emails SET read = ?1 WHERE id IN (${placeholders})`,
+			read ? 1 : 0,
+			...ids,
+		);
+		return { updated: ids.length };
+	}
+
+	async bulkMoveEmails(ids: string[], folderId: string) {
+		const folder = this.db
+			.select({ id: schema.folders.id })
+			.from(schema.folders)
+			.where(eq(schema.folders.id, folderId))
+			.get();
+
+		if (!folder) return { moved: 0, error: "Folder not found" };
+		if (ids.length === 0) return { moved: 0 };
+
+		const placeholders = ids.map((_, i) => `?${i + 2}`).join(",");
+		this.ctx.storage.sql.exec(
+			`UPDATE emails SET folder_id = ?1 WHERE id IN (${placeholders})`,
+			folderId,
+			...ids,
+		);
+		return { moved: ids.length };
+	}
+
+	// ── Memory files ─────────────────────────────────────────────
+
+	async createMemoryFile(params: {
+		id: string;
+		title: string;
+		tags?: string;
+		content: string;
+		r2_key: string;
+		status?: string;
+		source_type?: string;
+		word_count?: number;
+		token_count?: number;
+		source_kind?: string;
+		source_uri?: string;
+		external_id?: string;
+		parent_id?: string;
+		checksum?: string;
+		draft_eligible?: number;
+	}) {
+		const now = new Date().toISOString();
+		return this.db
+			.insert(schema.memoryFiles)
+			.values({
+				...params,
+				status: params.status ?? "ready",
+				source_type: params.source_type ?? "text",
+				created_at: now,
+				updated_at: now,
+			})
+			.returning()
+			.get();
+	}
+
+	async listMemoryFiles() {
+		return this.db
+			.select({
+				id: schema.memoryFiles.id,
+				title: schema.memoryFiles.title,
+				tags: schema.memoryFiles.tags,
+				status: schema.memoryFiles.status,
+				source_type: schema.memoryFiles.source_type,
+				error_message: schema.memoryFiles.error_message,
+				word_count: schema.memoryFiles.word_count,
+				token_count: schema.memoryFiles.token_count,
+				summary: schema.memoryFiles.summary,
+				source_kind: schema.memoryFiles.source_kind,
+				source_uri: schema.memoryFiles.source_uri,
+				external_id: schema.memoryFiles.external_id,
+				parent_id: schema.memoryFiles.parent_id,
+				draft_eligible: schema.memoryFiles.draft_eligible,
+				last_indexed_at: schema.memoryFiles.last_indexed_at,
+				created_at: schema.memoryFiles.created_at,
+				updated_at: schema.memoryFiles.updated_at,
+			})
+			.from(schema.memoryFiles)
+			.orderBy(desc(schema.memoryFiles.created_at))
+			.all();
+	}
+
+	async getMemoryFile(id: string) {
+		return (
+			this.db
+				.select()
+				.from(schema.memoryFiles)
+				.where(eq(schema.memoryFiles.id, id))
+				.get() ?? null
+		);
+	}
+
+	async getMemoryFileByExternalId(externalId: string) {
+		return this.db.select().from(schema.memoryFiles).where(eq(schema.memoryFiles.external_id, externalId)).get() ?? null;
+	}
+
+	async updateMemoryFileStatus(
+		id: string,
+		status: string,
+		params?: {
+			content?: string;
+			error_message?: string;
+			word_count?: number;
+			token_count?: number;
+		},
+	) {
+		return this.db
+			.update(schema.memoryFiles)
+			.set({
+				status,
+				...(params?.content !== undefined ? { content: params.content } : {}),
+				...(params?.word_count !== undefined ? { word_count: params.word_count } : {}),
+				...(params?.token_count !== undefined ? { token_count: params.token_count } : {}),
+				error_message: params?.error_message ?? null,
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+	}
+
+	async updateMemoryFileMetadata(id: string, params: { title?: string; tags?: string; parent_id?: string; draft_eligible?: number }) {
+		const row = this.db
+			.select({ id: schema.memoryFiles.id })
+			.from(schema.memoryFiles)
+			.where(eq(schema.memoryFiles.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db
+			.update(schema.memoryFiles)
+			.set({
+				...(params.title !== undefined ? { title: params.title } : {}),
+				...(params.tags !== undefined ? { tags: params.tags } : {}),
+				...(params.parent_id !== undefined ? { parent_id: params.parent_id || null } : {}),
+				...(params.draft_eligible !== undefined ? { draft_eligible: params.draft_eligible } : {}),
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+
+		return this.db.select().from(schema.memoryFiles).where(eq(schema.memoryFiles.id, id)).get();
+	}
+
+	async updateMemorySummary(id: string, summary: string) {
+		return this.db
+			.update(schema.memoryFiles)
+			.set({ summary, updated_at: new Date().toISOString() })
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+	}
+
+	async deleteMemoryFile(id: string) {
+		const row = this.db
+			.select({ r2_key: schema.memoryFiles.r2_key })
+			.from(schema.memoryFiles)
+			.where(eq(schema.memoryFiles.id, id))
+			.get();
+
+		if (!row) return null;
+
+		this.db
+			.delete(schema.memoryFiles)
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+
+		return row;
+	}
+
+	async replaceMemoryChunks(fileId: string, chunks: Array<{
+		id: string;
+		heading?: string | null;
+		content: string;
+		start_offset: number;
+		end_offset: number;
+		token_count?: number;
+	}>) {
+		this.db.delete(schema.memoryChunks).where(eq(schema.memoryChunks.memory_file_id, fileId)).run();
+		if (chunks.length === 0) return;
+		const createdAt = new Date().toISOString();
+		this.db.insert(schema.memoryChunks).values(chunks.map((chunk) => ({
+			...chunk,
+			memory_file_id: fileId,
+			heading: chunk.heading ?? null,
+			created_at: createdAt,
+		}))).run();
+		this.db.update(schema.memoryFiles)
+			.set({ last_indexed_at: createdAt, updated_at: createdAt })
+			.where(eq(schema.memoryFiles.id, fileId))
+			.run();
+	}
+
+	async listMemoryFacts(status?: string) {
+		const rows = this.db.select().from(schema.memoryFacts);
+		return status ? rows.where(eq(schema.memoryFacts.status, status)).all() : rows.all();
+	}
+
+	async getFirstMemoryChunkId(fileId: string) {
+		return this.db.select({ id: schema.memoryChunks.id })
+			.from(schema.memoryChunks)
+			.where(eq(schema.memoryChunks.memory_file_id, fileId))
+			.orderBy(asc(schema.memoryChunks.start_offset))
+			.get()?.id ?? null;
+	}
+
+	async createMemoryFact(params: {
+		id: string;
+		kind: string;
+		value: string;
+		confidence?: number;
+		source_chunk_id?: string;
+	}) {
+		const now = new Date().toISOString();
+		return this.db.insert(schema.memoryFacts).values({
+			...params,
+			status: "suggested",
+			created_at: now,
+			updated_at: now,
+		}).returning().get();
+	}
+
+	async updateMemoryFactStatus(id: string, status: "suggested" | "confirmed" | "rejected" | "superseded") {
+		return this.db.update(schema.memoryFacts)
+			.set({ status, updated_at: new Date().toISOString() })
+			.where(eq(schema.memoryFacts.id, id))
+			.run();
+	}
+
+	async searchMemoryKeyword(query: string, limit = 10) {
+		const like = `%${query}%`;
+		return [
+			...this.ctx.storage.sql.exec(
+				`SELECT mf.id, mf.title, mf.tags,
+				 COALESCE(SUBSTR(mc.content, MAX(1, INSTR(LOWER(mc.content), LOWER(?1)) - 100), 500),
+				 SUBSTR(mf.content, MAX(1, INSTR(LOWER(mf.content), LOWER(?1)) - 100), 500)) as snippet,
+				 COALESCE(mc.heading, '') as heading, COALESCE(mc.start_offset, 0) as start_offset,
+				 mf.source_kind, mf.source_uri, mf.draft_eligible, mf.created_at
+				 FROM memory_files mf LEFT JOIN memory_chunks mc ON mc.memory_file_id = mf.id
+				 WHERE mf.status = 'ready' AND mf.draft_eligible = 1 AND
+				 (mf.title LIKE ?2 OR mf.tags LIKE ?2 OR mf.content LIKE ?2 OR mc.content LIKE ?2)
+				 ORDER BY mf.created_at DESC LIMIT ?3`,
+				query,
+				like,
+				limit,
+			),
+		];
+	}
+
+	async getMemoryFileIds(ids: string[]) {
+		if (ids.length === 0) return [];
+		const placeholders = ids.map((_, i) => `?${i + 1}`).join(",");
+		return [
+			...this.ctx.storage.sql.exec(
+				`SELECT id, title, tags, SUBSTR(content, 1, 500) as snippet,
+				 source_kind, source_uri, draft_eligible FROM memory_files
+				 WHERE id IN (${placeholders}) AND status = 'ready' AND draft_eligible = 1`,
+				...ids,
+			),
+		];
+	}
+
+	// ── Canned response templates ───────────────────────────────
+
+	async createTemplate(params: { id: string; title: string; body: string; tags?: string }) {
+		const now = new Date().toISOString();
+		return this.db
+			.insert(schema.templates)
+			.values({ ...params, created_at: now, updated_at: now })
+			.returning()
+			.get();
+	}
+
+	async listTemplates() {
+		return this.db
+			.select()
+			.from(schema.templates)
+			.orderBy(desc(schema.templates.created_at))
+			.all();
+	}
+
+	async updateTemplate(id: string, params: { title?: string; body?: string; tags?: string }) {
+		const row = this.db
+			.select({ id: schema.templates.id })
+			.from(schema.templates)
+			.where(eq(schema.templates.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db
+			.update(schema.templates)
+			.set({
+				...(params.title !== undefined ? { title: params.title } : {}),
+				...(params.body !== undefined ? { body: params.body } : {}),
+				...(params.tags !== undefined ? { tags: params.tags } : {}),
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.templates.id, id))
+			.run();
+
+		return this.db.select().from(schema.templates).where(eq(schema.templates.id, id)).get();
+	}
+
+	async deleteTemplate(id: string) {
+		const row = this.db
+			.select({ id: schema.templates.id })
+			.from(schema.templates)
+			.where(eq(schema.templates.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db.delete(schema.templates).where(eq(schema.templates.id, id)).run();
+		return row;
+	}
+
+	// ── Rosters / students ───────────────────────────────────────
+
+	async createRoster(id: string, name: string, students: { name?: string; email: string }[]) {
+		const now = new Date().toISOString();
+		this.db.insert(schema.rosters).values({ id, name, created_at: now }).run();
+		if (students.length > 0) {
+			this.db
+				.insert(schema.students)
+				.values(
+					students.map((s) => ({
+						id: crypto.randomUUID(),
+						roster_id: id,
+						name: s.name ?? null,
+						email: s.email.toLowerCase(),
+						created_at: now,
+					})),
+				)
+				.run();
+		}
+		return { id, name, studentCount: students.length };
+	}
+
+	async listRosters() {
+		return [
+			...this.ctx.storage.sql.exec(
+				`SELECT r.id, r.name, r.created_at,
+				 (SELECT COUNT(*) FROM students WHERE students.roster_id = r.id) as studentCount
+				 FROM rosters r ORDER BY r.created_at DESC`,
+			),
+		];
+	}
+
+	async listStudents(rosterId: string) {
+		return this.db
+			.select()
+			.from(schema.students)
+			.where(eq(schema.students.roster_id, rosterId))
+			.all();
+	}
+
+	async deleteRoster(id: string) {
+		const row = this.db
+			.select({ id: schema.rosters.id })
+			.from(schema.rosters)
+			.where(eq(schema.rosters.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db.delete(schema.rosters).where(eq(schema.rosters.id, id)).run();
+		return row;
+	}
+
+	async matchSender(email: string) {
+		const row = this.db
+			.select({
+				studentName: schema.students.name,
+				rosterId: schema.students.roster_id,
+				rosterName: schema.rosters.name,
+			})
+			.from(schema.students)
+			.innerJoin(schema.rosters, eq(schema.students.roster_id, schema.rosters.id))
+			.where(eq(schema.students.email, email.toLowerCase()))
+			.get();
+		return row ?? null;
+	}
+
 	// ── Search (raw SQL — dynamic condition builder) ───────────────
 
 	/**

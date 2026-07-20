@@ -42,6 +42,7 @@ https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 - **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
 - **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
 - **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
+- **Evidence-backed memory** — Markdown/file memory with keyword and optional semantic retrieval, source provenance, confirmed facts, Google Drive imports, and operator-visible drafting context
 
 ## Stack
 
@@ -61,6 +62,10 @@ npm run dev
 
 1. Set your domain in `wrangler.jsonc`
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
+
+### Optional Google Drive memory imports
+
+Configure `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` as Worker secrets, then share selected Drive files with that service account. In Memory, choose **Google Drive** and paste the selected file IDs. Imports are mailbox-scoped, deduplicated by Drive file ID, converted to Markdown-compatible text, chunked, and indexed through the same pipeline as uploaded files.
 
 ### Deploy
 

@@ -9,6 +9,14 @@ import { z } from "zod";
 import { sendEmail } from "./email-sender";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
 import { rewriteEmailBody } from "./lib/ai-rewrite";
+import { searchMemory } from "./lib/memory-search";
+import { resolveSourceType, processMemoryUpload } from "./lib/memory-upload";
+import { summarizeMemoryFile } from "./lib/memory-summarize";
+import { countWords, estimateTokens } from "./lib/text-metrics";
+import { chunkMarkdown } from "./lib/memory-chunks";
+import { buildDraftContext } from "./lib/memory-context";
+import { getDriveFile } from "./lib/google-drive";
+import { extractMemoryFacts } from "./lib/memory-facts";
 import {
 	validateSender,
 	SenderValidationError,
@@ -275,6 +283,65 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) =
 	return success ? c.json({ status: "moved" }) : c.json({ error: "Folder not found" }, 400);
 });
 
+// Single-segment slugs (not "/emails/bulk/move") to avoid colliding with the
+// "/emails/:id/move" pattern above, where ":id" would otherwise match "bulk".
+app.post("/api/v1/mailboxes/:mailboxId/emails/bulk-mark-read", async (c: AppContext) => {
+	const { ids, read } = (await c.req.json()) as { ids: string[]; read: boolean };
+	if (!Array.isArray(ids) || typeof read !== "boolean") {
+		return c.json({ error: "ids (array) and read (boolean) are required" }, 400);
+	}
+	const result = await (c.var.mailboxStub as any).bulkMarkRead(ids, read);
+	return c.json(result);
+});
+
+// TEMP DEBUG ROUTE — inserts a synthetic inbox email and triggers the agent's
+// /onNewEmail path, mirroring receiveEmail()'s flow below. Used only to
+// verify the urgent/phishing safety hooks in handleNewEmail during local
+// testing. Remove before merging.
+app.post("/api/v1/mailboxes/:mailboxId/_debug/simulate-inbound", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId")!;
+	const { sender, subject, text } = (await c.req.json()) as {
+		sender: string;
+		subject: string;
+		text: string;
+	};
+	const stub = c.var.mailboxStub;
+	const messageId = crypto.randomUUID();
+	await stub.createEmail(
+		Folders.INBOX,
+		{
+			id: messageId,
+			subject,
+			sender: sender.toLowerCase(),
+			recipient: mailboxId,
+			date: new Date().toISOString(),
+			body: `<p>${text}</p>`,
+			thread_id: messageId,
+		},
+		[],
+	);
+	const agentStub = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId));
+	const agentResponse = await agentStub.fetch(
+		new Request("https://agents/onNewEmail", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ mailboxId, emailId: messageId, sender: sender.toLowerCase(), subject, threadId: messageId }),
+		}),
+	);
+	const agentResult = await agentResponse.json();
+	return c.json({ emailId: messageId, agentResult });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/emails/bulk-move", async (c: AppContext) => {
+	const { ids, folderId } = (await c.req.json()) as { ids: string[]; folderId: string };
+	if (!Array.isArray(ids) || !folderId) {
+		return c.json({ error: "ids (array) and folderId are required" }, 400);
+	}
+	const result = await (c.var.mailboxStub as any).bulkMoveEmails(ids, folderId);
+	if (result.error) return c.json(result, 400);
+	return c.json(result);
+});
+
 // -- Threads --------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) => {
@@ -312,6 +379,253 @@ app.put("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => {
 app.delete("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => {
 	const ok = await c.var.mailboxStub.deleteFolder(c.req.param("id")!);
 	return ok ? c.body(null, 204) : c.json({ error: "Folder not found or cannot be deleted" }, 400);
+});
+
+// -- Memory -----------------------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/memory", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listMemoryFiles());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory", async (c: AppContext) => {
+	const { title, content, tags } = (await c.req.json()) as {
+		title?: string;
+		content?: string;
+		tags?: string;
+	};
+	if (!title?.trim() || !content?.trim()) {
+		return c.json({ error: "title and content are required" }, 400);
+	}
+	const mailboxId = c.req.param("mailboxId")!;
+	const id = crypto.randomUUID();
+	const r2_key = `memory/${mailboxId}/${id}.md`;
+	await c.env.BUCKET.put(r2_key, content, { httpMetadata: { contentType: "text/markdown" } });
+	const row = await (c.var.mailboxStub as any).createMemoryFile({
+		id,
+		title: title.trim(),
+		tags,
+		content,
+		r2_key,
+		word_count: countWords(content),
+		token_count: estimateTokens(content),
+		source_kind: "manual",
+	});
+	await (c.var.mailboxStub as any).replaceMemoryChunks(id, chunkMarkdown(content));
+	c.executionCtx.waitUntil(extractMemoryFacts(c.env, mailboxId, id).catch((error) => console.warn("Memory fact extraction failed:", error)));
+	return c.json(row, 201);
+});
+
+// Static sub-paths (search, upload) must be registered before the
+// parameterized /memory/:id routes below to avoid ambiguity with routers
+// that resolve in registration order.
+app.get("/api/v1/mailboxes/:mailboxId/memory/search", async (c: AppContext) => {
+	const query = c.req.query("query") || "";
+	const mailboxId = c.req.param("mailboxId")!;
+	return c.json(await searchMemory(c.env, mailboxId, query));
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/memory/context", async (c: AppContext) => {
+	const query = c.req.query("query") || "";
+	if (!query.trim()) return c.json({ error: "query is required" }, 400);
+	return c.json(await buildDraftContext(c.env, c.req.param("mailboxId")!, query));
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/memory/facts", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listMemoryFacts(c.req.query("status")));
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/facts/:id/status", async (c: AppContext) => {
+	const { status } = await c.req.json<{ status?: string }>();
+	if (!status || !["suggested", "confirmed", "rejected", "superseded"].includes(status)) {
+		return c.json({ error: "invalid fact status" }, 400);
+	}
+	await (c.var.mailboxStub as any).updateMemoryFactStatus(c.req.param("id")!, status);
+	return c.json({ status });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/upload", async (c: AppContext) => {
+	const formData = await c.req.formData();
+	const file = formData.get("file");
+	if (!(file instanceof File)) {
+		return c.json({ error: "file is required" }, 400);
+	}
+	const title = ((formData.get("title") as string) || file.name).trim();
+	const tags = (formData.get("tags") as string) || undefined;
+
+	const sourceType = resolveSourceType(file.type, file.name);
+	if (!sourceType) {
+		return c.json({ error: "Unsupported file type" }, 400);
+	}
+
+	const mailboxId = c.req.param("mailboxId")!;
+	const id = crypto.randomUUID();
+	const r2_key = `memory/${mailboxId}/${id}.md`;
+
+	const row = await (c.var.mailboxStub as any).createMemoryFile({
+		id,
+		title,
+		tags,
+		content: "",
+		r2_key,
+		status: "processing",
+		source_type: sourceType,
+		source_kind: "upload",
+	});
+
+	c.executionCtx.waitUntil(
+			(async () => {
+				await processMemoryUpload(c.env, mailboxId, id, r2_key, file, sourceType);
+				await extractMemoryFacts(c.env, mailboxId, id);
+			})().catch((e) => console.error("Memory upload processing failed:", (e as Error).message),
+		),
+	);
+
+	return c.json(row, 202);
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/import/google-drive", async (c: AppContext) => {
+	const { fileIds, parentId } = await c.req.json<{ fileIds?: string[]; parentId?: string }>();
+	if (!Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 20) {
+		return c.json({ error: "fileIds must contain between 1 and 20 files" }, 400);
+	}
+	const mailboxId = c.req.param("mailboxId")!;
+	const imported: unknown[] = [];
+	const skipped: string[] = [];
+	for (const fileId of fileIds) {
+		try {
+			const existing = await (c.var.mailboxStub as any).getMemoryFileByExternalId(`google-drive:${fileId}`);
+			if (existing) {
+				skipped.push(fileId);
+				continue;
+			}
+			const { file, content, sourceType } = await getDriveFile(c.env, fileId);
+			const id = crypto.randomUUID();
+			const r2Key = `memory/${mailboxId}/${id}.md`;
+			await c.env.BUCKET.put(r2Key, content, { httpMetadata: { contentType: "text/markdown" } });
+			const row = await (c.var.mailboxStub as any).createMemoryFile({
+				id,
+				title: file.name,
+				content,
+				r2_key: r2Key,
+				source_type: sourceType,
+				source_kind: "google_drive",
+				source_uri: file.webViewLink,
+				external_id: `google-drive:${file.id}`,
+				parent_id: parentId,
+				word_count: countWords(content),
+				token_count: estimateTokens(content),
+			});
+			await (c.var.mailboxStub as any).replaceMemoryChunks(id, chunkMarkdown(content));
+			await extractMemoryFacts(c.env, mailboxId, id);
+			imported.push(row);
+		} catch (error) {
+			return c.json({ error: error instanceof Error ? error.message : "Google Drive import failed", imported, skipped }, 502);
+		}
+	}
+	return c.json({ imported, skipped });
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/memory/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).getMemoryFile(c.req.param("id")!);
+	if (!row) return c.json({ error: "Not found" }, 404);
+	return c.json(row);
+});
+
+app.put("/api/v1/mailboxes/:mailboxId/memory/:id", async (c: AppContext) => {
+	const { title, tags, parent_id, draft_eligible } = (await c.req.json()) as { title?: string; tags?: string; parent_id?: string; draft_eligible?: boolean };
+	const row = await (c.var.mailboxStub as any).updateMemoryFileMetadata(c.req.param("id")!, { title, tags, parent_id, draft_eligible: draft_eligible == null ? undefined : draft_eligible ? 1 : 0 });
+	return row ? c.json(row) : c.json({ error: "Not found" }, 404);
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/memory/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).deleteMemoryFile(c.req.param("id")!);
+	if (row === null) return c.json({ error: "Not found" }, 404);
+	await c.env.BUCKET.delete(row.r2_key);
+	return c.body(null, 204);
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/:id/summarize", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId")!;
+	const id = c.req.param("id")!;
+	const row = await (c.var.mailboxStub as any).getMemoryFile(id);
+	if (!row) return c.json({ error: "Not found" }, 404);
+	if (!row.content?.trim()) return c.json({ error: "No content to summarize" }, 400);
+	try {
+		const summary = await summarizeMemoryFile(c.env, mailboxId, row.content);
+		await (c.var.mailboxStub as any).updateMemorySummary(id, summary);
+		return c.json({ summary });
+	} catch (err) {
+		return c.json({ error: err instanceof Error ? err.message : "Summarization failed" }, 500);
+	}
+});
+
+// -- Templates --------------------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/templates", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listTemplates());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/templates", async (c: AppContext) => {
+	const { title, body, tags } = (await c.req.json()) as {
+		title?: string;
+		body?: string;
+		tags?: string;
+	};
+	if (!title?.trim() || !body?.trim()) {
+		return c.json({ error: "title and body are required" }, 400);
+	}
+	const id = crypto.randomUUID();
+	const row = await (c.var.mailboxStub as any).createTemplate({
+		id,
+		title: title.trim(),
+		body: body.trim(),
+		tags,
+	});
+	return c.json(row, 201);
+});
+
+app.put("/api/v1/mailboxes/:mailboxId/templates/:id", async (c: AppContext) => {
+	const { title, body, tags } = (await c.req.json()) as {
+		title?: string;
+		body?: string;
+		tags?: string;
+	};
+	const row = await (c.var.mailboxStub as any).updateTemplate(c.req.param("id")!, { title, body, tags });
+	return row ? c.json(row) : c.json({ error: "Not found" }, 404);
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/templates/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).deleteTemplate(c.req.param("id")!);
+	return row ? c.body(null, 204) : c.json({ error: "Not found" }, 404);
+});
+
+// -- Rosters ----------------------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/rosters", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listRosters());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/rosters", async (c: AppContext) => {
+	const { name, students } = (await c.req.json()) as {
+		name?: string;
+		students?: { name?: string; email: string }[];
+	};
+	if (!name?.trim() || !Array.isArray(students)) {
+		return c.json({ error: "name and students are required" }, 400);
+	}
+	const validStudents = students.filter((s) => typeof s.email === "string" && s.email.trim());
+	const id = crypto.randomUUID();
+	const row = await (c.var.mailboxStub as any).createRoster(id, name.trim(), validStudents);
+	return c.json(row, 201);
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/rosters/:id/students", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listStudents(c.req.param("id")!));
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/rosters/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).deleteRoster(c.req.param("id")!);
+	return row ? c.body(null, 204) : c.json({ error: "Not found" }, 404);
 });
 
 // -- Search ---------------------------------------------------------

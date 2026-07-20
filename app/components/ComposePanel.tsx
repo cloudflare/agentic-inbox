@@ -155,6 +155,8 @@ export default function ComposePanel() {
 							<ComposeAIBar
 								mailboxId={mailboxId}
 								body={body}
+								subject={subject}
+								to={to}
 								onRewrite={applyAiRewrite}
 							/>
 						)}

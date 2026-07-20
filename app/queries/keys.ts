@@ -23,5 +23,24 @@ export const queryKeys = {
 		results: (mailboxId: string, query: string, page: number) =>
 			["search", mailboxId, query, page] as const,
 	},
+	memory: {
+		list: (mailboxId: string) => ["memory", mailboxId] as const,
+		search: (mailboxId: string, query: string) =>
+			["memory", mailboxId, "search", query] as const,
+		detail: (mailboxId: string, id: string) =>
+			["memory", mailboxId, "detail", id] as const,
+		context: (mailboxId: string, query: string) =>
+			["memory", mailboxId, "context", query] as const,
+		facts: (mailboxId: string, status?: string) =>
+			["memory", mailboxId, "facts", status ?? "all"] as const,
+	},
+	templates: {
+		list: (mailboxId: string) => ["templates", mailboxId] as const,
+	},
+	rosters: {
+		list: (mailboxId: string) => ["rosters", mailboxId] as const,
+		students: (mailboxId: string, rosterId: string) =>
+			["rosters", mailboxId, rosterId, "students"] as const,
+	},
 	config: ["config"] as const,
 };

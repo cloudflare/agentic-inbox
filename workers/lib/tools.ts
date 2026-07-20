@@ -27,6 +27,8 @@ import {
 	buildThreadingHeaders,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
+import { containsSensitiveInfo } from "./ai-safety";
+import { buildDraftContext } from "./memory-context";
 import { sendEmail } from "../email-sender";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
@@ -41,6 +43,17 @@ type MailboxSearchStub = {
 
 type RateLimitStub = {
 	checkSendRateLimit: () => Promise<string | null>;
+};
+
+type MemoryStub = {
+	createMemoryFile: (params: {
+		id: string;
+		title: string;
+		tags?: string;
+		content: string;
+		r2_key: string;
+		source_kind?: string;
+	}) => Promise<unknown>;
 };
 
 // ── list_mailboxes ─────────────────────────────────────────────────
@@ -101,6 +114,41 @@ export async function toolSearchEmails(
 	return (stub as unknown as MailboxSearchStub).searchEmails({
 		query: params.query,
 		folder: params.folder,
+	});
+}
+
+// ── search_memory ──────────────────────────────────────────────────
+
+export async function toolSearchMemory(
+	env: Env,
+	mailboxId: string,
+	params: { query: string },
+) {
+	return buildDraftContext(env, mailboxId, params.query);
+}
+
+// ── add_memory (lib-only — not exposed as an agent tool; memory ────
+// curation is a human task via the Settings UI, not something the
+// drafting agent should do autonomously) ────────────────────────────
+
+export async function toolAddMemory(
+	env: Env,
+	mailboxId: string,
+	params: { title: string; content: string; tags?: string },
+) {
+	const stub = getMailboxStub(env, mailboxId) as unknown as MemoryStub;
+	const id = crypto.randomUUID();
+	const r2_key = `memory/${mailboxId}/${id}.md`;
+	await env.BUCKET.put(r2_key, params.content, {
+		httpMetadata: { contentType: "text/markdown" },
+	});
+	return stub.createMemoryFile({
+		id,
+		title: params.title,
+		tags: params.tags,
+		content: params.content,
+		r2_key,
+		source_kind: "manual",
 	});
 }
 
@@ -400,7 +448,7 @@ export async function toolSendReply(
 		bodyHtml: string;
 	},
 ): Promise<
-	| { status: "sent"; messageId: string; message: string }
+	| { status: "sent"; messageId: string; message: string; sensitiveInfoWarning?: boolean }
 	| { error: string }
 > {
 	const stub = getMailboxStub(env, mailboxId);
@@ -426,6 +474,11 @@ export async function toolSendReply(
 	if (!sanitizedBody) {
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
+
+	// Warn (not block) if the operator's own content mentions specific
+	// grades/GPA/student-ID info — this may be intentional, so we still send.
+	const sensitiveInfoWarning = await containsSensitiveInfo(env.AI, sanitizedBody);
+
 	const quotedBlock = buildQuotedReplyBlock({
 		date: originalEmail.date,
 		sender: originalEmail.sender || params.to,
@@ -464,7 +517,12 @@ export async function toolSendReply(
 		[],
 	);
 
-	return { status: "sent", messageId, message: `Reply sent to ${params.to}` };
+	return {
+		status: "sent",
+		messageId,
+		message: `Reply sent to ${params.to}`,
+		...(sensitiveInfoWarning ? { sensitiveInfoWarning: true } : {}),
+	};
 }
 
 // ── send_email ─────────────────────────────────────────────────────
@@ -478,7 +536,7 @@ export async function toolSendEmail(
 		bodyHtml: string;
 	},
 ): Promise<
-	| { status: "sent"; messageId: string; message: string }
+	| { status: "sent"; messageId: string; message: string; sensitiveInfoWarning?: boolean }
 	| { error: string }
 > {
 	const stub = getMailboxStub(env, mailboxId);
@@ -497,6 +555,10 @@ export async function toolSendEmail(
 	if (!sanitizedBody) {
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
+
+	// Warn (not block) if the operator's own content mentions specific
+	// grades/GPA/student-ID info — this may be intentional, so we still send.
+	const sensitiveInfoWarning = await containsSensitiveInfo(env.AI, sanitizedBody);
 
 	try {
 		await sendEmail(env.EMAIL, {

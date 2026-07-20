@@ -168,4 +168,114 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
 	},
+	{
+		name: "9_add_memory_files",
+		sql: txn(`
+            CREATE TABLE memory_files (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                tags TEXT,
+                content TEXT,
+                r2_key TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE INDEX idx_memory_files_created_at ON memory_files(created_at);
+        `),
+	},
+	{
+		name: "10_add_memory_file_status",
+		sql: txn(`
+            ALTER TABLE memory_files ADD COLUMN status TEXT NOT NULL DEFAULT 'ready';
+            ALTER TABLE memory_files ADD COLUMN source_type TEXT NOT NULL DEFAULT 'text';
+            ALTER TABLE memory_files ADD COLUMN error_message TEXT;
+        `),
+	},
+	{
+		name: "11_add_memory_file_metrics",
+		sql: txn(`
+            ALTER TABLE memory_files ADD COLUMN word_count INTEGER;
+            ALTER TABLE memory_files ADD COLUMN token_count INTEGER;
+            ALTER TABLE memory_files ADD COLUMN summary TEXT;
+        `),
+	},
+	{
+		name: "12_add_templates",
+		sql: txn(`
+            CREATE TABLE templates (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                tags TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE INDEX idx_templates_created_at ON templates(created_at);
+        `),
+	},
+	{
+		name: "13_add_rosters",
+		sql: txn(`
+            CREATE TABLE rosters (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE students (
+                id TEXT PRIMARY KEY,
+                roster_id TEXT NOT NULL,
+                name TEXT,
+                email TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(roster_id) REFERENCES rosters(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX idx_students_roster_id ON students(roster_id);
+            CREATE INDEX idx_students_email ON students(email);
+        `),
+	},
+	{
+		name: "14_add_memory_provenance_and_chunks",
+		sql: txn(`
+            ALTER TABLE memory_files ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'manual';
+            ALTER TABLE memory_files ADD COLUMN source_uri TEXT;
+            ALTER TABLE memory_files ADD COLUMN external_id TEXT;
+            ALTER TABLE memory_files ADD COLUMN parent_id TEXT;
+            ALTER TABLE memory_files ADD COLUMN checksum TEXT;
+            ALTER TABLE memory_files ADD COLUMN draft_eligible INTEGER NOT NULL DEFAULT 1;
+            ALTER TABLE memory_files ADD COLUMN last_indexed_at TEXT;
+
+            CREATE INDEX idx_memory_files_external_id ON memory_files(external_id);
+            CREATE INDEX idx_memory_files_parent_id ON memory_files(parent_id);
+
+            CREATE TABLE memory_chunks (
+                id TEXT PRIMARY KEY,
+                memory_file_id TEXT NOT NULL,
+                heading TEXT,
+                content TEXT NOT NULL,
+                start_offset INTEGER NOT NULL,
+                end_offset INTEGER NOT NULL,
+                token_count INTEGER,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(memory_file_id) REFERENCES memory_files(id) ON DELETE CASCADE
+            );
+            CREATE INDEX idx_memory_chunks_file_id ON memory_chunks(memory_file_id);
+
+            CREATE TABLE memory_facts (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                value TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'suggested',
+                confidence INTEGER,
+                source_chunk_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(source_chunk_id) REFERENCES memory_chunks(id) ON DELETE SET NULL
+            );
+            CREATE INDEX idx_memory_facts_status ON memory_facts(status);
+        `),
+	},
 ];
