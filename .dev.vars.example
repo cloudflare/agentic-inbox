@@ -4,3 +4,8 @@ TEAM_DOMAIN=https://your-team.cloudflareaccess.com
 # Optional Google Drive import. Share selected files with this service account.
 GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@example.iam.gserviceaccount.com
 GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"
+# Optional Microsoft Graph app-only OneDrive import.
+MICROSOFT_TENANT_ID=your-tenant-id
+MICROSOFT_CLIENT_ID=your-app-client-id
+MICROSOFT_CLIENT_SECRET=your-app-client-secret
+ONEDRIVE_USER_ID=person@example.com

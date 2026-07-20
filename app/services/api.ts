@@ -204,6 +204,8 @@ const api = {
 	},
 	importGoogleDrive: (mailboxId: string, fileIds: string[], parentId?: string) =>
 		post<{ imported: MemoryEntry[]; skipped: string[] }>(`/api/v1/mailboxes/${mailboxId}/memory/import/google-drive`, { fileIds, parentId }),
+	importOneDrive: (mailboxId: string, fileIds: string[], parentId?: string) =>
+		post<{ imported: MemoryEntry[]; skipped: string[] }>(`/api/v1/mailboxes/${mailboxId}/memory/import/onedrive`, { fileIds, parentId }),
 	getMemory: (mailboxId: string, id: string) =>
 		get<MemoryFileDetail>(`/api/v1/mailboxes/${mailboxId}/memory/${id}`),
 	updateMemory: (mailboxId: string, id: string, data: { title?: string; tags?: string; parent_id?: string; draft_eligible?: boolean }) =>

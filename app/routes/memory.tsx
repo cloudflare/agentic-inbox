@@ -70,7 +70,7 @@ export default function MemoryRoute() {
 	const { data: searchData } = useSearchMemory(mailboxId, searchQuery);
 
 	const [isAddOpen, setIsAddOpen] = useState(false);
-	const [addTab, setAddTab] = useState<"text" | "file" | "drive">("text");
+	const [addTab, setAddTab] = useState<"text" | "file" | "drive" | "onedrive">("text");
 	const [title, setTitle] = useState("");
 	const [content, setContent] = useState("");
 	const [tags, setTags] = useState("");
@@ -78,6 +78,7 @@ export default function MemoryRoute() {
 	const [isDragging, setIsDragging] = useState(false);
 	const [isUploadingBatch, setIsUploadingBatch] = useState(false);
 	const [driveFileIds, setDriveFileIds] = useState("");
+	const [oneDriveFileIds, setOneDriveFileIds] = useState("");
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -96,6 +97,7 @@ export default function MemoryRoute() {
 		setTags("");
 		setStagedFiles([]);
 		setDriveFileIds("");
+		setOneDriveFileIds("");
 		setAddTab("text");
 	};
 
@@ -154,6 +156,20 @@ export default function MemoryRoute() {
 				toastManager.add({ title: "Google Drive import completed" });
 			} catch {
 				toastManager.add({ title: "Google Drive import failed", variant: "error" });
+			}
+			return;
+		}
+
+		if (addTab === "onedrive") {
+			if (!oneDriveFileIds.trim()) return;
+			try {
+				await api.importOneDrive(mailboxId, oneDriveFileIds.split(/[\s,]+/).filter(Boolean));
+				await queryClient.invalidateQueries({ queryKey: queryKeys.memory.list(mailboxId) });
+				resetAddForm();
+				setIsAddOpen(false);
+				toastManager.add({ title: "OneDrive import started" });
+			} catch {
+				toastManager.add({ title: "OneDrive import failed", variant: "error" });
 			}
 			return;
 		}
@@ -426,9 +442,10 @@ export default function MemoryRoute() {
 							{ value: "text", label: "Type note" },
 							{ value: "file", label: "Upload file" },
 							{ value: "drive", label: "Google Drive" },
+							{ value: "onedrive", label: "Microsoft OneDrive" },
 						]}
 						value={addTab}
-						onValueChange={(v) => setAddTab(v as "text" | "file" | "drive")}
+						onValueChange={(v) => setAddTab(v as "text" | "file" | "drive" | "onedrive")}
 						className="mb-4"
 					/>
 					<form onSubmit={handleAdd} className="space-y-4">
@@ -466,6 +483,18 @@ export default function MemoryRoute() {
 									className="w-full resize-y rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-sm text-kumo-default"
 								/>
 								<p className="text-xs text-kumo-subtle">Files must be shared with the configured service account.</p>
+							</div>
+						) : addTab === "onedrive" ? (
+							<div className="space-y-2">
+								<label className="text-xs font-medium text-kumo-default">OneDrive file IDs</label>
+								<textarea
+									value={oneDriveFileIds}
+									onChange={(e) => setOneDriveFileIds(e.target.value)}
+									placeholder="Paste file IDs separated by spaces or commas"
+									rows={4}
+									className="w-full resize-y rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-sm text-kumo-default"
+								/>
+								<p className="text-xs text-kumo-subtle">Files are read through Microsoft Graph from the configured OneDrive owner.</p>
 							</div>
 						) : (
 							<div className="space-y-3">
@@ -553,7 +582,7 @@ export default function MemoryRoute() {
 								disabled={
 									addTab === "text"
 										? !title.trim() || !content.trim()
-										: addTab === "drive" ? !driveFileIds.trim() : stagedFiles.length === 0
+										: addTab === "drive" ? !driveFileIds.trim() : addTab === "onedrive" ? !oneDriveFileIds.trim() : stagedFiles.length === 0
 								}
 								loading={addMemoryMutation.isPending || isUploadingBatch}
 							>

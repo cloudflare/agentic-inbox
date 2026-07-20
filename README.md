@@ -63,9 +63,11 @@ npm run dev
 1. Set your domain in `wrangler.jsonc`
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
 
-### Optional Google Drive memory imports
+### Optional cloud-drive memory imports
 
 Configure `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` as Worker secrets, then share selected Drive files with that service account. In Memory, choose **Google Drive** and paste the selected file IDs. Imports are mailbox-scoped, deduplicated by Drive file ID, converted to Markdown-compatible text, chunked, and indexed through the same pipeline as uploaded files.
+
+For Microsoft OneDrive, configure `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and `ONEDRIVE_USER_ID` as Worker secrets. Grant the Microsoft Entra app the least-privilege Microsoft Graph application permission needed to read the configured user drive, then choose **Microsoft OneDrive** in Memory and paste selected file IDs. OneDrive imports use the same normalization, chunking, provenance, deduplication, and fact-review pipeline.
 
 ### Deploy
 

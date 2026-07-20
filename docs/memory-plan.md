@@ -13,7 +13,7 @@ and internal citations never enter outgoing email content.
 - Keyword retrieval with optional Cloudflare AI Search semantic retrieval and
   deterministic keyword fallback.
 - A shared `DraftContextPack` used by the agent and composer source panel.
-- Google Drive service-account imports for explicitly selected files.
+- Google Drive service-account and Microsoft OneDrive app-only imports for explicitly selected files.
 - Background suggested-fact extraction with source-chunk provenance.
 - Memory explorer source metadata, preview links, and draft inclusion controls.
 

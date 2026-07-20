@@ -17,6 +17,7 @@ import { chunkMarkdown } from "./lib/memory-chunks";
 import { buildDraftContext } from "./lib/memory-context";
 import { getDriveFile } from "./lib/google-drive";
 import { extractMemoryFacts } from "./lib/memory-facts";
+import { getOneDriveFile } from "./lib/onedrive";
 import {
 	validateSender,
 	SenderValidationError,
@@ -532,6 +533,51 @@ app.post("/api/v1/mailboxes/:mailboxId/memory/import/google-drive", async (c: Ap
 		}
 	}
 	return c.json({ imported, skipped });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/import/onedrive", async (c: AppContext) => {
+	const { fileIds, parentId } = await c.req.json<{ fileIds?: string[]; parentId?: string }>();
+	if (!Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 20) {
+		return c.json({ error: "fileIds must contain between 1 and 20 files" }, 400);
+	}
+	const mailboxId = c.req.param("mailboxId")!;
+	const imported: unknown[] = [];
+	const skipped: string[] = [];
+	for (const fileId of fileIds) {
+		try {
+			const externalId = `onedrive:${fileId}`;
+			const existing = await (c.var.mailboxStub as any).getMemoryFileByExternalId(externalId);
+			if (existing) {
+				skipped.push(fileId);
+				continue;
+			}
+			const { item, file, sourceType } = await getOneDriveFile(c.env, fileId);
+			const id = crypto.randomUUID();
+			const r2Key = `memory/${mailboxId}/${id}.md`;
+			const row = await (c.var.mailboxStub as any).createMemoryFile({
+				id,
+				title: item.name,
+				content: "",
+				r2_key: r2Key,
+				status: "processing",
+				source_type: sourceType,
+				source_kind: "onedrive",
+				source_uri: item.webUrl,
+				external_id: externalId,
+				parent_id: parentId,
+			});
+			c.executionCtx.waitUntil(
+				(async () => {
+					await processMemoryUpload(c.env, mailboxId, id, r2Key, file, sourceType);
+					await extractMemoryFacts(c.env, mailboxId, id);
+				})().catch((error) => console.error("OneDrive memory import failed:", (error as Error).message)),
+			);
+			imported.push(row);
+		} catch (error) {
+			return c.json({ error: error instanceof Error ? error.message : "OneDrive import failed", imported, skipped }, 502);
+		}
+	}
+	return c.json({ imported, skipped }, 202);
 });
 
 app.get("/api/v1/mailboxes/:mailboxId/memory/:id", async (c: AppContext) => {

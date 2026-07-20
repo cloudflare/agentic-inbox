@@ -89,7 +89,7 @@ export interface MemoryEntry {
 	word_count: number | null;
 	token_count: number | null;
 	summary: string | null;
-	source_kind: "manual" | "upload" | "google_drive" | "email";
+	source_kind: "manual" | "upload" | "google_drive" | "onedrive" | "email";
 	source_uri: string | null;
 	external_id: string | null;
 	parent_id: string | null;
