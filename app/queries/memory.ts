@@ -138,3 +138,12 @@ export function useUpdateMemoryFactStatus() {
 		onSuccess: (_data, { mailboxId }) => qc.invalidateQueries({ queryKey: ["memory", mailboxId, "facts"] }),
 	});
 }
+
+export function useUpdateMemoryFact() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: ({ mailboxId, id, kind, value }: { mailboxId: string; id: string; kind?: string; value?: string }) =>
+			api.updateMemoryFact(mailboxId, id, { kind, value }),
+		onSuccess: (_data, { mailboxId }) => qc.invalidateQueries({ queryKey: ["memory", mailboxId, "facts"] }),
+	});
+}

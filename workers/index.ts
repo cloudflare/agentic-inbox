@@ -443,6 +443,15 @@ app.post("/api/v1/mailboxes/:mailboxId/memory/facts/:id/status", async (c: AppCo
 	return c.json({ status });
 });
 
+app.put("/api/v1/mailboxes/:mailboxId/memory/facts/:id", async (c: AppContext) => {
+	const { kind, value } = await c.req.json<{ kind?: string; value?: string }>();
+	if ((kind !== undefined && !kind.trim()) || (value !== undefined && !value.trim())) {
+		return c.json({ error: "kind and value cannot be empty" }, 400);
+	}
+	await (c.var.mailboxStub as any).updateMemoryFact(c.req.param("id")!, { kind: kind?.trim(), value: value?.trim() });
+	return c.json({ updated: true });
+});
+
 app.post("/api/v1/mailboxes/:mailboxId/memory/upload", async (c: AppContext) => {
 	const formData = await c.req.formData();
 	const file = formData.get("file");

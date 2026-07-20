@@ -27,10 +27,13 @@ import {
 	useAddMemory,
 	useDeleteMemory,
 	useMemoryDetail,
+	useMemoryFacts,
 	useMemoryList,
 	useSearchMemory,
 	useSummarizeMemory,
 	useUpdateMemory,
+	useUpdateMemoryFact,
+	useUpdateMemoryFactStatus,
 	useUploadMemory,
 } from "~/queries/memory";
 import { queryKeys } from "~/queries/keys";
@@ -59,6 +62,9 @@ export default function MemoryRoute() {
 	const deleteMemoryMutation = useDeleteMemory();
 	const updateMemoryMutation = useUpdateMemory();
 	const summarizeMemoryMutation = useSummarizeMemory();
+	const { data: facts = [] } = useMemoryFacts(mailboxId, "suggested");
+	const updateFactMutation = useUpdateMemoryFact();
+	const updateFactStatusMutation = useUpdateMemoryFactStatus();
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const { data: searchData } = useSearchMemory(mailboxId, searchQuery);
@@ -78,6 +84,8 @@ export default function MemoryRoute() {
 	const [isBulkTagsOpen, setIsBulkTagsOpen] = useState(false);
 	const [bulkTags, setBulkTags] = useState("");
 	const [isBulkSaving, setIsBulkSaving] = useState(false);
+	const [editingFactId, setEditingFactId] = useState<string | null>(null);
+	const [factDraft, setFactDraft] = useState("");
 
 	const [previewId, setPreviewId] = useState<string | null>(null);
 	const { data: previewDetail } = useMemoryDetail(mailboxId, previewId ?? undefined);
@@ -249,6 +257,44 @@ export default function MemoryRoute() {
 					onChange={(e) => setSearchQuery(e.target.value)}
 				/>
 			</div>
+
+			{facts.length > 0 && (
+				<section className="rounded-lg border border-kumo-line bg-kumo-fill/20 mb-4 p-3">
+					<div className="flex items-center justify-between mb-2">
+						<div>
+							<h2 className="text-sm font-semibold text-kumo-default">Review extracted facts</h2>
+							<p className="text-xs text-kumo-subtle">Confirm facts before the agent can use them in drafts.</p>
+						</div>
+						<Badge variant="secondary">{facts.length} suggested</Badge>
+					</div>
+					<div className="space-y-2">
+						{facts.map((fact) => (
+							<div key={fact.id} className="rounded-md border border-kumo-line bg-kumo-base p-2">
+								{editingFactId === fact.id ? (
+									<div className="space-y-2">
+										<textarea value={factDraft} onChange={(e) => setFactDraft(e.target.value)} rows={2} className="w-full resize-y rounded border border-kumo-line bg-kumo-recessed px-2 py-1.5 text-xs text-kumo-default" />
+										<div className="flex justify-end gap-2">
+											<Button size="xs" variant="ghost" onClick={() => setEditingFactId(null)}>Cancel</Button>
+											<Button size="xs" variant="primary" loading={updateFactMutation.isPending} onClick={async () => { await updateFactMutation.mutateAsync({ mailboxId: mailboxId!, id: fact.id, value: factDraft }); setEditingFactId(null); }}>Save</Button>
+										</div>
+									</div>
+								) : (
+									<div className="flex items-start gap-2">
+										<div className="min-w-0 flex-1">
+											<div className="text-xs font-medium text-kumo-default">{fact.kind}</div>
+											<p className="text-xs text-kumo-subtle">{fact.value}</p>
+											{fact.confidence != null && <span className="text-[11px] text-kumo-subtle">Confidence {fact.confidence}%</span>}
+										</div>
+										<Button size="xs" variant="ghost" onClick={() => { setEditingFactId(fact.id); setFactDraft(fact.value); }}>Edit</Button>
+										<Button size="xs" variant="secondary" loading={updateFactStatusMutation.isPending} onClick={() => updateFactStatusMutation.mutate({ mailboxId: mailboxId!, id: fact.id, status: "confirmed" })}>Confirm</Button>
+										<Button size="xs" variant="ghost" onClick={() => updateFactStatusMutation.mutate({ mailboxId: mailboxId!, id: fact.id, status: "rejected" })}>Reject</Button>
+									</div>
+								)}
+							</div>
+						))}
+					</div>
+				</section>
+			)}
 
 			{!isSearching && selectedIds.size > 0 && (
 				<div className="flex items-center gap-2 mb-2">

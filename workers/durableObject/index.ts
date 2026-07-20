@@ -883,6 +883,17 @@ export class MailboxDO extends DurableObject<Env> {
 			.run();
 	}
 
+	async updateMemoryFact(id: string, params: { kind?: string; value?: string }) {
+		return this.db.update(schema.memoryFacts)
+			.set({
+				...(params.kind !== undefined ? { kind: params.kind } : {}),
+				...(params.value !== undefined ? { value: params.value } : {}),
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.memoryFacts.id, id))
+			.run();
+	}
+
 	async searchMemoryKeyword(query: string, limit = 10) {
 		const like = `%${query}%`;
 		return [

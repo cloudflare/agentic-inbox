@@ -190,6 +190,8 @@ const api = {
 		get<MemoryFact[]>(`/api/v1/mailboxes/${mailboxId}/memory/facts`, { params: status ? { status } : undefined }),
 	updateMemoryFactStatus: (mailboxId: string, id: string, status: MemoryFact["status"]) =>
 		post<{ status: string }>(`/api/v1/mailboxes/${mailboxId}/memory/facts/${id}/status`, { status }),
+	updateMemoryFact: (mailboxId: string, id: string, data: { kind?: string; value?: string }) =>
+		put<{ updated: boolean }>(`/api/v1/mailboxes/${mailboxId}/memory/facts/${id}`, data),
 	uploadMemory: (mailboxId: string, file: File, title?: string, tags?: string) => {
 		const formData = new FormData();
 		formData.append("file", file);
