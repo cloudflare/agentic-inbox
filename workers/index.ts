@@ -8,6 +8,16 @@ import PostalMime from "postal-mime";
 import { z } from "zod";
 import { sendEmail } from "./email-sender";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
+import { rewriteEmailBody } from "./lib/ai-rewrite";
+import { searchMemory } from "./lib/memory-search";
+import { resolveSourceType, processMemoryUpload } from "./lib/memory-upload";
+import { summarizeMemoryFile } from "./lib/memory-summarize";
+import { countWords, estimateTokens } from "./lib/text-metrics";
+import { chunkMarkdown } from "./lib/memory-chunks";
+import { buildDraftContext } from "./lib/memory-context";
+import { getDriveFile } from "./lib/google-drive";
+import { extractMemoryFacts } from "./lib/memory-facts";
+import { getOneDriveFile } from "./lib/onedrive";
 import {
 	validateSender,
 	SenderValidationError,
@@ -20,6 +30,12 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import { createGraphEvent, createGraphSubscription, createGraphTodoTask, exchangeMicrosoftCode, listGraphContacts, listGraphEvents, listGraphMessages, listGraphTodoTasks, microsoftOAuthUrl, refreshMicrosoftToken } from "./lib/microsoft-graph";
+import { buildBriefing, extractProductivityItems } from "./lib/productivity";
+import { decryptToken, encryptToken } from "./lib/token-crypto";
+import { dispatchTopic, type TopicContext } from "./lib/topic";
+import { syncMicrosoftInbox } from "./lib/microsoft-sync";
+import { triageOutlookEmail } from "./lib/outlook-ai-bridge";
 
 type AppContext = Context<MailboxContext>;
 
@@ -40,6 +56,18 @@ const DraftBody = z.object({
 	in_reply_to: z.string().optional(),
 	thread_id: z.string().optional(),
 	draft_id: z.string().optional(),
+});
+
+const OutlookBridgeBody = z.object({
+	messageId: z.string().optional(),
+	conversationId: z.string().optional(),
+	from: z.string().optional(),
+	to: z.string().optional(),
+	subject: z.string().optional(),
+	bodyHtml: z.string().optional(),
+	body: z.string().optional(),
+}).refine((value) => value.bodyHtml !== undefined || value.body !== undefined, {
+	message: "bodyHtml or body is required",
 });
 
 // -- Helpers --------------------------------------------------------
@@ -63,6 +91,23 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	return v === "true" || v === "1";
 }
 
+async function microsoftAccessToken(env: Env, mailboxStub: any): Promise<string> {
+	const accounts = await mailboxStub.listConnectedAccounts();
+	const account = accounts.find((candidate: { provider: string }) => candidate.provider === "microsoft");
+	if (!account) throw new Error("Connect a Microsoft account first");
+	const stored = await mailboxStub.getConnectedAccount(account.id);
+	if (!stored?.tokenCiphertext) throw new Error("Microsoft account requires reauthentication");
+	let token = JSON.parse(await decryptToken(env.TOKEN_ENCRYPTION_KEY, stored.tokenCiphertext)) as { access_token?: string; refresh_token?: string; expires_at?: number };
+	if (!token.access_token || (token.expires_at && token.expires_at <= Date.now())) {
+		if (!token.refresh_token) throw new Error("Microsoft account requires reauthentication");
+		const refreshed = await refreshMicrosoftToken(env, token.refresh_token);
+		await mailboxStub.updateConnectedAccountToken(stored.id, await encryptToken(env.TOKEN_ENCRYPTION_KEY, refreshed));
+		token = refreshed as typeof token;
+	}
+	if (!token.access_token) throw new Error("Microsoft access token is unavailable");
+	return token.access_token;
+}
+
 // -- App & middleware -----------------------------------------------
 
 const app = new Hono<MailboxContext>();
@@ -83,13 +128,118 @@ app.use("/api/*", cors({
 }));
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
+// Microsoft OAuth is intentionally outside the mailbox API middleware. The
+// callback establishes the provider account and then stores it on the chosen
+// mailbox Durable Object. The state cookie prevents cross-mailbox callbacks.
+function getCookie(request: Request, name: string): string | null {
+	const header = request.headers.get("cookie") ?? "";
+	const value = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+	return value ? decodeURIComponent(value.slice(name.length + 1)) : null;
+}
+
+app.get("/auth/microsoft/start", (c) => {
+	const mailboxId = c.req.query("mailboxId");
+	if (!mailboxId) return c.json({ error: "mailboxId is required" }, 400);
+	const state = `${mailboxId}:${crypto.randomUUID()}`;
+	const location = microsoftOAuthUrl(c.env, state);
+	return new Response(null, {
+		status: 302,
+		headers: {
+			Location: location,
+			"Set-Cookie": `microsoft_oauth_state=${encodeURIComponent(state)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
+		},
+	});
+});
+
+app.get("/auth/microsoft/callback", async (c) => {
+	const code = c.req.query("code");
+	const state = c.req.query("state");
+	const expectedState = getCookie(c.req.raw, "microsoft_oauth_state");
+	if (!code || !state || !expectedState || state !== expectedState) {
+		return c.text("Invalid Microsoft OAuth state", 400);
+	}
+	const mailboxId = state.split(":")[0];
+	try {
+		const token = await exchangeMicrosoftCode(c.env, code);
+		const accessToken = String(token.access_token || "");
+		const profileResponse = await fetch("https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName", {
+			headers: { Authorization: `Bearer ${accessToken}` },
+		});
+		if (!profileResponse.ok) return c.text("Microsoft profile lookup failed", 502);
+		const profile = await profileResponse.json() as { id?: string; displayName?: string; mail?: string; userPrincipalName?: string };
+		if (!profile.id) return c.text("Microsoft profile did not include an account id", 502);
+		const mailbox = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+		const tokenCiphertext = await encryptToken(c.env.TOKEN_ENCRYPTION_KEY, token);
+		await (mailbox as any).upsertConnectedAccount({
+			id: `microsoft:${profile.id}`,
+			provider: "microsoft",
+			providerAccountId: profile.id,
+			email: profile.mail || profile.userPrincipalName,
+			displayName: profile.displayName,
+			tokenCiphertext,
+		});
+		return new Response(null, { status: 302, headers: {
+			Location: `/mailbox/${encodeURIComponent(mailboxId)}/settings?connected=microsoft`,
+			"Set-Cookie": "microsoft_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+		} });
+	} catch (error) {
+		console.error("Microsoft OAuth callback failed", error);
+		return c.text("Microsoft connection failed", 502);
+	}
+});
+
+app.post("/webhooks/microsoft", async (c) => {
+	const validationToken = c.req.query("validationToken");
+	if (validationToken) return c.text(validationToken);
+	const payload = await c.req.json().catch(() => ({})) as { value?: Array<{ clientState?: string }> };
+	const mailboxIds = [...new Set((payload.value ?? []).map((notification) => notification.clientState).filter((value): value is string => Boolean(value)))];
+	for (const mailboxId of mailboxIds) {
+		c.executionCtx.waitUntil(syncMicrosoftInbox(c.env, mailboxId).catch((error) => console.error("Microsoft webhook sync failed", error)));
+	}
+	return c.json({ accepted: true, mailboxes: mailboxIds.length });
+});
+
+// Power Automate integration. This deliberately has its own shared secret and
+// does not use the app's Microsoft OAuth or Cloudflare Access session.
+app.post("/integrations/power-automate/outlook", async (c) => {
+	if (!c.env.BRIDGE_SECRET) return c.json({ error: "Outlook bridge is not configured" }, 503);
+	if (c.req.header("Authorization") !== `Bearer ${c.env.BRIDGE_SECRET}`) {
+		return c.json({ error: "Unauthorized" }, 401);
+	}
+
+	try {
+		const input = OutlookBridgeBody.parse(await c.req.json());
+		const ai = await triageOutlookEmail(c.env.AI, {
+			messageId: input.messageId,
+			conversationId: input.conversationId,
+			from: input.from,
+			to: input.to,
+			subject: input.subject,
+			bodyHtml: input.bodyHtml ?? input.body,
+		});
+		return c.json({
+			messageId: input.messageId ?? "",
+			conversationId: input.conversationId ?? "",
+			from: input.from ?? "",
+			to: input.to ?? "",
+			subject: input.subject ?? "",
+			...ai,
+		});
+	} catch (error) {
+		if (error instanceof z.ZodError) return c.json({ error: error.issues[0]?.message || "Invalid request" }, 400);
+		console.error("Outlook AI bridge failed", error);
+		return c.json({ error: error instanceof Error ? error.message : "Outlook AI bridge failed" }, 502);
+	}
+});
+
 // -- Config ---------------------------------------------------------
 
 app.get("/api/v1/config", (c) => {
 	const domainsRaw = c.env.DOMAINS || "";
 	const domains = domainsRaw.split(",").map((d) => d.trim()).filter(Boolean);
 	const emailAddresses = c.env.EMAIL_ADDRESSES ?? [];
-	return c.json({ domains, emailAddresses });
+	const openRouterConfigured = Boolean(c.env.OPENROUTER_API_KEY);
+	return c.json({ domains, emailAddresses, openRouterConfigured, microsoftConfigured: Boolean(c.env.MICROSOFT_CLIENT_ID) });
 });
 
 // -- Mailboxes ------------------------------------------------------
@@ -140,7 +290,150 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
 	return c.body(null, 204);
 });
 
+// ── Unified productivity API --------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/accounts", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listConnectedAccounts());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/sync", async (c: AppContext) => {
+	try {
+		if (c.env.SYNC_QUEUE) {
+			const jobId = crypto.randomUUID();
+			await c.env.SYNC_QUEUE.send({ jobId, mailboxId: c.req.param("mailboxId"), provider: "microsoft" });
+			return c.json({ status: "queued", provider: "microsoft", jobId }, 202);
+		}
+		const synced = await syncMicrosoftInbox(c.env, c.req.param("mailboxId")!);
+		return c.json({ status: "completed", provider: "microsoft", synced });
+	} catch (error) {
+		console.error("Microsoft sync failed", error);
+		const message = error instanceof Error ? error.message : "Microsoft sync failed";
+		return c.json({ error: message }, message.includes("Connect") || message.includes("reauthentication") ? 409 : 502);
+	}
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/productivity", async (c: AppContext) => {
+	try {
+		const accessToken = await microsoftAccessToken(c.env, c.var.mailboxStub as any);
+		const [events, contacts, tasks] = await Promise.all([
+			listGraphEvents(accessToken), listGraphContacts(accessToken), listGraphTodoTasks(accessToken),
+		]);
+		for (const event of events) await (c.var.mailboxStub as any).upsertProviderItem({ id: `microsoft:event:${event.id}`, kind: "event", provider: "microsoft", providerId: event.id, title: event.subject || "Untitled event", startAt: event.start?.dateTime, endAt: event.end?.dateTime });
+		for (const contact of contacts) await (c.var.mailboxStub as any).upsertProviderItem({ id: `microsoft:contact:${contact.id}`, kind: "contact", provider: "microsoft", providerId: contact.id, title: contact.displayName || contact.emailAddresses?.[0]?.address || "Contact", body: contact.companyName });
+		for (const task of tasks.tasks) await (c.var.mailboxStub as any).upsertProviderItem({ id: `microsoft:task:${task.id}`, kind: "task", provider: "microsoft", providerId: task.id, title: task.title || "Untitled task", dueAt: task.dueDateTime?.dateTime, status: task.status === "completed" ? "done" : "open" });
+		return c.json({ events, contacts, tasks: tasks.tasks, taskListId: tasks.listId });
+	} catch (error) {
+		return c.json({ error: error instanceof Error ? error.message : "Productivity sync failed" }, 502);
+	}
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/productivity/events", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { subject?: string; start?: string; end?: string; timeZone?: string };
+	if (!body.subject || !body.start || !body.end) return c.json({ error: "subject, start, and end are required" }, 400);
+	try { return c.json(await createGraphEvent(await microsoftAccessToken(c.env, c.var.mailboxStub as any), { subject: body.subject, start: { dateTime: body.start, timeZone: body.timeZone || "UTC" }, end: { dateTime: body.end, timeZone: body.timeZone || "UTC" } }), 201); }
+	catch (error) { return c.json({ error: error instanceof Error ? error.message : "Calendar action failed" }, 502); }
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/productivity/tasks", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { title?: string; dueAt?: string | null };
+	if (!body.title) return c.json({ error: "title is required" }, 400);
+	try {
+		const token = await microsoftAccessToken(c.env, c.var.mailboxStub as any);
+		const tasks = await listGraphTodoTasks(token, { top: 1 });
+		return c.json(await createGraphTodoTask(token, { title: body.title, ...(body.dueAt ? { dueDateTime: { dateTime: body.dueAt, timeZone: "UTC" } } : {}) }, { listId: tasks.listId }), 201);
+	} catch (error) { return c.json({ error: error instanceof Error ? error.message : "Task action failed" }, 502); }
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/subscriptions", async (c: AppContext) => {
+	try {
+		const token = await microsoftAccessToken(c.env, c.var.mailboxStub as any);
+		const origin = c.env.APP_ORIGIN || new URL(c.req.url).origin;
+		const notificationUrl = new URL("/webhooks/microsoft", origin).toString();
+		const mailboxId = c.req.param("mailboxId")!;
+		const resources = ["/me/mailFolders('inbox')/messages", "/me/events", "/me/contacts"];
+		const subscriptions: Array<{ id: string; resource: string; expirationDateTime: string }> = [];
+		for (const resource of resources) {
+			const subscription = await createGraphSubscription(token, resource, notificationUrl, mailboxId);
+			await (c.var.mailboxStub as any).upsertGraphSubscription({ id: subscription.id, provider: "microsoft", resource: subscription.resource, expirationAt: subscription.expirationDateTime });
+			subscriptions.push(subscription);
+		}
+		return c.json({ subscriptions }, 201);
+	} catch (error) { return c.json({ error: error instanceof Error ? error.message : "Subscription setup failed" }, 502); }
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/extractions", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listExtractions(c.req.query("status")));
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/emails/:id/extract", async (c: AppContext) => {
+	const email = await c.var.mailboxStub.getEmail(c.req.param("id")!);
+	if (!email) return c.json({ error: "Email not found" }, 404);
+	const extracted = extractProductivityItems(email);
+	for (const item of extracted) await (c.var.mailboxStub as any).createExtraction(item);
+	return c.json(extracted);
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/extractions/:id/commit", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { kind?: string; title?: string; dueAt?: string | null };
+	if (!body.kind || !body.title) return c.json({ error: "kind and title are required" }, 400);
+	return c.json(await (c.var.mailboxStub as any).commitExtraction(c.req.param("id"), body.kind, body.title, body.dueAt));
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/briefing", async (c: AppContext) => {
+	const emails = await c.var.mailboxStub.getEmails({ folder: "inbox", page: 1, limit: 25 });
+	const tasks = await (c.var.mailboxStub as any).listProductivityItems();
+	const items = [
+		...emails.map((email: any) => ({ id: email.id, type: "email" as const, title: email.subject || email.sender, date: email.date, read: !!email.read, threadId: email.thread_id })),
+		...tasks.map((item: any) => ({ id: item.id, type: item.kind === "follow-up" ? "follow-up" as const : item.kind === "event" ? "event" as const : "task" as const, title: item.title, date: item.dueAt, read: true })),
+	];
+	return c.json({ items: buildBriefing(items), generatedAt: new Date().toISOString() });
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/topics", async (c: AppContext) => {
+	return c.json({ topics: await (c.var.mailboxStub as any).listTopics(), agentEndpoint: `/agents/${encodeURIComponent(c.req.param("mailboxId")!)}` });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/topics", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { title?: string; content?: string; selectedEmailIds?: string[] };
+	if (!body.title?.trim()) return c.json({ error: "title is required" }, 400);
+	const topic: TopicContext = {
+		topicId: crypto.randomUUID(),
+		title: body.title.trim(),
+		mailboxId: c.req.param("mailboxId")!,
+		selectedEmailIds: body.selectedEmailIds ?? [],
+		content: body.content?.trim() ?? "",
+		createdAt: new Date().toISOString(),
+	};
+	try {
+		await (c.var.mailboxStub as any).createTopic(topic);
+		const dispatch = await dispatchTopic(c.env, topic);
+		await (c.var.mailboxStub as any).updateTopicStatus(topic.topicId, { status: "dispatched", jobId: dispatch.jobId, mode: dispatch.mode });
+		return c.json({ topic, dispatch }, 202);
+	} catch (error) {
+		await (c.var.mailboxStub as any).updateTopicStatus(topic.topicId, { status: "failed" }).catch(() => undefined);
+		return c.json({ error: error instanceof Error ? error.message : "Topic dispatch failed" }, 502);
+	}
+});
+
 // -- Emails ---------------------------------------------------------
+
+// AI rewrite endpoint
+app.post("/api/v1/mailboxes/:mailboxId/ai/rewrite", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId")!;
+	const { body, action, instruction } = (await c.req.json()) as {
+		body: string;
+		action: "polish" | "formalize" | "friendly" | "shorten" | "custom";
+		instruction?: string;
+	};
+	if (!body || !action) return c.json({ error: "body and action are required" }, 400);
+	try {
+		const rewritten = await rewriteEmailBody(c.env, mailboxId, body, action, instruction);
+		return c.json({ body: rewritten });
+	} catch (err) {
+		const message = err instanceof Error ? err.message : "AI rewrite failed";
+		return c.json({ error: message }, 500);
+	}
+});
 
 app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const folder = c.req.query("folder");
@@ -255,6 +548,65 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) =
 	return success ? c.json({ status: "moved" }) : c.json({ error: "Folder not found" }, 400);
 });
 
+// Single-segment slugs (not "/emails/bulk/move") to avoid colliding with the
+// "/emails/:id/move" pattern above, where ":id" would otherwise match "bulk".
+app.post("/api/v1/mailboxes/:mailboxId/emails/bulk-mark-read", async (c: AppContext) => {
+	const { ids, read } = (await c.req.json()) as { ids: string[]; read: boolean };
+	if (!Array.isArray(ids) || typeof read !== "boolean") {
+		return c.json({ error: "ids (array) and read (boolean) are required" }, 400);
+	}
+	const result = await (c.var.mailboxStub as any).bulkMarkRead(ids, read);
+	return c.json(result);
+});
+
+// TEMP DEBUG ROUTE — inserts a synthetic inbox email and triggers the agent's
+// /onNewEmail path, mirroring receiveEmail()'s flow below. Used only to
+// verify the urgent/phishing safety hooks in handleNewEmail during local
+// testing. Remove before merging.
+app.post("/api/v1/mailboxes/:mailboxId/_debug/simulate-inbound", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId")!;
+	const { sender, subject, text } = (await c.req.json()) as {
+		sender: string;
+		subject: string;
+		text: string;
+	};
+	const stub = c.var.mailboxStub;
+	const messageId = crypto.randomUUID();
+	await stub.createEmail(
+		Folders.INBOX,
+		{
+			id: messageId,
+			subject,
+			sender: sender.toLowerCase(),
+			recipient: mailboxId,
+			date: new Date().toISOString(),
+			body: `<p>${text}</p>`,
+			thread_id: messageId,
+		},
+		[],
+	);
+	const agentStub = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId));
+	const agentResponse = await agentStub.fetch(
+		new Request("https://agents/onNewEmail", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ mailboxId, emailId: messageId, sender: sender.toLowerCase(), subject, threadId: messageId }),
+		}),
+	);
+	const agentResult = await agentResponse.json();
+	return c.json({ emailId: messageId, agentResult });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/emails/bulk-move", async (c: AppContext) => {
+	const { ids, folderId } = (await c.req.json()) as { ids: string[]; folderId: string };
+	if (!Array.isArray(ids) || !folderId) {
+		return c.json({ error: "ids (array) and folderId are required" }, 400);
+	}
+	const result = await (c.var.mailboxStub as any).bulkMoveEmails(ids, folderId);
+	if (result.error) return c.json(result, 400);
+	return c.json(result);
+});
+
 // -- Threads --------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) => {
@@ -292,6 +644,307 @@ app.put("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => {
 app.delete("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => {
 	const ok = await c.var.mailboxStub.deleteFolder(c.req.param("id")!);
 	return ok ? c.body(null, 204) : c.json({ error: "Folder not found or cannot be deleted" }, 400);
+});
+
+// -- Memory -----------------------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/memory", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listMemoryFiles());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory", async (c: AppContext) => {
+	const { title, content, tags } = (await c.req.json()) as {
+		title?: string;
+		content?: string;
+		tags?: string;
+	};
+	if (!title?.trim() || !content?.trim()) {
+		return c.json({ error: "title and content are required" }, 400);
+	}
+	const mailboxId = c.req.param("mailboxId")!;
+	const id = crypto.randomUUID();
+	const r2_key = `memory/${mailboxId}/${id}.md`;
+	await c.env.BUCKET.put(r2_key, content, { httpMetadata: { contentType: "text/markdown" } });
+	const row = await (c.var.mailboxStub as any).createMemoryFile({
+		id,
+		title: title.trim(),
+		tags,
+		content,
+		r2_key,
+		word_count: countWords(content),
+		token_count: estimateTokens(content),
+		source_kind: "manual",
+	});
+	await (c.var.mailboxStub as any).replaceMemoryChunks(id, chunkMarkdown(content));
+	c.executionCtx.waitUntil(extractMemoryFacts(c.env, mailboxId, id).catch((error) => console.warn("Memory fact extraction failed:", error)));
+	return c.json(row, 201);
+});
+
+// Static sub-paths (search, upload) must be registered before the
+// parameterized /memory/:id routes below to avoid ambiguity with routers
+// that resolve in registration order.
+app.get("/api/v1/mailboxes/:mailboxId/memory/search", async (c: AppContext) => {
+	const query = c.req.query("query") || "";
+	const mailboxId = c.req.param("mailboxId")!;
+	return c.json(await searchMemory(c.env, mailboxId, query));
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/memory/context", async (c: AppContext) => {
+	const query = c.req.query("query") || "";
+	if (!query.trim()) return c.json({ error: "query is required" }, 400);
+	return c.json(await buildDraftContext(c.env, c.req.param("mailboxId")!, query));
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/memory/facts", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listMemoryFacts(c.req.query("status")));
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/facts/:id/status", async (c: AppContext) => {
+	const { status } = await c.req.json<{ status?: string }>();
+	if (!status || !["suggested", "confirmed", "rejected", "superseded"].includes(status)) {
+		return c.json({ error: "invalid fact status" }, 400);
+	}
+	await (c.var.mailboxStub as any).updateMemoryFactStatus(c.req.param("id")!, status);
+	return c.json({ status });
+});
+
+app.put("/api/v1/mailboxes/:mailboxId/memory/facts/:id", async (c: AppContext) => {
+	const { kind, value } = await c.req.json<{ kind?: string; value?: string }>();
+	if ((kind !== undefined && !kind.trim()) || (value !== undefined && !value.trim())) {
+		return c.json({ error: "kind and value cannot be empty" }, 400);
+	}
+	await (c.var.mailboxStub as any).updateMemoryFact(c.req.param("id")!, { kind: kind?.trim(), value: value?.trim() });
+	return c.json({ updated: true });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/upload", async (c: AppContext) => {
+	const formData = await c.req.formData();
+	const file = formData.get("file");
+	if (!(file instanceof File)) {
+		return c.json({ error: "file is required" }, 400);
+	}
+	const title = ((formData.get("title") as string) || file.name).trim();
+	const tags = (formData.get("tags") as string) || undefined;
+
+	const sourceType = resolveSourceType(file.type, file.name);
+	if (!sourceType) {
+		return c.json({ error: "Unsupported file type" }, 400);
+	}
+
+	const mailboxId = c.req.param("mailboxId")!;
+	const id = crypto.randomUUID();
+	const r2_key = `memory/${mailboxId}/${id}.md`;
+
+	const row = await (c.var.mailboxStub as any).createMemoryFile({
+		id,
+		title,
+		tags,
+		content: "",
+		r2_key,
+		status: "processing",
+		source_type: sourceType,
+		source_kind: "upload",
+	});
+
+	c.executionCtx.waitUntil(
+			(async () => {
+				await processMemoryUpload(c.env, mailboxId, id, r2_key, file, sourceType);
+				await extractMemoryFacts(c.env, mailboxId, id);
+			})().catch((e) => console.error("Memory upload processing failed:", (e as Error).message),
+		),
+	);
+
+	return c.json(row, 202);
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/import/google-drive", async (c: AppContext) => {
+	const { fileIds, parentId } = await c.req.json<{ fileIds?: string[]; parentId?: string }>();
+	if (!Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 20) {
+		return c.json({ error: "fileIds must contain between 1 and 20 files" }, 400);
+	}
+	const mailboxId = c.req.param("mailboxId")!;
+	const imported: unknown[] = [];
+	const skipped: string[] = [];
+	for (const fileId of fileIds) {
+		try {
+			const existing = await (c.var.mailboxStub as any).getMemoryFileByExternalId(`google-drive:${fileId}`);
+			if (existing) {
+				skipped.push(fileId);
+				continue;
+			}
+			const { file, content, sourceType } = await getDriveFile(c.env, fileId);
+			const id = crypto.randomUUID();
+			const r2Key = `memory/${mailboxId}/${id}.md`;
+			await c.env.BUCKET.put(r2Key, content, { httpMetadata: { contentType: "text/markdown" } });
+			const row = await (c.var.mailboxStub as any).createMemoryFile({
+				id,
+				title: file.name,
+				content,
+				r2_key: r2Key,
+				source_type: sourceType,
+				source_kind: "google_drive",
+				source_uri: file.webViewLink,
+				external_id: `google-drive:${file.id}`,
+				parent_id: parentId,
+				word_count: countWords(content),
+				token_count: estimateTokens(content),
+			});
+			await (c.var.mailboxStub as any).replaceMemoryChunks(id, chunkMarkdown(content));
+			await extractMemoryFacts(c.env, mailboxId, id);
+			imported.push(row);
+		} catch (error) {
+			return c.json({ error: error instanceof Error ? error.message : "Google Drive import failed", imported, skipped }, 502);
+		}
+	}
+	return c.json({ imported, skipped });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/import/onedrive", async (c: AppContext) => {
+	const { fileIds, parentId } = await c.req.json<{ fileIds?: string[]; parentId?: string }>();
+	if (!Array.isArray(fileIds) || fileIds.length === 0 || fileIds.length > 20) {
+		return c.json({ error: "fileIds must contain between 1 and 20 files" }, 400);
+	}
+	const mailboxId = c.req.param("mailboxId")!;
+	const imported: unknown[] = [];
+	const skipped: string[] = [];
+	for (const fileId of fileIds) {
+		try {
+			const externalId = `onedrive:${fileId}`;
+			const existing = await (c.var.mailboxStub as any).getMemoryFileByExternalId(externalId);
+			if (existing) {
+				skipped.push(fileId);
+				continue;
+			}
+			const { item, file, sourceType } = await getOneDriveFile(c.env, fileId);
+			const id = crypto.randomUUID();
+			const r2Key = `memory/${mailboxId}/${id}.md`;
+			const row = await (c.var.mailboxStub as any).createMemoryFile({
+				id,
+				title: item.name,
+				content: "",
+				r2_key: r2Key,
+				status: "processing",
+				source_type: sourceType,
+				source_kind: "onedrive",
+				source_uri: item.webUrl,
+				external_id: externalId,
+				parent_id: parentId,
+			});
+			c.executionCtx.waitUntil(
+				(async () => {
+					await processMemoryUpload(c.env, mailboxId, id, r2Key, file, sourceType);
+					await extractMemoryFacts(c.env, mailboxId, id);
+				})().catch((error) => console.error("OneDrive memory import failed:", (error as Error).message)),
+			);
+			imported.push(row);
+		} catch (error) {
+			return c.json({ error: error instanceof Error ? error.message : "OneDrive import failed", imported, skipped }, 502);
+		}
+	}
+	return c.json({ imported, skipped }, 202);
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/memory/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).getMemoryFile(c.req.param("id")!);
+	if (!row) return c.json({ error: "Not found" }, 404);
+	return c.json(row);
+});
+
+app.put("/api/v1/mailboxes/:mailboxId/memory/:id", async (c: AppContext) => {
+	const { title, tags, parent_id, draft_eligible } = (await c.req.json()) as { title?: string; tags?: string; parent_id?: string; draft_eligible?: boolean };
+	const row = await (c.var.mailboxStub as any).updateMemoryFileMetadata(c.req.param("id")!, { title, tags, parent_id, draft_eligible: draft_eligible == null ? undefined : draft_eligible ? 1 : 0 });
+	return row ? c.json(row) : c.json({ error: "Not found" }, 404);
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/memory/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).deleteMemoryFile(c.req.param("id")!);
+	if (row === null) return c.json({ error: "Not found" }, 404);
+	await c.env.BUCKET.delete(row.r2_key);
+	return c.body(null, 204);
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/memory/:id/summarize", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId")!;
+	const id = c.req.param("id")!;
+	const row = await (c.var.mailboxStub as any).getMemoryFile(id);
+	if (!row) return c.json({ error: "Not found" }, 404);
+	if (!row.content?.trim()) return c.json({ error: "No content to summarize" }, 400);
+	try {
+		const summary = await summarizeMemoryFile(c.env, mailboxId, row.content);
+		await (c.var.mailboxStub as any).updateMemorySummary(id, summary);
+		return c.json({ summary });
+	} catch (err) {
+		return c.json({ error: err instanceof Error ? err.message : "Summarization failed" }, 500);
+	}
+});
+
+// -- Templates --------------------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/templates", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listTemplates());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/templates", async (c: AppContext) => {
+	const { title, body, tags } = (await c.req.json()) as {
+		title?: string;
+		body?: string;
+		tags?: string;
+	};
+	if (!title?.trim() || !body?.trim()) {
+		return c.json({ error: "title and body are required" }, 400);
+	}
+	const id = crypto.randomUUID();
+	const row = await (c.var.mailboxStub as any).createTemplate({
+		id,
+		title: title.trim(),
+		body: body.trim(),
+		tags,
+	});
+	return c.json(row, 201);
+});
+
+app.put("/api/v1/mailboxes/:mailboxId/templates/:id", async (c: AppContext) => {
+	const { title, body, tags } = (await c.req.json()) as {
+		title?: string;
+		body?: string;
+		tags?: string;
+	};
+	const row = await (c.var.mailboxStub as any).updateTemplate(c.req.param("id")!, { title, body, tags });
+	return row ? c.json(row) : c.json({ error: "Not found" }, 404);
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/templates/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).deleteTemplate(c.req.param("id")!);
+	return row ? c.body(null, 204) : c.json({ error: "Not found" }, 404);
+});
+
+// -- Rosters ----------------------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/rosters", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listRosters());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/rosters", async (c: AppContext) => {
+	const { name, students } = (await c.req.json()) as {
+		name?: string;
+		students?: { name?: string; email: string }[];
+	};
+	if (!name?.trim() || !Array.isArray(students)) {
+		return c.json({ error: "name and students are required" }, 400);
+	}
+	const validStudents = students.filter((s) => typeof s.email === "string" && s.email.trim());
+	const id = crypto.randomUUID();
+	const row = await (c.var.mailboxStub as any).createRoster(id, name.trim(), validStudents);
+	return c.json(row, 201);
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/rosters/:id/students", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listStudents(c.req.param("id")!));
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/rosters/:id", async (c: AppContext) => {
+	const row = await (c.var.mailboxStub as any).deleteRoster(c.req.param("id")!);
+	return row ? c.body(null, 204) : c.json({ error: "Not found" }, 404);
 });
 
 // -- Search ---------------------------------------------------------

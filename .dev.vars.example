@@ -1,3 +1,19 @@
 # Cloudflare Access (required in production). TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 POLICY_AUD=your-access-policy-audience-tag
 TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+# Optional Google Drive import. Share selected files with this service account.
+GOOGLE_SERVICE_ACCOUNT_EMAIL=service-account@example.iam.gserviceaccount.com
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"
+# Optional Microsoft Graph app-only OneDrive import.
+MICROSOFT_TENANT_ID=your-tenant-id
+MICROSOFT_CLIENT_ID=your-app-client-id
+MICROSOFT_CLIENT_SECRET=your-app-client-secret
+ONEDRIVE_USER_ID=person@example.com
+# Microsoft OAuth (required for the Outlook connector)
+MICROSOFT_TENANT_ID=common
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_REDIRECT_URI=http://localhost:5173/auth/microsoft/callback
+APP_ORIGIN=http://localhost:5173
+# Generate a separate random value for production token encryption.
+TOKEN_ENCRYPTION_KEY=

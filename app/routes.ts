@@ -12,9 +12,14 @@ export default [
 	index("routes/home.tsx"),
 	route("mailbox/:mailboxId", "routes/mailbox.tsx", [
 		index("routes/mailbox-index.tsx"),
+		route("briefing", "routes/briefing.tsx"),
+		route("productivity", "routes/productivity.tsx"),
 		route("emails/:folder", "routes/email-list.tsx"),
 		route("settings", "routes/settings.tsx"),
 		route("search", "routes/search-results.tsx"),
+		route("memory", "routes/memory.tsx"),
+		route("templates", "routes/templates.tsx"),
+		route("roster", "routes/roster.tsx"),
 	]),
 	route("*", "routes/not-found.tsx"),
 ] satisfies RouteConfig;

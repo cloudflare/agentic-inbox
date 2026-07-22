@@ -24,6 +24,8 @@ import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
 import { getSnippetText } from "~/lib/utils";
 import {
+	useBulkMarkRead,
+	useBulkMoveEmails,
 	useDeleteEmail,
 	useEmails,
 	useMarkThreadRead,
@@ -158,6 +160,18 @@ export default function EmailListRoute() {
 	const updateEmail = useUpdateEmail();
 	const markThreadRead = useMarkThreadRead();
 	const deleteEmail = useDeleteEmail();
+	const bulkMarkRead = useBulkMarkRead();
+	const bulkMoveEmails = useBulkMoveEmails();
+
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const toggleSelect = (id: string) => {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
+	};
 
 	const params = useMemo(
 		() => ({
@@ -307,6 +321,54 @@ export default function EmailListRoute() {
 					</div>
 				</div>
 
+				{/* Bulk action bar */}
+				{selectedIds.size > 0 && mailboxId && (
+					<div className="flex items-center gap-2 px-4 py-2 border-b border-kumo-line shrink-0 md:px-5 bg-kumo-tint">
+						<span className="text-xs text-kumo-subtle">{selectedIds.size} selected</span>
+						<Button
+							size="xs"
+							variant="secondary"
+							onClick={() =>
+								bulkMarkRead.mutate({ mailboxId, ids: [...selectedIds], read: true })
+							}
+						>
+							Mark read
+						</Button>
+						<Button
+							size="xs"
+							variant="secondary"
+							onClick={() =>
+								bulkMarkRead.mutate({ mailboxId, ids: [...selectedIds], read: false })
+							}
+						>
+							Mark unread
+						</Button>
+						<select
+							defaultValue=""
+							onChange={(e) => {
+								const folderId = e.target.value;
+								if (!folderId) return;
+								bulkMoveEmails.mutate({ mailboxId, ids: [...selectedIds], folderId });
+								setSelectedIds(new Set());
+								e.target.value = "";
+							}}
+							className="rounded-md border border-kumo-line bg-kumo-recessed px-2 py-1 text-xs text-kumo-default"
+						>
+							<option value="" disabled>
+								Move to...
+							</option>
+							{folders.map((f) => (
+								<option key={f.id} value={f.id}>
+									{f.name}
+								</option>
+							))}
+						</select>
+						<Button size="xs" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+							Clear
+						</Button>
+					</div>
+				)}
+
 				{/* Email rows */}
 				<div className="flex-1 overflow-y-auto">
 				{isRefreshing && emails.length === 0 ? (
@@ -332,6 +394,16 @@ export default function EmailListRoute() {
 											isPanelOpen ? "md:px-4 md:py-2.5" : ""
 										} ${isSelected ? "bg-kumo-tint" : "hover:bg-kumo-tint"}`}
 									>
+										{/* Bulk-select checkbox */}
+										<input
+											type="checkbox"
+											checked={selectedIds.has(email.id)}
+											onChange={() => toggleSelect(email.id)}
+											onClick={(e) => e.stopPropagation()}
+											aria-label="Select email"
+											className="shrink-0"
+										/>
+
 										{/* Unread dot */}
 										<div className="w-2.5 shrink-0 flex justify-center">
 											{hasUnread(email) && (

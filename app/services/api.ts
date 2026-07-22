@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { Email, Folder, Mailbox } from "~/types";
+import type { BriefingItem, ConnectedAccount, DraftContextPack, Email, Extraction, Folder, Mailbox, MemoryEntry, MemoryFact, MemoryFileDetail, MemorySearchResponse, ProductivitySnapshot, Roster, Student, Template, Topic } from "~/types";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -31,13 +31,19 @@ async function request<T>(
 		: controller.signal;
 
 	try {
+		// FormData bodies must let the browser set their own multipart
+		// Content-Type (with boundary) — forcing application/json here would
+		// break the upload.
+		const isFormData = options.body instanceof FormData;
 		const res = await fetch(url, {
 			...options,
 			signal,
-			headers: {
-				"Content-Type": "application/json",
-				...(options.headers as Record<string, string>),
-			},
+			headers: isFormData
+				? (options.headers as Record<string, string>)
+				: {
+						"Content-Type": "application/json",
+						...(options.headers as Record<string, string>),
+					},
 		});
 
 		if (!res.ok) {
@@ -97,7 +103,7 @@ interface EmailListResponse {
 const api = {
 	// Config
 	getConfig: () =>
-		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),
+		get<{ domains: string[]; emailAddresses: string[]; openRouterConfigured: boolean; microsoftConfigured: boolean }>("/api/v1/config"),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
@@ -109,6 +115,31 @@ const api = {
 		put<Mailbox>(`/api/v1/mailboxes/${mailboxId}`, { settings }),
 	deleteMailbox: (mailboxId: string) =>
 		del<void>(`/api/v1/mailboxes/${mailboxId}`),
+	listConnectedAccounts: (mailboxId: string) =>
+		get<ConnectedAccount[]>(`/api/v1/mailboxes/${mailboxId}/accounts`),
+	startMicrosoftConnect: (mailboxId: string) => {
+		window.location.assign(`/auth/microsoft/start?mailboxId=${encodeURIComponent(mailboxId)}`);
+	},
+	queueSync: (mailboxId: string) =>
+		post<{ jobId: string; status: string; provider: string }>(`/api/v1/mailboxes/${mailboxId}/sync`),
+	getBriefing: (mailboxId: string) =>
+		get<{ items: BriefingItem[]; generatedAt: string }>(`/api/v1/mailboxes/${mailboxId}/briefing`),
+	listExtractions: (mailboxId: string, status?: string) =>
+		get<Extraction[]>(`/api/v1/mailboxes/${mailboxId}/extractions`, status ? { params: { status } } : undefined),
+	extractEmail: (mailboxId: string, emailId: string) =>
+		post<Extraction[]>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/extract`),
+	commitExtraction: (mailboxId: string, id: string, data: { kind: string; title: string; dueAt?: string | null }) =>
+		post<{ id: string; status: string }>(`/api/v1/mailboxes/${mailboxId}/extractions/${id}/commit`, data),
+	getProductivity: (mailboxId: string) =>
+		get<ProductivitySnapshot>(`/api/v1/mailboxes/${mailboxId}/productivity`),
+	createCalendarEvent: (mailboxId: string, data: { subject: string; start: string; end: string; timeZone?: string }) =>
+		post<unknown>(`/api/v1/mailboxes/${mailboxId}/productivity/events`, data),
+	createTask: (mailboxId: string, data: { title: string; dueAt?: string | null }) =>
+		post<unknown>(`/api/v1/mailboxes/${mailboxId}/productivity/tasks`, data),
+	createSubscriptions: (mailboxId: string) =>
+		post<{ subscriptions: unknown[] }>(`/api/v1/mailboxes/${mailboxId}/subscriptions`),
+	listTopics: (mailboxId: string) =>
+		get<{ topics: Topic[]; agentEndpoint: string }>(`/api/v1/mailboxes/${mailboxId}/topics`),
 
 	// Emails
 	listEmails: (mailboxId: string, params: Record<string, string>, opts?: { signal?: AbortSignal }) =>
@@ -123,6 +154,10 @@ const api = {
 		del<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`),
 	moveEmail: (mailboxId: string, id: string, folderId: string) =>
 		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}/move`, { folderId }),
+	bulkMarkRead: (mailboxId: string, ids: string[], read: boolean) =>
+		post<{ updated: number }>(`/api/v1/mailboxes/${mailboxId}/emails/bulk-mark-read`, { ids, read }),
+	bulkMoveEmails: (mailboxId: string, ids: string[], folderId: string) =>
+		post<{ moved: number }>(`/api/v1/mailboxes/${mailboxId}/emails/bulk-move`, { ids, folderId }),
 	getThread: (mailboxId: string, threadId: string, opts?: { signal?: AbortSignal }) =>
 		get<Email[]>(`/api/v1/mailboxes/${mailboxId}/threads/${threadId}`, { signal: opts?.signal }),
 	markThreadRead: (mailboxId: string, threadId: string) =>
@@ -160,6 +195,68 @@ const api = {
 	// Search
 	searchEmails: (mailboxId: string, params: Record<string, string>) =>
 		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${mailboxId}/search`, { params }),
+
+	// AI
+	rewriteEmailBody: (mailboxId: string, body: string, action: string, instruction?: string) =>
+		post<{ body: string }>(`/api/v1/mailboxes/${mailboxId}/ai/rewrite`, { body, action, instruction }),
+
+	// Memory
+	listMemory: (mailboxId: string) =>
+		get<MemoryEntry[]>(`/api/v1/mailboxes/${mailboxId}/memory`),
+	addMemory: (mailboxId: string, data: { title: string; content: string; tags?: string }) =>
+		post<MemoryEntry>(`/api/v1/mailboxes/${mailboxId}/memory`, data),
+	deleteMemory: (mailboxId: string, id: string) =>
+		del<void>(`/api/v1/mailboxes/${mailboxId}/memory/${id}`),
+	searchMemory: (mailboxId: string, query: string) =>
+		get<MemorySearchResponse>(`/api/v1/mailboxes/${mailboxId}/memory/search`, { params: { query } }),
+	getMemoryContext: (mailboxId: string, query: string) =>
+		get<DraftContextPack>(`/api/v1/mailboxes/${mailboxId}/memory/context`, { params: { query } }),
+	listMemoryFacts: (mailboxId: string, status?: string) =>
+		get<MemoryFact[]>(`/api/v1/mailboxes/${mailboxId}/memory/facts`, { params: status ? { status } : undefined }),
+	updateMemoryFactStatus: (mailboxId: string, id: string, status: MemoryFact["status"]) =>
+		post<{ status: string }>(`/api/v1/mailboxes/${mailboxId}/memory/facts/${id}/status`, { status }),
+	updateMemoryFact: (mailboxId: string, id: string, data: { kind?: string; value?: string }) =>
+		put<{ updated: boolean }>(`/api/v1/mailboxes/${mailboxId}/memory/facts/${id}`, data),
+	uploadMemory: (mailboxId: string, file: File, title?: string, tags?: string) => {
+		const formData = new FormData();
+		formData.append("file", file);
+		if (title) formData.append("title", title);
+		if (tags) formData.append("tags", tags);
+		return request<MemoryEntry>(`/api/v1/mailboxes/${mailboxId}/memory/upload`, {
+			method: "POST",
+			body: formData,
+		});
+	},
+	importGoogleDrive: (mailboxId: string, fileIds: string[], parentId?: string) =>
+		post<{ imported: MemoryEntry[]; skipped: string[] }>(`/api/v1/mailboxes/${mailboxId}/memory/import/google-drive`, { fileIds, parentId }),
+	importOneDrive: (mailboxId: string, fileIds: string[], parentId?: string) =>
+		post<{ imported: MemoryEntry[]; skipped: string[] }>(`/api/v1/mailboxes/${mailboxId}/memory/import/onedrive`, { fileIds, parentId }),
+	getMemory: (mailboxId: string, id: string) =>
+		get<MemoryFileDetail>(`/api/v1/mailboxes/${mailboxId}/memory/${id}`),
+	updateMemory: (mailboxId: string, id: string, data: { title?: string; tags?: string; parent_id?: string; draft_eligible?: boolean }) =>
+		put<MemoryEntry>(`/api/v1/mailboxes/${mailboxId}/memory/${id}`, data),
+	summarizeMemory: (mailboxId: string, id: string) =>
+		post<{ summary: string }>(`/api/v1/mailboxes/${mailboxId}/memory/${id}/summarize`),
+
+	// Templates
+	listTemplates: (mailboxId: string) =>
+		get<Template[]>(`/api/v1/mailboxes/${mailboxId}/templates`),
+	createTemplate: (mailboxId: string, data: { title: string; body: string; tags?: string }) =>
+		post<Template>(`/api/v1/mailboxes/${mailboxId}/templates`, data),
+	updateTemplate: (mailboxId: string, id: string, data: { title?: string; body?: string; tags?: string }) =>
+		put<Template>(`/api/v1/mailboxes/${mailboxId}/templates/${id}`, data),
+	deleteTemplate: (mailboxId: string, id: string) =>
+		del<void>(`/api/v1/mailboxes/${mailboxId}/templates/${id}`),
+
+	// Rosters
+	listRosters: (mailboxId: string) =>
+		get<Roster[]>(`/api/v1/mailboxes/${mailboxId}/rosters`),
+	createRoster: (mailboxId: string, data: { name: string; students: { name?: string; email: string }[] }) =>
+		post<Roster>(`/api/v1/mailboxes/${mailboxId}/rosters`, data),
+	listStudents: (mailboxId: string, rosterId: string) =>
+		get<Student[]>(`/api/v1/mailboxes/${mailboxId}/rosters/${rosterId}/students`),
+	deleteRoster: (mailboxId: string, id: string) =>
+		del<void>(`/api/v1/mailboxes/${mailboxId}/rosters/${id}`),
 };
 
 export default api;

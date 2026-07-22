@@ -5,5 +5,5 @@
 import { Navigate } from "react-router";
 
 export default function MailboxIndexRoute() {
-  return <Navigate to="emails/inbox" replace />;
+  return <Navigate to="briefing" replace />;
 }

@@ -178,6 +178,8 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const [showCcBcc, setShowCcBcc] = useState(false);
 	const [subject, setSubject] = useState("");
 	const [body, setBody] = useState("");
+	const [bodyHistory, setBodyHistory] = useState<string[]>([]);
+	const [historyIndex, setHistoryIndex] = useState(-1);
 	const [error, setError] = useState<string | null>(null);
 	const [isSavingDraft, setIsSavingDraft] = useState(false);
 	const [isSending, setIsSending] = useState(false);
@@ -262,5 +264,26 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		finally { setIsSending(false); }
 	};
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel };
+	const applyAiRewrite = (newBody: string) => {
+		const newHistory = [...bodyHistory.slice(0, historyIndex + 1), body, newBody];
+		setBodyHistory(newHistory);
+		setHistoryIndex(newHistory.length - 1);
+		setBody(newBody);
+	};
+
+	const undoAiEdit = () => {
+		if (historyIndex <= 0) return;
+		const prevIndex = historyIndex - 1;
+		setHistoryIndex(prevIndex);
+		setBody(bodyHistory[prevIndex]);
+	};
+
+	const redoAiEdit = () => {
+		if (historyIndex >= bodyHistory.length - 1) return;
+		const nextIndex = historyIndex + 1;
+		setHistoryIndex(nextIndex);
+		setBody(bodyHistory[nextIndex]);
+	};
+
+	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel, applyAiRewrite, undoAiEdit, redoAiEdit, canUndoAi: historyIndex > 0, canRedoAi: historyIndex < bodyHistory.length - 1 };
 }

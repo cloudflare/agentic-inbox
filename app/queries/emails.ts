@@ -229,6 +229,32 @@ export function useMoveEmail() {
 	});
 }
 
+export function useBulkMarkRead() {
+	const invalidate = useInvalidateEmailData();
+	return useMutation({
+		mutationFn: ({
+			mailboxId,
+			ids,
+			read,
+		}: { mailboxId: string; ids: string[]; read: boolean }) =>
+			api.bulkMarkRead(mailboxId, ids, read),
+		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
+	});
+}
+
+export function useBulkMoveEmails() {
+	const invalidate = useInvalidateEmailData();
+	return useMutation({
+		mutationFn: ({
+			mailboxId,
+			ids,
+			folderId,
+		}: { mailboxId: string; ids: string[]; folderId: string }) =>
+			api.bulkMoveEmails(mailboxId, ids, folderId),
+		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
+	});
+}
+
 export function useSaveDraft() {
 	const invalidate = useInvalidateEmailData();
 	return useMutation({

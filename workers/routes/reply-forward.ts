@@ -17,6 +17,8 @@ import {
 import { SendEmailRequestSchema } from "../lib/schemas";
 import { Folders } from "../../shared/folders";
 import type { MailboxContext } from "../lib/mailbox";
+import { containsSensitiveInfo } from "../lib/ai-safety";
+import { getSafetySettings } from "../lib/mailbox-settings";
 
 type AppContext = Context<MailboxContext>;
 type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
@@ -109,7 +111,15 @@ export async function handleReplyEmail(c: AppContext) {
 		}),
 	);
 
-	return c.json({ id: messageId, status: "sent" }, 202);
+	const safetySettings = await getSafetySettings(c.env, mailboxId);
+	const sensitiveInfoWarning = safetySettings.sensitiveInfoWarning
+		? await containsSensitiveInfo(c.env.AI, html || text || "")
+		: false;
+
+	return c.json(
+		{ id: messageId, status: "sent", ...(sensitiveInfoWarning ? { sensitiveInfoWarning: true } : {}) },
+		202,
+	);
 }
 
 export async function handleForwardEmail(c: AppContext) {
@@ -194,5 +204,13 @@ export async function handleForwardEmail(c: AppContext) {
 		}),
 	);
 
-	return c.json({ id: messageId, status: "sent" }, 202);
+	const safetySettings = await getSafetySettings(c.env, mailboxId);
+	const sensitiveInfoWarning = safetySettings.sensitiveInfoWarning
+		? await containsSensitiveInfo(c.env.AI, html || text || "")
+		: false;
+
+	return c.json(
+		{ id: messageId, status: "sent", ...(sensitiveInfoWarning ? { sensitiveInfoWarning: true } : {}) },
+		202,
+	);
 }

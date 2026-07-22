@@ -3,10 +3,11 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Banner, Button, Input } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
+import { ArrowCounterClockwiseIcon, FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
+import { ComposeAIBar } from "./ComposeAIBar";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -35,6 +36,11 @@ export default function ComposePanel() {
 		handleSend,
 		closeCompose,
 		closePanel,
+		applyAiRewrite,
+		undoAiEdit,
+		redoAiEdit,
+		canUndoAi,
+		canRedoAi,
 	} = useComposeForm(mailboxId, folder);
 
 	return (
@@ -145,7 +151,40 @@ export default function ComposePanel() {
 							value={body}
 							onChange={setBody}
 						/>
+						{mailboxId && (
+							<ComposeAIBar
+								mailboxId={mailboxId}
+								body={body}
+								subject={subject}
+								to={to}
+								onRewrite={applyAiRewrite}
+							/>
+						)}
 					</div>
+					{(canUndoAi || canRedoAi) && (
+						<div className="flex items-center gap-1">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								icon={<ArrowCounterClockwiseIcon size={14} />}
+								disabled={!canUndoAi}
+								onClick={undoAiEdit}
+							>
+								Undo AI
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								icon={<ArrowCounterClockwiseIcon size={14} className="scale-x-[-1]" />}
+								disabled={!canRedoAi}
+								onClick={redoAiEdit}
+							>
+								Redo AI
+							</Button>
+						</div>
+					)}
 				</div>
 
 				{/* Footer actions */}

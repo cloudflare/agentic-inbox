@@ -42,6 +42,7 @@ https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 - **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
 - **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
 - **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
+- **Evidence-backed memory** — Markdown/file memory with keyword and optional semantic retrieval, source provenance, confirmed facts, Google Drive imports, and operator-visible drafting context
 
 ## Stack
 
@@ -61,6 +62,55 @@ npm run dev
 
 1. Set your domain in `wrangler.jsonc`
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
+
+### Optional cloud-drive memory imports
+
+Configure `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` as Worker secrets, then share selected Drive files with that service account. In Memory, choose **Google Drive** and paste the selected file IDs. Imports are mailbox-scoped, deduplicated by Drive file ID, converted to Markdown-compatible text, chunked, and indexed through the same pipeline as uploaded files.
+
+For Microsoft OneDrive, configure `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and `ONEDRIVE_USER_ID` as Worker secrets. Grant the Microsoft Entra app the least-privilege Microsoft Graph application permission needed to read the configured user drive, then choose **Microsoft OneDrive** in Memory and paste selected file IDs. OneDrive imports use the same normalization, chunking, provenance, deduplication, and fact-review pipeline.
+
+### Outlook + Power Automate workflows
+
+The recommended no-Premium workflow uses standard Outlook email actions and the existing Cloudflare Email Routing receiver:
+
+```
+Outlook: When a new email arrives (V3)
+        -> Forward an email (V2) to the Agentic Inbox address
+Cloudflare Email Routing
+        -> Agentic Inbox Worker receives and stores the message
+        -> EmailAgent + Workers AI create an Agentic Inbox draft
+        -> Operator reviews and sends from Agentic Inbox
+```
+
+This path does not require Microsoft OAuth tokens in Cloudflare, OneDrive, or the Premium HTTP connector. Configure the forwarding destination as a mailbox already created in Agentic Inbox, for example `ai@example.com`, and ensure Cloudflare Email Routing forwards that address to this Worker.
+
+#### Optional Premium HTTP bridge
+
+The separately deployed bridge is available at:
+
+```text
+https://outlook-ai-bridge.shorlol.workers.dev/integrations/power-automate/outlook
+```
+
+It accepts an authenticated JSON POST and returns parsed `classification`, `priority`, `draftSubject`, `draftBodyHtml`, and `confidence` fields. It is intended for Power Automate's Premium **HTTP** action and does not persist messages or send mail:
+
+```text
+Outlook trigger -> Premium HTTP POST -> Workers AI JSON -> Outlook Create draft
+```
+
+Configure its secret with `npx wrangler secret put BRIDGE_SECRET --name outlook-ai-bridge`. Do not use the Office 365 Users or Office 365 Outlook **Send an HTTP request** actions as substitutes: those actions are Microsoft Graph-specific, not general external HTTP clients.
+
+#### Outlook Drafts without Premium HTTP
+
+Putting the AI result into the Outlook Drafts folder without Premium HTTP requires a second email relay that is not yet part of the Worker:
+
+```text
+Outlook -> standard Forward action -> Agentic Inbox + Workers AI
+       -> Worker sends a structured [Agentic Draft] result email
+       -> Outlook trigger -> Parse JSON -> Draft an email message
+```
+
+The required backend addition is a Worker result-email step containing the original recipient, generated subject, and generated HTML body. The second standard Outlook flow can then create the real Outlook draft and optionally delete the temporary result email. Until that relay is implemented, AI drafts are available in Agentic Inbox only.
 
 ### Deploy
 

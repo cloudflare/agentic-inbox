@@ -5,14 +5,19 @@
 import { Badge, Button, Dialog, Input, Tooltip } from "@cloudflare/kumo";
 import {
 	ArchiveIcon,
+	BrainIcon,
+	CalendarDotsIcon,
 	CaretLeftIcon,
 	FileIcon,
 	FolderIcon,
+	LightningIcon,
+	NoteIcon,
 	PaperPlaneTiltIcon,
 	PencilSimpleIcon,
 	PlusIcon,
 	TrashIcon,
 	TrayIcon,
+	UsersIcon,
 } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
@@ -159,6 +164,13 @@ export default function Sidebar() {
 
 			{/* Navigation */}
 			<nav className="flex-1 overflow-y-auto px-2 space-y-0.5">
+				<FolderLink
+					to={`/mailbox/${mailboxId}/briefing`}
+					icon={<LightningIcon size={18} weight="regular" />}
+					label="Briefing"
+					onClick={handleNavClick}
+				/>
+				<FolderLink to={`/mailbox/${mailboxId}/productivity`} icon={<CalendarDotsIcon size={18} />} label="Productivity" onClick={handleNavClick} />
 				{SYSTEM_FOLDER_LINKS.map((folder) => (
 					<FolderLink
 						key={folder.id}
@@ -169,6 +181,27 @@ export default function Sidebar() {
 						onClick={handleNavClick}
 					/>
 				))}
+
+				<FolderLink
+					to={`/mailbox/${mailboxId}/memory`}
+					icon={<BrainIcon size={18} weight="regular" />}
+					label="Memory"
+					onClick={handleNavClick}
+				/>
+
+				<FolderLink
+					to={`/mailbox/${mailboxId}/templates`}
+					icon={<NoteIcon size={18} weight="regular" />}
+					label="Templates"
+					onClick={handleNavClick}
+				/>
+
+				<FolderLink
+					to={`/mailbox/${mailboxId}/roster`}
+					icon={<UsersIcon size={18} weight="regular" />}
+					label="Rosters"
+					onClick={handleNavClick}
+				/>
 
 				{/* Custom folders */}
 				{customFolders.length > 0 && (

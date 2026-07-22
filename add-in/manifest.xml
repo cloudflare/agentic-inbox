@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Replace YOUR-ADDIN-HOST.example.com with the HTTPS host that serves /add-in/. -->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xsi:type="MailApp">
+  <Id>c4ae0c81-89f5-40d3-b8f8-e1eaaef82f66</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Cloudflare</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Agentic Inbox" />
+  <Description DefaultValue="Open Agentic Inbox with Outlook message context." />
+  <IconUrl DefaultValue="https://YOUR-ADDIN-HOST.example.com/favicon.ico" />
+  <HighResolutionIconUrl DefaultValue="https://YOUR-ADDIN-HOST.example.com/favicon.ico" />
+  <SupportUrl DefaultValue="https://YOUR-ADDIN-HOST.example.com/" />
+  <AppDomains>
+    <AppDomain>https://YOUR-ADDIN-HOST.example.com</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.5" />
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://YOUR-ADDIN-HOST.example.com/add-in/taskpane.html?hostContext=read&amp;appRoot=current&amp;appPath=/" />
+        <RequestedHeight>320</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+    <Form xsi:type="ItemEdit">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://YOUR-ADDIN-HOST.example.com/add-in/taskpane.html?hostContext=compose&amp;appRoot=current&amp;appPath=/" />
+        <RequestedHeight>320</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadWriteItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit" />
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+  <VersionOverrides
+    xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1"
+    xsi:type="VersionOverridesV1_1">
+    <Description resid="Commands.Description" />
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.5">
+        <bt:Set Name="Mailbox" />
+      </bt:Sets>
+    </Requirements>
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+          <FunctionFile resid="Taskpane.Read.Url" />
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="ReadGroup">
+                <Label resid="Commands.GroupLabel" />
+                <Control xsi:type="Button" id="ReadOpenTaskpane">
+                  <Label resid="Commands.ReadButtonLabel" />
+                  <Supertip>
+                    <Title resid="Commands.ReadButtonLabel" />
+                    <Description resid="Commands.ReadButtonDescription" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Read.Url" />
+                    <SupportsPinning>true</SupportsPinning>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+          <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="ComposeGroup">
+                <Label resid="Commands.GroupLabel" />
+                <Control xsi:type="Button" id="ComposeOpenTaskpane">
+                  <Label resid="Commands.ComposeButtonLabel" />
+                  <Supertip>
+                    <Title resid="Commands.ComposeButtonLabel" />
+                    <Description resid="Commands.ComposeButtonDescription" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Compose.Url" />
+                    <SupportsPinning>true</SupportsPinning>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://YOUR-ADDIN-HOST.example.com/favicon.ico" />
+        <bt:Image id="Icon.32" DefaultValue="https://YOUR-ADDIN-HOST.example.com/favicon.ico" />
+        <bt:Image id="Icon.80" DefaultValue="https://YOUR-ADDIN-HOST.example.com/favicon.ico" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Read.Url" DefaultValue="https://YOUR-ADDIN-HOST.example.com/add-in/taskpane.html?hostContext=read&amp;appRoot=current&amp;appPath=/" />
+        <bt:Url id="Taskpane.Compose.Url" DefaultValue="https://YOUR-ADDIN-HOST.example.com/add-in/taskpane.html?hostContext=compose&amp;appRoot=current&amp;appPath=/" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Commands.GroupLabel" DefaultValue="Agentic Inbox" />
+        <bt:String id="Commands.ReadButtonLabel" DefaultValue="Open Inbox" />
+        <bt:String id="Commands.ComposeButtonLabel" DefaultValue="Open Inbox" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Commands.Description" DefaultValue="Open Agentic Inbox with the current Outlook item context." />
+        <bt:String id="Commands.ReadButtonDescription" DefaultValue="Inspect the current message and open Agentic Inbox." />
+        <bt:String id="Commands.ComposeButtonDescription" DefaultValue="Inspect the draft and open Agentic Inbox." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

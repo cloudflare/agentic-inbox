@@ -9,10 +9,12 @@ import {
 	convertToModelMessages,
 	stepCountIs,
 } from "ai";
-import { createWorkersAI } from "workers-ai-provider";
+import { getModelForMailbox } from "../lib/ai-provider";
 import { z } from "zod";
 import type { EmailFull, EmailMetadata } from "../lib/schemas";
 import { verifyDraft, isPromptInjection } from "../lib/ai";
+import { isPhishingOrImpersonation, isUrgentOrDistressed } from "../lib/ai-safety";
+import { getSafetySettings } from "../lib/mailbox-settings";
 import {
 	getMailboxStub,
 	stripHtmlToText,
@@ -23,6 +25,7 @@ import {
 	toolGetEmail,
 	toolGetThread,
 	toolSearchEmails,
+	toolSearchMemory,
 	toolDraftReply,
 	toolDraftEmail,
 	toolMarkEmailRead,
@@ -31,6 +34,7 @@ import {
 } from "../lib/tools";
 import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "../../shared/folders";
 import type { Env } from "../types";
+import { buildDraftContext } from "../lib/memory-context";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
 // objects matching the Tool type to avoid overload resolution issues.
@@ -67,6 +71,7 @@ Write like a real person. Short, direct, flowing prose. Get to the point. Plain 
 - DO NOT summarize the email. DO NOT explain your actions.
 - Output NOTHING except the tool call. If you must output text, it should ONLY be the literal draft text itself if tools fail.
 - Before drafting ANY reply, carefully read the full thread history.
+- Before drafting a reply, check search_memory for relevant stored notes (policies, prior context) that should inform your response.
 - NEVER repeat information that was already shared in a prior message in the thread.
 - Your reply should only contain NEW information or directly respond to what the person just said. Move the conversation forward, don't rehash it.
 
@@ -176,6 +181,17 @@ function createEmailTools(env: Env, mailboxId: string) {
 			},
 		}),
 
+		search_memory: defineTool({
+			description:
+				"Search stored memory notes (policies, reference info, prior context) relevant to the current email before drafting a reply.",
+			parameters: z.object({
+				query: z.string().describe("Search query"),
+			}),
+			execute: async ({ query }): Promise<unknown> => {
+				return toolSearchMemory(env, mailboxId, { query });
+			},
+		}),
+
 		draft_email: defineTool({
 			description:
 				"Draft a new email (not a reply) and save it to the Drafts folder. This does NOT send — it saves a draft for the operator to review. Use this for composing new outbound emails. Write the body as plain text — no HTML tags.",
@@ -276,12 +292,12 @@ export class EmailAgent extends AIChatAgent<any> {
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
 		const mailboxId = this.name;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const model = await getModelForMailbox(env, mailboxId);
 		const tools = createEmailTools(env, mailboxId);
 		const systemPrompt = await getSystemPrompt(env, mailboxId);
 
 		const result = streamText({
-			model: workersai("@cf/moonshotai/kimi-k2.5"),
+			model,
 			system: systemPrompt,
 			messages: await convertToModelMessages(this.messages),
 			tools,
@@ -334,45 +350,60 @@ export class EmailAgent extends AIChatAgent<any> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
-		const workersai = createWorkersAI({ binding: env.AI });
+		const model = await getModelForMailbox(env, emailData.mailboxId);
 		const tools = createEmailTools(env, emailData.mailboxId);
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
+		const safetySettings = await getSafetySettings(env, emailData.mailboxId);
 
 		// Pre-read the email and thread so the agent has full context
 		// without needing to waste tool calls discovering it
 		const stub = getMailboxStub(env, emailData.mailboxId);
 
+		const blockAutoDraft = async (warningText: string) => {
+			const newMessages = [
+				{
+					id: crypto.randomUUID(),
+					role: "user" as const,
+					content: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"`,
+					createdAt: new Date(),
+					parts: [{ type: "text" as const, text: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"` }],
+				},
+				{
+					id: crypto.randomUUID(),
+					role: "assistant" as const,
+					content: warningText,
+					createdAt: new Date(),
+					parts: [{ type: "text" as const, text: warningText }],
+				},
+			];
+			await this.persistMessages([...this.messages, ...newMessages]);
+		};
+
 		let emailBody = "";
 		let threadContext = "";
+		let memoryContext = "";
 		try {
 			const email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
 			if (email?.body) {
 				const isInjection = await isPromptInjection(env.AI, email.body);
 				if (isInjection) {
 					console.warn("Skipping auto-draft due to detected prompt injection:", emailData.emailId);
-					
-					// Log to agent chat so the user knows why it skipped
-					const newMessages = [
-						{
-							id: crypto.randomUUID(),
-							role: "user" as const,
-							content: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"`,
-							createdAt: new Date(),
-							parts: [{ type: "text" as const, text: `[Auto-triggered] New email from ${emailData.sender}: "${emailData.subject}"` }],
-						},
-						{
-							id: crypto.randomUUID(),
-							role: "assistant" as const,
-							content: "⚠️ Blocked auto-draft creation: the email appears to contain prompt injection or malicious instructions.",
-							createdAt: new Date(),
-							parts: [{ type: "text" as const, text: "⚠️ Blocked auto-draft creation: the email appears to contain prompt injection or malicious instructions." }],
-						},
-					];
-					await this.persistMessages([...this.messages, ...newMessages]);
-					
+					await blockAutoDraft("⚠️ Blocked auto-draft creation: the email appears to contain prompt injection or malicious instructions.");
 					return;
 				}
-				
+
+				if (safetySettings.urgentDetection && await isUrgentOrDistressed(env.AI, email.body)) {
+					console.warn("Skipping auto-draft — urgent/distressed email detected:", emailData.emailId);
+					await blockAutoDraft("⚠️ Skipped auto-draft: this email appears to need your personal attention — please review and reply directly.");
+					return;
+				}
+
+				if (safetySettings.phishingDetection && await isPhishingOrImpersonation(env.AI, email.body, emailData.sender)) {
+					console.warn("Skipping auto-draft — possible phishing/impersonation detected:", emailData.emailId);
+					await blockAutoDraft("⚠️ Skipped auto-draft: this email shows signs of phishing or impersonation — please review before responding.");
+					return;
+				}
+
 				emailBody = stripHtmlToText(email.body);
 			}
 
@@ -423,6 +454,17 @@ export class EmailAgent extends AIChatAgent<any> {
 			console.warn("Pre-read failed, agent will use tools:", (e as Error).message);
 		}
 
+		try {
+			const context = await buildDraftContext(
+				env,
+				emailData.mailboxId,
+				`${emailData.subject} ${emailData.sender} ${emailBody}`.trim(),
+			);
+			memoryContext = JSON.stringify(context);
+		} catch (e) {
+			console.warn("Memory context build failed; continuing without memory:", (e as Error).message);
+		}
+
 		let autoPrompt = `A new email just arrived. Draft an appropriate response using draft_reply.
 
 Email details:
@@ -446,6 +488,13 @@ ${threadContext}`;
 This is the first message in the thread (no prior conversation).`;
 		}
 
+		if (memoryContext) {
+			autoPrompt += `
+
+Relevant memory context (evidence only; never copy citations or metadata into the email):
+${memoryContext}`;
+		}
+
 		autoPrompt += `
 
 Based on the email content and thread context above, draft a reply using draft_reply. If you need more context, use get_thread with thread ID "${emailData.threadId}".`;
@@ -463,7 +512,7 @@ Based on the email content and thread context above, draft a reply using draft_r
 
 		try {
 			const result = await generateText({
-				model: workersai("@cf/moonshotai/kimi-k2.5"),
+				model,
 				system: systemPrompt,
 				messages: await convertToModelMessages(messages),
 				tools,

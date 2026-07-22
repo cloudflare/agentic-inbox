@@ -10,6 +10,8 @@ import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
+import { refreshMicrosoftToken, renewGraphSubscription } from "../lib/microsoft-graph";
+import { decryptToken, encryptToken } from "../lib/token-crypto";
 
 /**
  * SQL expression to normalize email subjects by stripping common
@@ -99,14 +101,56 @@ interface AttachmentData {
 	disposition?: string | null;
 }
 
+interface ProductivityItemData {
+	id?: string;
+	kind: string;
+	provider: string;
+	providerId?: string | null;
+	accountId?: string | null;
+	title: string;
+	body?: string | null;
+	startAt?: string | null;
+	endAt?: string | null;
+	dueAt?: string | null;
+	status?: string;
+	sourceEmailId?: string | null;
+	payloadJson?: string | null;
+}
+
 export class MailboxDO extends DurableObject<Env> {
 	declare __DURABLE_OBJECT_BRAND: never;
 	db: ReturnType<typeof drizzle>;
+	private readonly runtimeEnv: Env;
 
 	constructor(state: DurableObjectState, env: Env) {
 		super(state, env);
+		this.runtimeEnv = env;
 		this.db = drizzle(this.ctx.storage, { schema });
 		applyMigrations(this.ctx.storage.sql, mailboxMigrations, this.ctx.storage);
+	}
+
+	async alarm() {
+		const accountRef = (await this.listConnectedAccounts()).find((candidate: any) => candidate.provider === "microsoft") as { id?: string } | undefined;
+		const account = accountRef?.id ? await this.getConnectedAccount(accountRef.id) : undefined;
+		const subscriptions = await this.listGraphSubscriptions();
+		if (!account?.tokenCiphertext || subscriptions.length === 0) return;
+		try {
+			let token = JSON.parse(await decryptToken(this.runtimeEnv.TOKEN_ENCRYPTION_KEY, account.tokenCiphertext)) as { access_token?: string; refresh_token?: string; expires_at?: number };
+			if ((!token.access_token || (token.expires_at && token.expires_at <= Date.now())) && token.refresh_token) {
+				const refreshed = await refreshMicrosoftToken(this.runtimeEnv, token.refresh_token);
+				await this.updateConnectedAccountToken(account.id, await encryptToken(this.runtimeEnv.TOKEN_ENCRYPTION_KEY, refreshed));
+				token = refreshed as typeof token;
+			}
+			if (!token.access_token) return;
+			for (const subscription of subscriptions) {
+				const renewed = await renewGraphSubscription(token.access_token, String(subscription.id));
+				await this.upsertGraphSubscription({ id: renewed.id, provider: "microsoft", resource: String(subscription.resource), expirationAt: renewed.expirationDateTime });
+			}
+		} catch (error) {
+			console.error("Graph subscription renewal failed", error);
+		} finally {
+			this.ctx.storage.setAlarm(Date.now() + 45 * 60 * 1000);
+		}
 	}
 
 	// ── Email CRUD (Drizzle) ───────────────────────────────────────
@@ -649,6 +693,403 @@ export class MailboxDO extends DurableObject<Env> {
 		return true;
 	}
 
+	async bulkMarkRead(ids: string[], read: boolean) {
+		if (ids.length === 0) return { updated: 0 };
+		const placeholders = ids.map((_, i) => `?${i + 2}`).join(",");
+		this.ctx.storage.sql.exec(
+			`UPDATE emails SET read = ?1 WHERE id IN (${placeholders})`,
+			read ? 1 : 0,
+			...ids,
+		);
+		return { updated: ids.length };
+	}
+
+	async bulkMoveEmails(ids: string[], folderId: string) {
+		const folder = this.db
+			.select({ id: schema.folders.id })
+			.from(schema.folders)
+			.where(eq(schema.folders.id, folderId))
+			.get();
+
+		if (!folder) return { moved: 0, error: "Folder not found" };
+		if (ids.length === 0) return { moved: 0 };
+
+		const placeholders = ids.map((_, i) => `?${i + 2}`).join(",");
+		this.ctx.storage.sql.exec(
+			`UPDATE emails SET folder_id = ?1 WHERE id IN (${placeholders})`,
+			folderId,
+			...ids,
+		);
+		return { moved: ids.length };
+	}
+
+	// ── Memory files ─────────────────────────────────────────────
+
+	async createMemoryFile(params: {
+		id: string;
+		title: string;
+		tags?: string;
+		content: string;
+		r2_key: string;
+		status?: string;
+		source_type?: string;
+		word_count?: number;
+		token_count?: number;
+		source_kind?: string;
+		source_uri?: string;
+		external_id?: string;
+		parent_id?: string;
+		checksum?: string;
+		draft_eligible?: number;
+	}) {
+		const now = new Date().toISOString();
+		return this.db
+			.insert(schema.memoryFiles)
+			.values({
+				...params,
+				status: params.status ?? "ready",
+				source_type: params.source_type ?? "text",
+				created_at: now,
+				updated_at: now,
+			})
+			.returning()
+			.get();
+	}
+
+	async listMemoryFiles() {
+		return this.db
+			.select({
+				id: schema.memoryFiles.id,
+				title: schema.memoryFiles.title,
+				tags: schema.memoryFiles.tags,
+				status: schema.memoryFiles.status,
+				source_type: schema.memoryFiles.source_type,
+				error_message: schema.memoryFiles.error_message,
+				word_count: schema.memoryFiles.word_count,
+				token_count: schema.memoryFiles.token_count,
+				summary: schema.memoryFiles.summary,
+				source_kind: schema.memoryFiles.source_kind,
+				source_uri: schema.memoryFiles.source_uri,
+				external_id: schema.memoryFiles.external_id,
+				parent_id: schema.memoryFiles.parent_id,
+				draft_eligible: schema.memoryFiles.draft_eligible,
+				last_indexed_at: schema.memoryFiles.last_indexed_at,
+				created_at: schema.memoryFiles.created_at,
+				updated_at: schema.memoryFiles.updated_at,
+			})
+			.from(schema.memoryFiles)
+			.orderBy(desc(schema.memoryFiles.created_at))
+			.all();
+	}
+
+	async getMemoryFile(id: string) {
+		return (
+			this.db
+				.select()
+				.from(schema.memoryFiles)
+				.where(eq(schema.memoryFiles.id, id))
+				.get() ?? null
+		);
+	}
+
+	async getMemoryFileByExternalId(externalId: string) {
+		return this.db.select().from(schema.memoryFiles).where(eq(schema.memoryFiles.external_id, externalId)).get() ?? null;
+	}
+
+	async updateMemoryFileStatus(
+		id: string,
+		status: string,
+		params?: {
+			content?: string;
+			error_message?: string;
+			word_count?: number;
+			token_count?: number;
+		},
+	) {
+		return this.db
+			.update(schema.memoryFiles)
+			.set({
+				status,
+				...(params?.content !== undefined ? { content: params.content } : {}),
+				...(params?.word_count !== undefined ? { word_count: params.word_count } : {}),
+				...(params?.token_count !== undefined ? { token_count: params.token_count } : {}),
+				error_message: params?.error_message ?? null,
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+	}
+
+	async updateMemoryFileMetadata(id: string, params: { title?: string; tags?: string; parent_id?: string; draft_eligible?: number }) {
+		const row = this.db
+			.select({ id: schema.memoryFiles.id })
+			.from(schema.memoryFiles)
+			.where(eq(schema.memoryFiles.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db
+			.update(schema.memoryFiles)
+			.set({
+				...(params.title !== undefined ? { title: params.title } : {}),
+				...(params.tags !== undefined ? { tags: params.tags } : {}),
+				...(params.parent_id !== undefined ? { parent_id: params.parent_id || null } : {}),
+				...(params.draft_eligible !== undefined ? { draft_eligible: params.draft_eligible } : {}),
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+
+		return this.db.select().from(schema.memoryFiles).where(eq(schema.memoryFiles.id, id)).get();
+	}
+
+	async updateMemorySummary(id: string, summary: string) {
+		return this.db
+			.update(schema.memoryFiles)
+			.set({ summary, updated_at: new Date().toISOString() })
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+	}
+
+	async deleteMemoryFile(id: string) {
+		const row = this.db
+			.select({ r2_key: schema.memoryFiles.r2_key })
+			.from(schema.memoryFiles)
+			.where(eq(schema.memoryFiles.id, id))
+			.get();
+
+		if (!row) return null;
+
+		this.db
+			.delete(schema.memoryFiles)
+			.where(eq(schema.memoryFiles.id, id))
+			.run();
+
+		return row;
+	}
+
+	async replaceMemoryChunks(fileId: string, chunks: Array<{
+		id: string;
+		heading?: string | null;
+		content: string;
+		start_offset: number;
+		end_offset: number;
+		token_count?: number;
+	}>) {
+		this.db.delete(schema.memoryChunks).where(eq(schema.memoryChunks.memory_file_id, fileId)).run();
+		if (chunks.length === 0) return;
+		const createdAt = new Date().toISOString();
+		this.db.insert(schema.memoryChunks).values(chunks.map((chunk) => ({
+			...chunk,
+			memory_file_id: fileId,
+			heading: chunk.heading ?? null,
+			created_at: createdAt,
+		}))).run();
+		this.db.update(schema.memoryFiles)
+			.set({ last_indexed_at: createdAt, updated_at: createdAt })
+			.where(eq(schema.memoryFiles.id, fileId))
+			.run();
+	}
+
+	async listMemoryFacts(status?: string) {
+		const rows = this.db.select().from(schema.memoryFacts);
+		return status ? rows.where(eq(schema.memoryFacts.status, status)).all() : rows.all();
+	}
+
+	async getFirstMemoryChunkId(fileId: string) {
+		return this.db.select({ id: schema.memoryChunks.id })
+			.from(schema.memoryChunks)
+			.where(eq(schema.memoryChunks.memory_file_id, fileId))
+			.orderBy(asc(schema.memoryChunks.start_offset))
+			.get()?.id ?? null;
+	}
+
+	async createMemoryFact(params: {
+		id: string;
+		kind: string;
+		value: string;
+		confidence?: number;
+		source_chunk_id?: string;
+	}) {
+		const now = new Date().toISOString();
+		return this.db.insert(schema.memoryFacts).values({
+			...params,
+			status: "suggested",
+			created_at: now,
+			updated_at: now,
+		}).returning().get();
+	}
+
+	async updateMemoryFactStatus(id: string, status: "suggested" | "confirmed" | "rejected" | "superseded") {
+		return this.db.update(schema.memoryFacts)
+			.set({ status, updated_at: new Date().toISOString() })
+			.where(eq(schema.memoryFacts.id, id))
+			.run();
+	}
+
+	async updateMemoryFact(id: string, params: { kind?: string; value?: string }) {
+		return this.db.update(schema.memoryFacts)
+			.set({
+				...(params.kind !== undefined ? { kind: params.kind } : {}),
+				...(params.value !== undefined ? { value: params.value } : {}),
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.memoryFacts.id, id))
+			.run();
+	}
+
+	async searchMemoryKeyword(query: string, limit = 10) {
+		const like = `%${query}%`;
+		return [
+			...this.ctx.storage.sql.exec(
+				`SELECT mf.id, mf.title, mf.tags,
+				 COALESCE(SUBSTR(mc.content, MAX(1, INSTR(LOWER(mc.content), LOWER(?1)) - 100), 500),
+				 SUBSTR(mf.content, MAX(1, INSTR(LOWER(mf.content), LOWER(?1)) - 100), 500)) as snippet,
+				 COALESCE(mc.heading, '') as heading, COALESCE(mc.start_offset, 0) as start_offset,
+				 mf.source_kind, mf.source_uri, mf.draft_eligible, mf.created_at
+				 FROM memory_files mf LEFT JOIN memory_chunks mc ON mc.memory_file_id = mf.id
+				 WHERE mf.status = 'ready' AND mf.draft_eligible = 1 AND
+				 (mf.title LIKE ?2 OR mf.tags LIKE ?2 OR mf.content LIKE ?2 OR mc.content LIKE ?2)
+				 ORDER BY mf.created_at DESC LIMIT ?3`,
+				query,
+				like,
+				limit,
+			),
+		];
+	}
+
+	async getMemoryFileIds(ids: string[]) {
+		if (ids.length === 0) return [];
+		const placeholders = ids.map((_, i) => `?${i + 1}`).join(",");
+		return [
+			...this.ctx.storage.sql.exec(
+				`SELECT id, title, tags, SUBSTR(content, 1, 500) as snippet,
+				 source_kind, source_uri, draft_eligible FROM memory_files
+				 WHERE id IN (${placeholders}) AND status = 'ready' AND draft_eligible = 1`,
+				...ids,
+			),
+		];
+	}
+
+	// ── Canned response templates ───────────────────────────────
+
+	async createTemplate(params: { id: string; title: string; body: string; tags?: string }) {
+		const now = new Date().toISOString();
+		return this.db
+			.insert(schema.templates)
+			.values({ ...params, created_at: now, updated_at: now })
+			.returning()
+			.get();
+	}
+
+	async listTemplates() {
+		return this.db
+			.select()
+			.from(schema.templates)
+			.orderBy(desc(schema.templates.created_at))
+			.all();
+	}
+
+	async updateTemplate(id: string, params: { title?: string; body?: string; tags?: string }) {
+		const row = this.db
+			.select({ id: schema.templates.id })
+			.from(schema.templates)
+			.where(eq(schema.templates.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db
+			.update(schema.templates)
+			.set({
+				...(params.title !== undefined ? { title: params.title } : {}),
+				...(params.body !== undefined ? { body: params.body } : {}),
+				...(params.tags !== undefined ? { tags: params.tags } : {}),
+				updated_at: new Date().toISOString(),
+			})
+			.where(eq(schema.templates.id, id))
+			.run();
+
+		return this.db.select().from(schema.templates).where(eq(schema.templates.id, id)).get();
+	}
+
+	async deleteTemplate(id: string) {
+		const row = this.db
+			.select({ id: schema.templates.id })
+			.from(schema.templates)
+			.where(eq(schema.templates.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db.delete(schema.templates).where(eq(schema.templates.id, id)).run();
+		return row;
+	}
+
+	// ── Rosters / students ───────────────────────────────────────
+
+	async createRoster(id: string, name: string, students: { name?: string; email: string }[]) {
+		const now = new Date().toISOString();
+		this.db.insert(schema.rosters).values({ id, name, created_at: now }).run();
+		if (students.length > 0) {
+			this.db
+				.insert(schema.students)
+				.values(
+					students.map((s) => ({
+						id: crypto.randomUUID(),
+						roster_id: id,
+						name: s.name ?? null,
+						email: s.email.toLowerCase(),
+						created_at: now,
+					})),
+				)
+				.run();
+		}
+		return { id, name, studentCount: students.length };
+	}
+
+	async listRosters() {
+		return [
+			...this.ctx.storage.sql.exec(
+				`SELECT r.id, r.name, r.created_at,
+				 (SELECT COUNT(*) FROM students WHERE students.roster_id = r.id) as studentCount
+				 FROM rosters r ORDER BY r.created_at DESC`,
+			),
+		];
+	}
+
+	async listStudents(rosterId: string) {
+		return this.db
+			.select()
+			.from(schema.students)
+			.where(eq(schema.students.roster_id, rosterId))
+			.all();
+	}
+
+	async deleteRoster(id: string) {
+		const row = this.db
+			.select({ id: schema.rosters.id })
+			.from(schema.rosters)
+			.where(eq(schema.rosters.id, id))
+			.get();
+		if (!row) return null;
+
+		this.db.delete(schema.rosters).where(eq(schema.rosters.id, id)).run();
+		return row;
+	}
+
+	async matchSender(email: string) {
+		const row = this.db
+			.select({
+				studentName: schema.students.name,
+				rosterId: schema.students.roster_id,
+				rosterName: schema.rosters.name,
+			})
+			.from(schema.students)
+			.innerJoin(schema.rosters, eq(schema.students.roster_id, schema.rosters.id))
+			.where(eq(schema.students.email, email.toLowerCase()))
+			.get();
+		return row ?? null;
+	}
+
 	// ── Search (raw SQL — dynamic condition builder) ───────────────
 
 	/**
@@ -868,5 +1309,215 @@ export class MailboxDO extends DurableObject<Env> {
 		if (attachments.length > 0) {
 			this.db.insert(schema.attachments).values(attachments).run();
 		}
+	}
+
+	// ── Unified productivity state (raw SQL) ───────────────────────
+
+	async upsertConnectedAccount(account: {
+		id: string; provider: string; providerAccountId: string; email?: string;
+		displayName?: string; tokenCiphertext?: string;
+	}) {
+		this.ctx.storage.sql.exec(
+			`INSERT INTO connected_accounts (id, provider, provider_account_id, email, display_name, token_ciphertext)
+			 VALUES (?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(provider, provider_account_id) DO UPDATE SET
+			 email = excluded.email, display_name = excluded.display_name,
+			 token_ciphertext = COALESCE(excluded.token_ciphertext, connected_accounts.token_ciphertext),
+			 status = 'connected', updated_at = datetime('now')`,
+			account.id, account.provider, account.providerAccountId, account.email ?? null,
+			account.displayName ?? null, account.tokenCiphertext ?? null,
+		);
+	}
+
+	async updateConnectedAccountToken(id: string, tokenCiphertext: string) {
+		this.ctx.storage.sql.exec(`UPDATE connected_accounts SET token_ciphertext = ?, status = 'connected', updated_at = datetime('now') WHERE id = ?`, tokenCiphertext, id);
+	}
+
+	async createTopic(topic: { id: string; title: string; content: string; selectedEmailIds: string[] }) {
+		this.ctx.storage.sql.exec(`INSERT INTO topics (id, title, content, selected_email_ids) VALUES (?, ?, ?, ?)`, topic.id, topic.title, topic.content, JSON.stringify(topic.selectedEmailIds));
+	}
+
+	async updateTopicStatus(id: string, update: { status: string; jobId?: string; mode?: string }) {
+		this.ctx.storage.sql.exec(`UPDATE topics SET status = ?, job_id = COALESCE(?, job_id), mode = COALESCE(?, mode), updated_at = datetime('now') WHERE id = ?`, update.status, update.jobId ?? null, update.mode ?? null, id);
+	}
+
+	async listTopics() {
+		return [...this.ctx.storage.sql.exec(`SELECT id, title, content, selected_email_ids as selectedEmailIds, status, job_id as jobId, mode, created_at as createdAt, updated_at as updatedAt FROM topics ORDER BY created_at DESC LIMIT 100`)].map((row: any) => ({ ...row, selectedEmailIds: JSON.parse(String(row.selectedEmailIds || "[]")) }));
+	}
+
+	async listConnectedAccounts() {
+		return [...this.ctx.storage.sql.exec(
+			`SELECT id, provider, provider_account_id as providerAccountId, email, display_name as displayName, status, created_at as createdAt, updated_at as updatedAt
+			 FROM connected_accounts ORDER BY created_at DESC`,
+		)];
+	}
+
+	async getConnectedAccount(id: string) {
+		return [...this.ctx.storage.sql.exec(
+			`SELECT id, provider, provider_account_id as providerAccountId, email, display_name as displayName, token_ciphertext as tokenCiphertext, status FROM connected_accounts WHERE id = ? LIMIT 1`, id,
+		)][0] as { id: string; provider: string; providerAccountId: string; email: string | null; displayName: string | null; tokenCiphertext: string; status: string } | undefined;
+	}
+
+	async upsertSyncedEmail(email: {
+		id: string; subject: string; sender: string; recipient: string; date: string;
+		body: string; read: boolean; threadId: string | null;
+	}) {
+		this.ctx.storage.sql.exec(
+			`INSERT INTO emails (id, folder_id, subject, sender, recipient, date, read, starred, body, thread_id, message_id)
+			 VALUES (?, 'inbox', ?, ?, ?, ?, ?, 0, ?, ?, ?)
+			 ON CONFLICT(id) DO UPDATE SET subject = excluded.subject, sender = excluded.sender,
+			 recipient = excluded.recipient, date = excluded.date, read = excluded.read,
+			 body = excluded.body, thread_id = excluded.thread_id, message_id = excluded.message_id`,
+			email.id, email.subject, email.sender, email.recipient, email.date, email.read ? 1 : 0,
+			email.body, email.threadId, email.id,
+		);
+	}
+
+	async createExtraction(extraction: {
+		id: string; kind: string; title: string; dueAt?: string | null;
+		confidence: number; sourceEmailId: string; sourceThreadId?: string | null;
+	}) {
+		this.ctx.storage.sql.exec(
+			`INSERT OR IGNORE INTO extractions (id, kind, title, due_at, confidence, source_email_id, source_thread_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			extraction.id, extraction.kind, extraction.title, extraction.dueAt ?? null,
+			extraction.confidence, extraction.sourceEmailId, extraction.sourceThreadId ?? null,
+		);
+	}
+
+	async listExtractions(status?: string) {
+		const query = status
+			? `SELECT id, kind, title, due_at as dueAt, confidence, source_email_id as sourceEmailId, source_thread_id as sourceThreadId, status, created_at as createdAt FROM extractions WHERE status = ? ORDER BY created_at DESC`
+			: `SELECT id, kind, title, due_at as dueAt, confidence, source_email_id as sourceEmailId, source_thread_id as sourceThreadId, status, created_at as createdAt FROM extractions ORDER BY created_at DESC`;
+		return status ? [...this.ctx.storage.sql.exec(query, status)] : [...this.ctx.storage.sql.exec(query)];
+	}
+
+	async commitExtraction(id: string, kind: string, title: string, dueAt?: string | null) {
+		this.ctx.storage.sql.exec(
+			`UPDATE extractions SET status = 'committed' WHERE id = ?`, id,
+		);
+		const itemId = `productivity:${id}`;
+		this.ctx.storage.sql.exec(
+			`INSERT OR REPLACE INTO productivity_items (id, kind, provider, title, due_at, status, source_email_id, updated_at)
+			 SELECT ?, ?, 'pending', ?, due_at, 'open', source_email_id, datetime('now') FROM extractions WHERE id = ?`,
+			itemId, kind, title, id,
+		);
+		return { id: itemId, kind, title, dueAt: dueAt ?? null, status: "open" };
+	}
+
+	async listProductivityItems() {
+		return [...this.ctx.storage.sql.exec(
+			`SELECT id, kind, provider, provider_id as providerId, account_id as accountId, title, body, start_at as startAt, end_at as endAt, due_at as dueAt, status, source_email_id as sourceEmailId, payload_json as payloadJson, created_at as createdAt, updated_at as updatedAt
+			 FROM productivity_items WHERE status != 'done' ORDER BY COALESCE(due_at, start_at, created_at) ASC LIMIT 100`,
+		)];
+	}
+
+	async upsertGraphSubscription(subscription: { id: string; provider: string; resource: string; expirationAt: string }) {
+		this.ctx.storage.sql.exec(
+			`INSERT OR REPLACE INTO graph_subscriptions (id, provider, resource, expiration_at, updated_at)
+			 VALUES (?, ?, ?, ?, datetime('now'))`, subscription.id, subscription.provider, subscription.resource, subscription.expirationAt,
+		);
+		this.ctx.storage.setAlarm(Math.min(Date.parse(subscription.expirationAt) - 10 * 60 * 1000, Date.now() + 45 * 60 * 1000));
+	}
+
+	async listGraphSubscriptions() {
+		return [...this.ctx.storage.sql.exec(
+			`SELECT id, provider, resource, expiration_at as expirationAt, created_at as createdAt, updated_at as updatedAt FROM graph_subscriptions ORDER BY expiration_at ASC`,
+		)];
+	}
+
+	async getProductivityItemByProvider(provider: string, providerId: string) {
+		return [...this.ctx.storage.sql.exec(
+			`SELECT id, kind, provider, provider_id as providerId, account_id as accountId, title, body, start_at as startAt, end_at as endAt, due_at as dueAt, status, source_email_id as sourceEmailId, payload_json as payloadJson, created_at as createdAt, updated_at as updatedAt
+			 FROM productivity_items WHERE provider = ? AND provider_id = ? LIMIT 1`,
+			provider,
+			providerId,
+		)][0] as Record<string, unknown> | undefined;
+	}
+
+	async listProviderProductivityItems(options: {
+		provider: string;
+		kind?: string;
+		accountId?: string;
+		status?: string;
+		limit?: number;
+	}) {
+		const conditions = ["provider = ?"];
+		const params: Array<string | number> = [options.provider];
+
+		if (options.kind) {
+			conditions.push(`kind = ?${params.length + 1}`);
+			params.push(options.kind);
+		}
+		if (options.accountId) {
+			conditions.push(`account_id = ?${params.length + 1}`);
+			params.push(options.accountId);
+		}
+		if (options.status) {
+			conditions.push(`status = ?${params.length + 1}`);
+			params.push(options.status);
+		}
+
+		const limit = Math.min(Math.max(options.limit ?? 100, 1), 250);
+		params.push(limit);
+
+		return [...this.ctx.storage.sql.exec(
+			`SELECT id, kind, provider, provider_id as providerId, account_id as accountId, title, body, start_at as startAt, end_at as endAt, due_at as dueAt, status, source_email_id as sourceEmailId, payload_json as payloadJson, created_at as createdAt, updated_at as updatedAt
+			 FROM productivity_items
+			 WHERE ${conditions.join(" AND ")}
+			 ORDER BY COALESCE(due_at, start_at, updated_at, created_at) ASC
+			 LIMIT ?${params.length}`,
+			...params,
+		)];
+	}
+
+	async upsertProviderItem(item: ProductivityItemData) {
+		const id = item.id ?? (
+			item.providerId
+				? `${item.provider}:${item.kind}:${item.providerId}`
+				: crypto.randomUUID()
+		);
+		this.ctx.storage.sql.exec(
+			`INSERT INTO productivity_items (
+				id, kind, provider, provider_id, account_id, title, body,
+				start_at, end_at, due_at, status, source_email_id, payload_json, updated_at
+			)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+			 ON CONFLICT(id) DO UPDATE SET
+				kind = excluded.kind,
+				provider = excluded.provider,
+				provider_id = excluded.provider_id,
+				account_id = excluded.account_id,
+				title = excluded.title,
+				body = excluded.body,
+				start_at = excluded.start_at,
+				end_at = excluded.end_at,
+				due_at = excluded.due_at,
+				status = excluded.status,
+				source_email_id = excluded.source_email_id,
+				payload_json = excluded.payload_json,
+				updated_at = datetime('now')`,
+			id,
+			item.kind,
+			item.provider,
+			item.providerId ?? null,
+			item.accountId ?? null,
+			item.title,
+			item.body ?? null,
+			item.startAt ?? null,
+			item.endAt ?? null,
+			item.dueAt ?? null,
+			item.status ?? "open",
+			item.sourceEmailId ?? null,
+			item.payloadJson ?? null,
+		);
+		return { ...item, id };
+	}
+
+	async upsertProviderItems(items: ProductivityItemData[]) {
+		if (items.length === 0) return [];
+		return this.ctx.storage.transactionSync(
+			() => items.map((item) => this.upsertProviderItem(item)),
+		);
 	}
 }

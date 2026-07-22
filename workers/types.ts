@@ -3,6 +3,18 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 export interface Env extends Cloudflare.Env {
-	POLICY_AUD: string;
-	TEAM_DOMAIN: string;
+	OPENROUTER_API_KEY?: string;
+	GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
+	GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
+	MICROSOFT_TENANT_ID?: string;
+	MICROSOFT_CLIENT_ID?: string;
+	MICROSOFT_CLIENT_SECRET?: string;
+	ONEDRIVE_USER_ID?: string;
+	MICROSOFT_REDIRECT_URI?: string;
+	APP_ORIGIN?: string;
+	TOKEN_ENCRYPTION_KEY?: string;
+	EXTERNAL_RUNNER_URL?: string;
+	EXTERNAL_RUNNER_SECRET?: string;
+	/** Shared bearer secret for the Power Automate Outlook bridge. */
+	BRIDGE_SECRET?: string;
 }
