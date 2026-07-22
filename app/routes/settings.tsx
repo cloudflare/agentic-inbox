@@ -37,6 +37,11 @@ export default function SettingsRoute() {
 		queryFn: () => api.getConfig(),
 		staleTime: Infinity,
 	});
+	const { data: connectedAccounts = [] } = useQuery({
+		queryKey: queryKeys.productivity.accounts(mailboxId || ""),
+		queryFn: () => api.listConnectedAccounts(mailboxId!),
+		enabled: Boolean(mailboxId),
+	});
 	const openRouterConfigured = configData?.openRouterConfigured ?? false;
 
 	useEffect(() => {
@@ -112,6 +117,21 @@ export default function SettingsRoute() {
 						/>
 						<Input label="Email" type="email" value={mailbox.email} disabled />
 					</div>
+				</div>
+
+				{/* Provider connections */}
+				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
+					<div className="flex items-center justify-between gap-3 mb-2">
+						<div className="text-sm font-medium text-kumo-default">Connected providers</div>
+						{configData?.microsoftConfigured && <Button size="sm" variant="secondary" onClick={() => api.startMicrosoftConnect(mailboxId!)}>Connect Outlook</Button>}
+					</div>
+					<p className="text-xs text-kumo-subtle mb-3">Outlook stays authoritative; this deployment caches selected mail and productivity context for search and briefing.</p>
+					{connectedAccounts.length === 0 ? <div className="text-sm text-kumo-subtle">No Microsoft account connected.</div> : connectedAccounts.map((account) => (
+						<div key={account.id} className="flex items-center justify-between rounded-md bg-kumo-recessed px-3 py-2 text-sm">
+							<span className="text-kumo-default">{account.displayName || account.email || account.provider}</span>
+							<Badge variant="secondary">{account.status}</Badge>
+						</div>
+					))}
 				</div>
 
 				{/* AI Model Provider */}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="addin-app-root" content="current">
+  <meta name="addin-app-path" content="/">
+  <title>Agentic Inbox for Outlook</title>
+  <link rel="stylesheet" href="./taskpane.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="./taskpane.js" defer></script>
+</head>
+<body>
+  <main class="shell" aria-labelledby="shell-title">
+    <section class="panel">
+      <div class="eyebrow-row">
+        <p class="eyebrow">Outlook context</p>
+        <span id="status-badge" class="status-badge status-pending">Loading</span>
+      </div>
+      <h1 id="shell-title">Agentic Inbox</h1>
+      <p class="lede">Open the hosted app with the current message context when Outlook makes it available.</p>
+
+      <dl class="context-list">
+        <div class="context-row">
+          <dt>Mode</dt>
+          <dd id="context-mode">Detecting</dd>
+        </div>
+        <div class="context-row">
+          <dt>Subject</dt>
+          <dd id="context-subject">Waiting for Outlook</dd>
+        </div>
+        <div class="context-row">
+          <dt>Sender</dt>
+          <dd id="context-sender">Waiting for Outlook</dd>
+        </div>
+      </dl>
+
+      <div class="actions">
+        <a id="open-app-link" class="primary-action" href="/" target="_blank" rel="noreferrer noopener">
+          Open Agentic Inbox
+        </a>
+        <button id="refresh-button" class="secondary-action" type="button">Refresh context</button>
+      </div>
+
+      <div class="destination">
+        <span class="destination-label">Hosted app</span>
+        <code id="destination-url">Resolving…</code>
+      </div>
+
+      <p id="context-note" class="note">The link uses the current origin by default. Override it with <code>appRoot</code> and <code>appPath</code> query parameters if this pane is hosted separately.</p>
+    </section>
+  </main>
+</body>
+</html>

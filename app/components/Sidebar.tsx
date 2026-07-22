@@ -6,9 +6,11 @@ import { Badge, Button, Dialog, Input, Tooltip } from "@cloudflare/kumo";
 import {
 	ArchiveIcon,
 	BrainIcon,
+	CalendarDotsIcon,
 	CaretLeftIcon,
 	FileIcon,
 	FolderIcon,
+	LightningIcon,
 	NoteIcon,
 	PaperPlaneTiltIcon,
 	PencilSimpleIcon,
@@ -162,6 +164,13 @@ export default function Sidebar() {
 
 			{/* Navigation */}
 			<nav className="flex-1 overflow-y-auto px-2 space-y-0.5">
+				<FolderLink
+					to={`/mailbox/${mailboxId}/briefing`}
+					icon={<LightningIcon size={18} weight="regular" />}
+					label="Briefing"
+					onClick={handleNavClick}
+				/>
+				<FolderLink to={`/mailbox/${mailboxId}/productivity`} icon={<CalendarDotsIcon size={18} />} label="Productivity" onClick={handleNavClick} />
 				{SYSTEM_FOLDER_LINKS.map((folder) => (
 					<FolderLink
 						key={folder.id}

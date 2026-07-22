@@ -9,6 +9,7 @@ import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
 import type { Env } from "./types";
+import { syncMicrosoftInbox } from "./lib/microsoft-sync";
 
 export { MailboxDO } from "./durableObject";
 export { EmailAgent } from "./agent";
@@ -44,6 +45,12 @@ const app = new Hono<{ Bindings: Env }>();
 
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
+	// OAuth callbacks and the Outlook add-in bootstrap must be reachable before
+	// a Microsoft account session exists. The add-in still obtains its app
+	// session through Microsoft OAuth before calling mailbox APIs.
+	if (c.req.path.startsWith("/auth/microsoft/") || c.req.path.startsWith("/webhooks/microsoft") || c.req.path.startsWith("/addin/")) {
+		return next();
+	}
 	// Skip validation in development
 	if (import.meta.env.DEV) {
 		return next();
@@ -110,6 +117,18 @@ app.all("*", (c) => {
 // Export the Hono app as the default export with an email handler
 export default {
 	fetch: app.fetch,
+	async queue(batch: MessageBatch<{ jobId: string; mailboxId: string; provider: string }>, env: Env) {
+		for (const message of batch.messages) {
+			try {
+				if (message.body.provider !== "microsoft") throw new Error(`Unsupported sync provider: ${message.body.provider}`);
+				await syncMicrosoftInbox(env, message.body.mailboxId);
+				message.ack();
+			} catch (error) {
+				console.error("Queued sync failed", { jobId: message.body.jobId, error });
+				message.retry();
+			}
+		}
+	},
 	async email(
 		event: { raw: ReadableStream; rawSize: number },
 		env: Env,

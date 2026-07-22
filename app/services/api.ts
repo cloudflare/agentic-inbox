@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { DraftContextPack, Email, Folder, Mailbox, MemoryEntry, MemoryFact, MemoryFileDetail, MemorySearchResponse, Roster, Student, Template } from "~/types";
+import type { BriefingItem, ConnectedAccount, DraftContextPack, Email, Extraction, Folder, Mailbox, MemoryEntry, MemoryFact, MemoryFileDetail, MemorySearchResponse, ProductivitySnapshot, Roster, Student, Template, Topic } from "~/types";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -103,7 +103,7 @@ interface EmailListResponse {
 const api = {
 	// Config
 	getConfig: () =>
-		get<{ domains: string[]; emailAddresses: string[]; openRouterConfigured: boolean }>("/api/v1/config"),
+		get<{ domains: string[]; emailAddresses: string[]; openRouterConfigured: boolean; microsoftConfigured: boolean }>("/api/v1/config"),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
@@ -115,6 +115,31 @@ const api = {
 		put<Mailbox>(`/api/v1/mailboxes/${mailboxId}`, { settings }),
 	deleteMailbox: (mailboxId: string) =>
 		del<void>(`/api/v1/mailboxes/${mailboxId}`),
+	listConnectedAccounts: (mailboxId: string) =>
+		get<ConnectedAccount[]>(`/api/v1/mailboxes/${mailboxId}/accounts`),
+	startMicrosoftConnect: (mailboxId: string) => {
+		window.location.assign(`/auth/microsoft/start?mailboxId=${encodeURIComponent(mailboxId)}`);
+	},
+	queueSync: (mailboxId: string) =>
+		post<{ jobId: string; status: string; provider: string }>(`/api/v1/mailboxes/${mailboxId}/sync`),
+	getBriefing: (mailboxId: string) =>
+		get<{ items: BriefingItem[]; generatedAt: string }>(`/api/v1/mailboxes/${mailboxId}/briefing`),
+	listExtractions: (mailboxId: string, status?: string) =>
+		get<Extraction[]>(`/api/v1/mailboxes/${mailboxId}/extractions`, status ? { params: { status } } : undefined),
+	extractEmail: (mailboxId: string, emailId: string) =>
+		post<Extraction[]>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/extract`),
+	commitExtraction: (mailboxId: string, id: string, data: { kind: string; title: string; dueAt?: string | null }) =>
+		post<{ id: string; status: string }>(`/api/v1/mailboxes/${mailboxId}/extractions/${id}/commit`, data),
+	getProductivity: (mailboxId: string) =>
+		get<ProductivitySnapshot>(`/api/v1/mailboxes/${mailboxId}/productivity`),
+	createCalendarEvent: (mailboxId: string, data: { subject: string; start: string; end: string; timeZone?: string }) =>
+		post<unknown>(`/api/v1/mailboxes/${mailboxId}/productivity/events`, data),
+	createTask: (mailboxId: string, data: { title: string; dueAt?: string | null }) =>
+		post<unknown>(`/api/v1/mailboxes/${mailboxId}/productivity/tasks`, data),
+	createSubscriptions: (mailboxId: string) =>
+		post<{ subscriptions: unknown[] }>(`/api/v1/mailboxes/${mailboxId}/subscriptions`),
+	listTopics: (mailboxId: string) =>
+		get<{ topics: Topic[]; agentEndpoint: string }>(`/api/v1/mailboxes/${mailboxId}/topics`),
 
 	// Emails
 	listEmails: (mailboxId: string, params: Record<string, string>, opts?: { signal?: AbortSignal }) =>

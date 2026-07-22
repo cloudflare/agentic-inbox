@@ -276,6 +276,91 @@ export const mailboxMigrations: Migration[] = [
                 FOREIGN KEY(source_chunk_id) REFERENCES memory_chunks(id) ON DELETE SET NULL
             );
             CREATE INDEX idx_memory_facts_status ON memory_facts(status);
-        `),
+		`),
+	},
+	{
+		name: "15_add_productivity_entities",
+		sql: txn(`
+			CREATE TABLE connected_accounts (
+				id TEXT PRIMARY KEY,
+				provider TEXT NOT NULL,
+				provider_account_id TEXT NOT NULL,
+				email TEXT,
+				display_name TEXT,
+				token_ciphertext TEXT,
+				status TEXT NOT NULL DEFAULT 'connected',
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+				UNIQUE(provider, provider_account_id)
+			);
+			CREATE TABLE productivity_items (
+				id TEXT PRIMARY KEY,
+				kind TEXT NOT NULL,
+				provider TEXT NOT NULL,
+				provider_id TEXT,
+				title TEXT NOT NULL,
+				body TEXT,
+				start_at TEXT,
+				end_at TEXT,
+				due_at TEXT,
+				status TEXT NOT NULL DEFAULT 'open',
+				source_email_id TEXT,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE INDEX idx_productivity_kind_status ON productivity_items(kind, status);
+			CREATE TABLE extractions (
+				id TEXT PRIMARY KEY,
+				kind TEXT NOT NULL,
+				title TEXT NOT NULL,
+				due_at TEXT,
+				confidence REAL NOT NULL,
+				source_email_id TEXT NOT NULL,
+				source_thread_id TEXT,
+				status TEXT NOT NULL DEFAULT 'suggested',
+				created_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE INDEX idx_extractions_status ON extractions(status);
+		`),
+	},
+	{
+		name: "16_add_graph_subscriptions",
+		sql: txn(`
+			CREATE TABLE graph_subscriptions (
+				id TEXT PRIMARY KEY,
+				provider TEXT NOT NULL,
+				resource TEXT NOT NULL,
+				expiration_at TEXT NOT NULL,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE INDEX idx_graph_subscription_expiration ON graph_subscriptions(expiration_at);
+		`),
+	},
+	{
+		name: "17_extend_productivity_items_for_provider_sync",
+		sql: txn(`
+			ALTER TABLE productivity_items ADD COLUMN account_id TEXT;
+			ALTER TABLE productivity_items ADD COLUMN payload_json TEXT;
+			CREATE INDEX idx_productivity_provider_id ON productivity_items(provider, provider_id);
+			CREATE INDEX idx_productivity_account_id ON productivity_items(account_id);
+		`),
+	},
+	{
+		name: "18_add_topics",
+		sql: txn(`
+			CREATE TABLE topics (
+				id TEXT PRIMARY KEY,
+				title TEXT NOT NULL,
+				content TEXT NOT NULL DEFAULT '',
+				selected_email_ids TEXT NOT NULL DEFAULT '[]',
+				status TEXT NOT NULL DEFAULT 'created',
+				job_id TEXT,
+				mode TEXT,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE INDEX idx_topics_status_created ON topics(status, created_at DESC);
+		`),
 	},
 ];

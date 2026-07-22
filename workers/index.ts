@@ -30,6 +30,11 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import { createGraphEvent, createGraphSubscription, createGraphTodoTask, exchangeMicrosoftCode, listGraphContacts, listGraphEvents, listGraphMessages, listGraphTodoTasks, microsoftOAuthUrl, refreshMicrosoftToken } from "./lib/microsoft-graph";
+import { buildBriefing, extractProductivityItems } from "./lib/productivity";
+import { decryptToken, encryptToken } from "./lib/token-crypto";
+import { dispatchTopic, type TopicContext } from "./lib/topic";
+import { syncMicrosoftInbox } from "./lib/microsoft-sync";
 
 type AppContext = Context<MailboxContext>;
 
@@ -73,6 +78,23 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	return v === "true" || v === "1";
 }
 
+async function microsoftAccessToken(env: Env, mailboxStub: any): Promise<string> {
+	const accounts = await mailboxStub.listConnectedAccounts();
+	const account = accounts.find((candidate: { provider: string }) => candidate.provider === "microsoft");
+	if (!account) throw new Error("Connect a Microsoft account first");
+	const stored = await mailboxStub.getConnectedAccount(account.id);
+	if (!stored?.tokenCiphertext) throw new Error("Microsoft account requires reauthentication");
+	let token = JSON.parse(await decryptToken(env.TOKEN_ENCRYPTION_KEY, stored.tokenCiphertext)) as { access_token?: string; refresh_token?: string; expires_at?: number };
+	if (!token.access_token || (token.expires_at && token.expires_at <= Date.now())) {
+		if (!token.refresh_token) throw new Error("Microsoft account requires reauthentication");
+		const refreshed = await refreshMicrosoftToken(env, token.refresh_token);
+		await mailboxStub.updateConnectedAccountToken(stored.id, await encryptToken(env.TOKEN_ENCRYPTION_KEY, refreshed));
+		token = refreshed as typeof token;
+	}
+	if (!token.access_token) throw new Error("Microsoft access token is unavailable");
+	return token.access_token;
+}
+
 // -- App & middleware -----------------------------------------------
 
 const app = new Hono<MailboxContext>();
@@ -93,6 +115,77 @@ app.use("/api/*", cors({
 }));
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
+// Microsoft OAuth is intentionally outside the mailbox API middleware. The
+// callback establishes the provider account and then stores it on the chosen
+// mailbox Durable Object. The state cookie prevents cross-mailbox callbacks.
+function getCookie(request: Request, name: string): string | null {
+	const header = request.headers.get("cookie") ?? "";
+	const value = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+	return value ? decodeURIComponent(value.slice(name.length + 1)) : null;
+}
+
+app.get("/auth/microsoft/start", (c) => {
+	const mailboxId = c.req.query("mailboxId");
+	if (!mailboxId) return c.json({ error: "mailboxId is required" }, 400);
+	const state = `${mailboxId}:${crypto.randomUUID()}`;
+	const location = microsoftOAuthUrl(c.env, state);
+	return new Response(null, {
+		status: 302,
+		headers: {
+			Location: location,
+			"Set-Cookie": `microsoft_oauth_state=${encodeURIComponent(state)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
+		},
+	});
+});
+
+app.get("/auth/microsoft/callback", async (c) => {
+	const code = c.req.query("code");
+	const state = c.req.query("state");
+	const expectedState = getCookie(c.req.raw, "microsoft_oauth_state");
+	if (!code || !state || !expectedState || state !== expectedState) {
+		return c.text("Invalid Microsoft OAuth state", 400);
+	}
+	const mailboxId = state.split(":")[0];
+	try {
+		const token = await exchangeMicrosoftCode(c.env, code);
+		const accessToken = String(token.access_token || "");
+		const profileResponse = await fetch("https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName", {
+			headers: { Authorization: `Bearer ${accessToken}` },
+		});
+		if (!profileResponse.ok) return c.text("Microsoft profile lookup failed", 502);
+		const profile = await profileResponse.json() as { id?: string; displayName?: string; mail?: string; userPrincipalName?: string };
+		if (!profile.id) return c.text("Microsoft profile did not include an account id", 502);
+		const mailbox = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+		const tokenCiphertext = await encryptToken(c.env.TOKEN_ENCRYPTION_KEY, token);
+		await (mailbox as any).upsertConnectedAccount({
+			id: `microsoft:${profile.id}`,
+			provider: "microsoft",
+			providerAccountId: profile.id,
+			email: profile.mail || profile.userPrincipalName,
+			displayName: profile.displayName,
+			tokenCiphertext,
+		});
+		return new Response(null, { status: 302, headers: {
+			Location: `/mailbox/${encodeURIComponent(mailboxId)}/settings?connected=microsoft`,
+			"Set-Cookie": "microsoft_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+		} });
+	} catch (error) {
+		console.error("Microsoft OAuth callback failed", error);
+		return c.text("Microsoft connection failed", 502);
+	}
+});
+
+app.post("/webhooks/microsoft", async (c) => {
+	const validationToken = c.req.query("validationToken");
+	if (validationToken) return c.text(validationToken);
+	const payload = await c.req.json().catch(() => ({})) as { value?: Array<{ clientState?: string }> };
+	const mailboxIds = [...new Set((payload.value ?? []).map((notification) => notification.clientState).filter((value): value is string => Boolean(value)))];
+	for (const mailboxId of mailboxIds) {
+		c.executionCtx.waitUntil(syncMicrosoftInbox(c.env, mailboxId).catch((error) => console.error("Microsoft webhook sync failed", error)));
+	}
+	return c.json({ accepted: true, mailboxes: mailboxIds.length });
+});
+
 // -- Config ---------------------------------------------------------
 
 app.get("/api/v1/config", (c) => {
@@ -100,7 +193,7 @@ app.get("/api/v1/config", (c) => {
 	const domains = domainsRaw.split(",").map((d) => d.trim()).filter(Boolean);
 	const emailAddresses = c.env.EMAIL_ADDRESSES ?? [];
 	const openRouterConfigured = Boolean(c.env.OPENROUTER_API_KEY);
-	return c.json({ domains, emailAddresses, openRouterConfigured });
+	return c.json({ domains, emailAddresses, openRouterConfigured, microsoftConfigured: Boolean(c.env.MICROSOFT_CLIENT_ID) });
 });
 
 // -- Mailboxes ------------------------------------------------------
@@ -149,6 +242,131 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
 	return c.body(null, 204);
+});
+
+// ── Unified productivity API --------------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/accounts", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listConnectedAccounts());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/sync", async (c: AppContext) => {
+	try {
+		if (c.env.SYNC_QUEUE) {
+			const jobId = crypto.randomUUID();
+			await c.env.SYNC_QUEUE.send({ jobId, mailboxId: c.req.param("mailboxId"), provider: "microsoft" });
+			return c.json({ status: "queued", provider: "microsoft", jobId }, 202);
+		}
+		const synced = await syncMicrosoftInbox(c.env, c.req.param("mailboxId")!);
+		return c.json({ status: "completed", provider: "microsoft", synced });
+	} catch (error) {
+		console.error("Microsoft sync failed", error);
+		const message = error instanceof Error ? error.message : "Microsoft sync failed";
+		return c.json({ error: message }, message.includes("Connect") || message.includes("reauthentication") ? 409 : 502);
+	}
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/productivity", async (c: AppContext) => {
+	try {
+		const accessToken = await microsoftAccessToken(c.env, c.var.mailboxStub as any);
+		const [events, contacts, tasks] = await Promise.all([
+			listGraphEvents(accessToken), listGraphContacts(accessToken), listGraphTodoTasks(accessToken),
+		]);
+		for (const event of events) await (c.var.mailboxStub as any).upsertProviderItem({ id: `microsoft:event:${event.id}`, kind: "event", provider: "microsoft", providerId: event.id, title: event.subject || "Untitled event", startAt: event.start?.dateTime, endAt: event.end?.dateTime });
+		for (const contact of contacts) await (c.var.mailboxStub as any).upsertProviderItem({ id: `microsoft:contact:${contact.id}`, kind: "contact", provider: "microsoft", providerId: contact.id, title: contact.displayName || contact.emailAddresses?.[0]?.address || "Contact", body: contact.companyName });
+		for (const task of tasks.tasks) await (c.var.mailboxStub as any).upsertProviderItem({ id: `microsoft:task:${task.id}`, kind: "task", provider: "microsoft", providerId: task.id, title: task.title || "Untitled task", dueAt: task.dueDateTime?.dateTime, status: task.status === "completed" ? "done" : "open" });
+		return c.json({ events, contacts, tasks: tasks.tasks, taskListId: tasks.listId });
+	} catch (error) {
+		return c.json({ error: error instanceof Error ? error.message : "Productivity sync failed" }, 502);
+	}
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/productivity/events", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { subject?: string; start?: string; end?: string; timeZone?: string };
+	if (!body.subject || !body.start || !body.end) return c.json({ error: "subject, start, and end are required" }, 400);
+	try { return c.json(await createGraphEvent(await microsoftAccessToken(c.env, c.var.mailboxStub as any), { subject: body.subject, start: { dateTime: body.start, timeZone: body.timeZone || "UTC" }, end: { dateTime: body.end, timeZone: body.timeZone || "UTC" } }), 201); }
+	catch (error) { return c.json({ error: error instanceof Error ? error.message : "Calendar action failed" }, 502); }
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/productivity/tasks", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { title?: string; dueAt?: string | null };
+	if (!body.title) return c.json({ error: "title is required" }, 400);
+	try {
+		const token = await microsoftAccessToken(c.env, c.var.mailboxStub as any);
+		const tasks = await listGraphTodoTasks(token, { top: 1 });
+		return c.json(await createGraphTodoTask(token, { title: body.title, ...(body.dueAt ? { dueDateTime: { dateTime: body.dueAt, timeZone: "UTC" } } : {}) }, { listId: tasks.listId }), 201);
+	} catch (error) { return c.json({ error: error instanceof Error ? error.message : "Task action failed" }, 502); }
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/subscriptions", async (c: AppContext) => {
+	try {
+		const token = await microsoftAccessToken(c.env, c.var.mailboxStub as any);
+		const origin = c.env.APP_ORIGIN || new URL(c.req.url).origin;
+		const notificationUrl = new URL("/webhooks/microsoft", origin).toString();
+		const mailboxId = c.req.param("mailboxId")!;
+		const resources = ["/me/mailFolders('inbox')/messages", "/me/events", "/me/contacts"];
+		const subscriptions: Array<{ id: string; resource: string; expirationDateTime: string }> = [];
+		for (const resource of resources) {
+			const subscription = await createGraphSubscription(token, resource, notificationUrl, mailboxId);
+			await (c.var.mailboxStub as any).upsertGraphSubscription({ id: subscription.id, provider: "microsoft", resource: subscription.resource, expirationAt: subscription.expirationDateTime });
+			subscriptions.push(subscription);
+		}
+		return c.json({ subscriptions }, 201);
+	} catch (error) { return c.json({ error: error instanceof Error ? error.message : "Subscription setup failed" }, 502); }
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/extractions", async (c: AppContext) => {
+	return c.json(await (c.var.mailboxStub as any).listExtractions(c.req.query("status")));
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/emails/:id/extract", async (c: AppContext) => {
+	const email = await c.var.mailboxStub.getEmail(c.req.param("id")!);
+	if (!email) return c.json({ error: "Email not found" }, 404);
+	const extracted = extractProductivityItems(email);
+	for (const item of extracted) await (c.var.mailboxStub as any).createExtraction(item);
+	return c.json(extracted);
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/extractions/:id/commit", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { kind?: string; title?: string; dueAt?: string | null };
+	if (!body.kind || !body.title) return c.json({ error: "kind and title are required" }, 400);
+	return c.json(await (c.var.mailboxStub as any).commitExtraction(c.req.param("id"), body.kind, body.title, body.dueAt));
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/briefing", async (c: AppContext) => {
+	const emails = await c.var.mailboxStub.getEmails({ folder: "inbox", page: 1, limit: 25 });
+	const tasks = await (c.var.mailboxStub as any).listProductivityItems();
+	const items = [
+		...emails.map((email: any) => ({ id: email.id, type: "email" as const, title: email.subject || email.sender, date: email.date, read: !!email.read, threadId: email.thread_id })),
+		...tasks.map((item: any) => ({ id: item.id, type: item.kind === "follow-up" ? "follow-up" as const : item.kind === "event" ? "event" as const : "task" as const, title: item.title, date: item.dueAt, read: true })),
+	];
+	return c.json({ items: buildBriefing(items), generatedAt: new Date().toISOString() });
+});
+
+app.get("/api/v1/mailboxes/:mailboxId/topics", async (c: AppContext) => {
+	return c.json({ topics: await (c.var.mailboxStub as any).listTopics(), agentEndpoint: `/agents/${encodeURIComponent(c.req.param("mailboxId")!)}` });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/topics", async (c: AppContext) => {
+	const body = await c.req.json().catch(() => ({})) as { title?: string; content?: string; selectedEmailIds?: string[] };
+	if (!body.title?.trim()) return c.json({ error: "title is required" }, 400);
+	const topic: TopicContext = {
+		topicId: crypto.randomUUID(),
+		title: body.title.trim(),
+		mailboxId: c.req.param("mailboxId")!,
+		selectedEmailIds: body.selectedEmailIds ?? [],
+		content: body.content?.trim() ?? "",
+		createdAt: new Date().toISOString(),
+	};
+	try {
+		await (c.var.mailboxStub as any).createTopic(topic);
+		const dispatch = await dispatchTopic(c.env, topic);
+		await (c.var.mailboxStub as any).updateTopicStatus(topic.topicId, { status: "dispatched", jobId: dispatch.jobId, mode: dispatch.mode });
+		return c.json({ topic, dispatch }, 202);
+	} catch (error) {
+		await (c.var.mailboxStub as any).updateTopicStatus(topic.topicId, { status: "failed" }).catch(() => undefined);
+		return c.json({ error: error instanceof Error ? error.message : "Topic dispatch failed" }, 502);
+	}
 });
 
 // -- Emails ---------------------------------------------------------

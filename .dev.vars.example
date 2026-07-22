@@ -9,3 +9,11 @@ MICROSOFT_TENANT_ID=your-tenant-id
 MICROSOFT_CLIENT_ID=your-app-client-id
 MICROSOFT_CLIENT_SECRET=your-app-client-secret
 ONEDRIVE_USER_ID=person@example.com
+# Microsoft OAuth (required for the Outlook connector)
+MICROSOFT_TENANT_ID=common
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_REDIRECT_URI=http://localhost:5173/auth/microsoft/callback
+APP_ORIGIN=http://localhost:5173
+# Generate a separate random value for production token encryption.
+TOKEN_ENCRYPTION_KEY=

@@ -175,3 +175,55 @@ export interface Student {
 	email: string;
 	created_at: string;
 }
+
+export interface ConnectedAccount {
+	id: string;
+	provider: "microsoft" | "google";
+	providerAccountId: string;
+	email: string | null;
+	displayName: string | null;
+	status: "connected" | "reauth_required" | "disconnected";
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface BriefingItem {
+	id: string;
+	type: "email" | "event" | "task" | "follow-up";
+	title: string;
+	reason: string;
+	priority: "high" | "medium" | "low";
+	sourceId: string;
+	sourceUrl: string;
+	createdAt: string;
+}
+
+export interface Extraction {
+	id: string;
+	kind: "event" | "task" | "follow-up";
+	title: string;
+	dueAt: string | null;
+	confidence: number;
+	sourceEmailId: string;
+	sourceThreadId: string | null;
+	status: "suggested" | "committed" | "dismissed";
+}
+
+export interface ProductivitySnapshot {
+	events: Array<{ id: string; subject?: string; start?: { dateTime?: string }; end?: { dateTime?: string } }>;
+	contacts: Array<{ id: string; displayName?: string; emailAddresses?: Array<{ address?: string }>; companyName?: string }>;
+	tasks: Array<{ id: string; title?: string; dueDateTime?: { dateTime?: string }; status?: string }>;
+	taskListId: string;
+}
+
+export interface Topic {
+	id: string;
+	title: string;
+	content: string;
+	selectedEmailIds: string[];
+	status: string;
+	jobId: string | null;
+	mode: string | null;
+	createdAt: string;
+	updatedAt: string;
+}

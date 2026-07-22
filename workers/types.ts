@@ -10,4 +10,9 @@ export interface Env extends Cloudflare.Env {
 	MICROSOFT_CLIENT_ID?: string;
 	MICROSOFT_CLIENT_SECRET?: string;
 	ONEDRIVE_USER_ID?: string;
+	MICROSOFT_REDIRECT_URI?: string;
+	APP_ORIGIN?: string;
+	TOKEN_ENCRYPTION_KEY?: string;
+	EXTERNAL_RUNNER_URL?: string;
+	EXTERNAL_RUNNER_SECRET?: string;
 }

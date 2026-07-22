@@ -43,4 +43,11 @@ export const queryKeys = {
 			["rosters", mailboxId, rosterId, "students"] as const,
 	},
 	config: ["config"] as const,
+	productivity: {
+		briefing: (mailboxId: string) => ["productivity", mailboxId, "briefing"] as const,
+		accounts: (mailboxId: string) => ["productivity", mailboxId, "accounts"] as const,
+		extractions: (mailboxId: string) => ["productivity", mailboxId, "extractions"] as const,
+		snapshot: (mailboxId: string) => ["productivity", mailboxId, "snapshot"] as const,
+		topics: (mailboxId: string) => ["productivity", mailboxId, "topics"] as const,
+	},
 };
