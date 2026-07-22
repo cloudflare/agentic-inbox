@@ -35,6 +35,7 @@ import { buildBriefing, extractProductivityItems } from "./lib/productivity";
 import { decryptToken, encryptToken } from "./lib/token-crypto";
 import { dispatchTopic, type TopicContext } from "./lib/topic";
 import { syncMicrosoftInbox } from "./lib/microsoft-sync";
+import { triageOutlookEmail } from "./lib/outlook-ai-bridge";
 
 type AppContext = Context<MailboxContext>;
 
@@ -55,6 +56,18 @@ const DraftBody = z.object({
 	in_reply_to: z.string().optional(),
 	thread_id: z.string().optional(),
 	draft_id: z.string().optional(),
+});
+
+const OutlookBridgeBody = z.object({
+	messageId: z.string().optional(),
+	conversationId: z.string().optional(),
+	from: z.string().optional(),
+	to: z.string().optional(),
+	subject: z.string().optional(),
+	bodyHtml: z.string().optional(),
+	body: z.string().optional(),
+}).refine((value) => value.bodyHtml !== undefined || value.body !== undefined, {
+	message: "bodyHtml or body is required",
 });
 
 // -- Helpers --------------------------------------------------------
@@ -184,6 +197,39 @@ app.post("/webhooks/microsoft", async (c) => {
 		c.executionCtx.waitUntil(syncMicrosoftInbox(c.env, mailboxId).catch((error) => console.error("Microsoft webhook sync failed", error)));
 	}
 	return c.json({ accepted: true, mailboxes: mailboxIds.length });
+});
+
+// Power Automate integration. This deliberately has its own shared secret and
+// does not use the app's Microsoft OAuth or Cloudflare Access session.
+app.post("/integrations/power-automate/outlook", async (c) => {
+	if (!c.env.BRIDGE_SECRET) return c.json({ error: "Outlook bridge is not configured" }, 503);
+	if (c.req.header("Authorization") !== `Bearer ${c.env.BRIDGE_SECRET}`) {
+		return c.json({ error: "Unauthorized" }, 401);
+	}
+
+	try {
+		const input = OutlookBridgeBody.parse(await c.req.json());
+		const ai = await triageOutlookEmail(c.env.AI, {
+			messageId: input.messageId,
+			conversationId: input.conversationId,
+			from: input.from,
+			to: input.to,
+			subject: input.subject,
+			bodyHtml: input.bodyHtml ?? input.body,
+		});
+		return c.json({
+			messageId: input.messageId ?? "",
+			conversationId: input.conversationId ?? "",
+			from: input.from ?? "",
+			to: input.to ?? "",
+			subject: input.subject ?? "",
+			...ai,
+		});
+	} catch (error) {
+		if (error instanceof z.ZodError) return c.json({ error: error.issues[0]?.message || "Invalid request" }, 400);
+		console.error("Outlook AI bridge failed", error);
+		return c.json({ error: error instanceof Error ? error.message : "Outlook AI bridge failed" }, 502);
+	}
 });
 
 // -- Config ---------------------------------------------------------

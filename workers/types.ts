@@ -15,4 +15,6 @@ export interface Env extends Cloudflare.Env {
 	TOKEN_ENCRYPTION_KEY?: string;
 	EXTERNAL_RUNNER_URL?: string;
 	EXTERNAL_RUNNER_SECRET?: string;
+	/** Shared bearer secret for the Power Automate Outlook bridge. */
+	BRIDGE_SECRET?: string;
 }

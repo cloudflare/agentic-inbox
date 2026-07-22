@@ -48,7 +48,7 @@ app.use("*", async (c, next) => {
 	// OAuth callbacks and the Outlook add-in bootstrap must be reachable before
 	// a Microsoft account session exists. The add-in still obtains its app
 	// session through Microsoft OAuth before calling mailbox APIs.
-	if (c.req.path.startsWith("/auth/microsoft/") || c.req.path.startsWith("/webhooks/microsoft") || c.req.path.startsWith("/addin/")) {
+	if (c.req.path.startsWith("/auth/microsoft/") || c.req.path.startsWith("/webhooks/microsoft") || c.req.path.startsWith("/integrations/power-automate/outlook") || c.req.path.startsWith("/addin/")) {
 		return next();
 	}
 	// Skip validation in development
