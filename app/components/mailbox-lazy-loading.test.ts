@@ -15,7 +15,11 @@ test("the rich composer is loaded only when compose is open", () => {
 	assert.doesNotMatch(mailbox, /import ComposeEmail from/);
 	assert.match(
 		mailbox,
-		/isComposing \? \([\s\S]*?<Suspense[\s\S]*?<ComposeEmail \/>/,
+		/isModalCompose =[\s\S]*?isComposing &&[\s\S]*?composeSurface\(composeOptions, selectedEmailId\) === "modal"/,
+	);
+	assert.match(
+		mailbox,
+		/isModalCompose \? \([\s\S]*?<Suspense[\s\S]*?<ComposeEmail \/>/,
 	);
 	assert.match(mailbox, /role="status"/);
 	assert.match(
@@ -28,6 +32,28 @@ test("the rich composer is loaded only when compose is open", () => {
 	assert.match(mailbox, /Retry composer/);
 	assert.match(mailbox, /composeRetryKey/);
 	assert.match(mailbox, /onRetry=\{\(\) => setComposeRetryKey/);
+});
+
+test("the inline composer is loaded only when a thread is being answered", () => {
+	const panel = read("./EmailPanel.tsx");
+
+	assert.match(
+		panel,
+		/lazy\(\(\) => import\("~\/components\/ComposeEmail"\)\)/,
+	);
+	assert.doesNotMatch(panel, /import ComposeEmail from/);
+	assert.match(
+		panel,
+		/isInlineComposing = isComposing &&[\s\S]*?composeSurface\(composeOptions, selectedEmailId\) === "inline"/,
+	);
+	assert.match(
+		panel,
+		/isInlineComposing && \([\s\S]*?<Suspense[\s\S]*?<InlineComposer variant="inline" \/>/,
+	);
+	assert.match(panel, /aria-label="Opening the composer"/);
+	assert.match(panel, /The composer could not open/);
+	assert.match(panel, /onRetry=\{\(\) => setInlineComposerRetryKey/);
+	assert.match(panel, /onCancel=\{\(\) => closeCompose\(\)\}/);
 });
 
 test("the optional writing assistant is deferred behind a retryable local boundary", () => {

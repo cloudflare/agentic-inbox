@@ -2,9 +2,9 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { useKumoToastManager } from "@cloudflare/kumo";
+import { Button, useKumoToastManager } from "@cloudflare/kumo";
 import { useQueries } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { Folders } from "shared/folders";
 import EmailPanelDialogs from "~/components/email-panel/EmailPanelDialogs";
@@ -19,8 +19,10 @@ import ConversationIntelligenceCard from "~/components/ConversationIntelligenceC
 import ConversationActivity from "~/components/ConversationActivity";
 import SnoozeDialog from "~/components/SnoozeDialog";
 import { FollowUpReminderControl } from "~/components/FollowUpReminderDialog";
+import LazyLoadBoundary from "~/components/LazyLoadBoundary";
 import { splitEmailList, toEmailListValue } from "~/lib/utils";
 import { normalizedAddress } from "~/lib/recipient-input";
+import { composeSurface } from "~/lib/compose-surface";
 import { evaluateStoredDraftAttachments } from "~/lib/compose-attachment-policy";
 import { planComposeEnqueueResult } from "~/lib/outbound-enqueue-outcome";
 import api from "~/services/api";
@@ -34,6 +36,53 @@ import { useFollowUpReminders } from "~/queries/follow-up-reminders";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email, Folder, Label, Mailbox } from "~/types";
 import { LogicalSendIdentity } from "~/lib/compose-send-identity";
+
+const InlineComposer = lazy(() => import("~/components/ComposeEmail"));
+
+function InlineComposerLoadingFallback() {
+	return (
+		<div
+			className="animate-pulse border-t-2 border-kumo-brand/40 px-4 py-5 space-y-3 md:px-6"
+			role="status"
+			aria-label="Opening the composer"
+		>
+			<div className="h-4 w-28 rounded bg-kumo-fill" />
+			<div className="h-11 w-full rounded bg-kumo-fill" />
+			<div className="h-32 w-full rounded bg-kumo-fill" />
+			<span className="sr-only">Opening the composer...</span>
+		</div>
+	);
+}
+
+function InlineComposerLoadError({
+	onRetry,
+	onCancel,
+}: {
+	onRetry: () => void;
+	onCancel: () => void;
+}) {
+	return (
+		<div
+			className="border-t-2 border-kumo-brand/40 px-4 py-5 md:px-6"
+			role="alert"
+		>
+			<p className="text-sm font-medium text-kumo-default">
+				The composer could not open
+			</p>
+			<p className="mt-1 text-sm text-kumo-subtle">
+				This conversation is intact. Try opening the composer again.
+			</p>
+			<div className="mt-3 flex flex-wrap gap-2">
+				<Button variant="primary" size="sm" className="min-h-11" onClick={onRetry}>
+					Try again
+				</Button>
+				<Button variant="ghost" size="sm" className="min-h-11" onClick={onCancel}>
+					Cancel reply
+				</Button>
+			</div>
+		</div>
+	);
+}
 
 function EmailPanelSkeleton() {
 	return (
@@ -79,7 +128,17 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		: undefined;
 	const hasAuthoritativeActivityMailbox =
 		activityMailboxType === "PERSONAL" || activityMailboxType === "SHARED";
-	const { closePanel, startCompose } = useUIStore();
+	const {
+		closePanel,
+		startCompose,
+		closeCompose,
+		isComposing,
+		composeOptions,
+		selectedEmailId,
+	} = useUIStore();
+	const isInlineComposing = isComposing &&
+		composeSurface(composeOptions, selectedEmailId) === "inline";
+	const [inlineComposerRetryKey, setInlineComposerRetryKey] = useState(0);
 	const toastManager = useKumoToastManager();
 	const [isSending, setIsSending] = useState(false);
 	const [isDrafting, setIsDrafting] = useState(false);
@@ -177,6 +236,16 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		target.focus({ preventScroll: true });
 		pendingMessageFocusRef.current = null;
 	}, [currentEmailId, allMessages.length, expandedMessages, email?.thread_id, threadRepliesFetched]);
+
+	// Closing the inline composer hands focus back to the message it answered,
+	// so the keyboard never lands on nothing.
+	const wasInlineComposingRef = useRef(false);
+	useEffect(() => {
+		if (wasInlineComposingRef.current && !isInlineComposing && newestMessageId) {
+			pendingMessageFocusRef.current = newestMessageId;
+		}
+		wasInlineComposingRef.current = isInlineComposing;
+	}, [isInlineComposing, newestMessageId]);
 
 	const focusMessage = (messageId: string) => {
 		pendingMessageFocusRef.current = messageId;
@@ -644,6 +713,21 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								bodyState={selectedBodyQuery}
 							/>
 					</div>
+				)}
+				{isInlineComposing && (
+					<LazyLoadBoundary
+						fallback={
+							<InlineComposerLoadError
+								onRetry={() => setInlineComposerRetryKey((key) => key + 1)}
+								onCancel={() => closeCompose()}
+							/>
+						}
+						resetKey={`${composeOptions.mode}:${composeOptions.originalEmail?.id ?? ""}:${inlineComposerRetryKey}`}
+					>
+						<Suspense fallback={<InlineComposerLoadingFallback />}>
+							<InlineComposer variant="inline" />
+						</Suspense>
+					</LazyLoadBoundary>
 				)}
 				{!isIntelligenceUnsupported && mailboxId && (
 					<ConversationIntelligenceCard

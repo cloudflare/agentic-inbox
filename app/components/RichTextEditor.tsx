@@ -42,6 +42,8 @@ interface RichTextEditorProps {
 	onInlineImages?: (files: File[]) => InlineImageInsertion[];
 	inlineImagePreviews?: Readonly<Record<string, string>>;
 	fileTransfersDisabled?: boolean;
+	/** Places the caret above any quoted or forwarded tail when the editor mounts. */
+	autoFocus?: boolean;
 }
 
 export default function RichTextEditor({
@@ -51,6 +53,7 @@ export default function RichTextEditor({
 	onInlineImages,
 	inlineImagePreviews = {},
 	fileTransfersDisabled = false,
+	autoFocus = false,
 }: RichTextEditorProps) {
 	const onFilesRef = useRef(onFiles);
 	onFilesRef.current = onFiles;
@@ -103,6 +106,7 @@ export default function RichTextEditor({
 	}, [insertInlineImages]);
 
 	const editor = useEditor({
+		autofocus: autoFocus ? "start" : false,
 		extensions: [
 			StarterKit,
 			Underline,

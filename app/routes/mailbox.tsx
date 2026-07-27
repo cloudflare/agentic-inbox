@@ -23,6 +23,7 @@ import {
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 import { hasComposeRecovery } from "~/lib/compose-recovery";
+import { composeSurface } from "~/lib/compose-surface";
 
 function confirmDiscardPendingCompose(hasValuableSeed: boolean): boolean {
 	return !hasValuableSeed && !hasComposeRecovery() || window.confirm(
@@ -163,7 +164,11 @@ export default function MailboxRoute() {
 		hydrateAgentPanel,
 		hydrateWorkspacePreferences,
 		closePanel,
+		selectedEmailId,
 	} = useUIStore();
+	// Replies compose inside the open thread; this modal owns every other target.
+	const isModalCompose =
+		isComposing && composeSurface(composeOptions, selectedEmailId) === "modal";
 	const hasValuableComposeSeed = Boolean(
 		composeOptions.initialTo ||
 		composeOptions.draftEmail &&
@@ -270,7 +275,7 @@ export default function MailboxRoute() {
 				</div>
 			)}
 
-			{isComposing ? (
+			{isModalCompose ? (
 					<LazyLoadBoundary
 						fallback={
 							<ComposeLoadError
@@ -279,7 +284,7 @@ export default function MailboxRoute() {
 								hasValuableSeed={hasValuableComposeSeed}
 							/>
 						}
-						resetKey={`${isComposing}:${composeRetryKey}`}
+						resetKey={`${isModalCompose}:${composeRetryKey}`}
 					>
 						<Suspense
 							fallback={
