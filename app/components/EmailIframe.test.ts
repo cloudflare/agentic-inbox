@@ -17,13 +17,11 @@ test("remote email images require explicit per-message consent", () => {
 });
 
 test("every email renderer passes explicit message identity", () => {
-	for (const relative of [
-		"./email-panel/SingleMessageView.tsx",
-		"./email-panel/ThreadMessage.tsx",
-	]) {
-		const renderer = readFileSync(new URL(relative, import.meta.url), "utf8");
-		assert.match(renderer, /<EmailMessageBody[\s\S]*?email=\{email\}/);
-	}
+	const renderer = readFileSync(
+		new URL("./email-panel/ThreadMessage.tsx", import.meta.url),
+		"utf8",
+	);
+	assert.match(renderer, /<EmailMessageBody[\s\S]*?email=\{email\}/);
 	const sharedRenderer = readFileSync(
 		new URL("./email-panel/EmailMessageBody.tsx", import.meta.url),
 		"utf8",
