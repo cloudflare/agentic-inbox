@@ -19,6 +19,18 @@ import {
 
 export type ComposeMode = "new" | "reply" | "reply-all" | "forward";
 
+/** One accepted send being watched through to a truthful outcome. */
+export type PendingSend = {
+	deliveryId: string;
+	/** The message the delivery places in Sent; scopes the outcome poll. */
+	emailId: string;
+	mailboxId: string;
+	scheduledFor?: string;
+	/** Replay copy from the enqueue policy, when it supersedes "Sending…". */
+	title?: string;
+	canUndo: boolean;
+};
+
 export interface ComposeOptions {
 	mode: ComposeMode;
 	/** Optional truthful recipient seed for a new message. */
@@ -83,6 +95,12 @@ interface UIState {
 	applyQueuedCompose: () => void;
 	cancelQueuedCompose: () => void;
 
+	// Accepted sends still waiting on a provider outcome. Held here, outside the
+	// composer, because the composer unmounts the moment a send is accepted.
+	pendingSends: PendingSend[];
+	trackSend: (send: PendingSend) => void;
+	resolveSend: (deliveryId: string) => void;
+
 	// Mobile sidebar
 	isSidebarOpen: boolean;
 	openSidebar: () => void;
@@ -138,6 +156,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 	_previousEmailId: null,
 	composeOptions: { mode: "new", originalEmail: null },
 	queuedCompose: null,
+	pendingSends: [],
 	isSidebarOpen: false,
 	// Start collapsed so the panel never hides content on first paint. The real
 	// preference is loaded client-side via hydrateAgentPanel() to avoid an SSR
@@ -171,6 +190,20 @@ export const useUIStore = create<UIState>((set, get) => ({
 		),
 
 	cancelQueuedCompose: () => set({ queuedCompose: null }),
+
+	trackSend: (send) =>
+		set((state) =>
+			state.pendingSends.some((held) => held.deliveryId === send.deliveryId)
+				? {}
+				: { pendingSends: [...state.pendingSends, send] },
+		),
+
+	resolveSend: (deliveryId) =>
+		set((state) => ({
+			pendingSends: state.pendingSends.filter(
+				(send) => send.deliveryId !== deliveryId,
+			),
+		})),
 
 	closePanel: () =>
 		set((state) =>

@@ -25,7 +25,7 @@ import { prefixedSubject } from "~/lib/compose-initialization";
 import { evaluateStoredDraftAttachments } from "~/lib/compose-attachment-policy";
 import { planComposeEnqueueResult } from "~/lib/outbound-enqueue-outcome";
 import api from "~/services/api";
-import { useAiDraftReply, useCancelOutboundDelivery, useDeleteEmail, useDiscardDraft, useEmail, useMoveEmail, useOutboundDeliveries, useReplyToEmail, useRestoreEmail, useSaveDraft, useSendEmail, useThreadReplies, useUpdateEmail } from "~/queries/emails";
+import { useAiDraftReply, useDeleteEmail, useDiscardDraft, useEmail, useMoveEmail, useOutboundDeliveries, useReplyToEmail, useRestoreEmail, useSaveDraft, useSendEmail, useThreadReplies, useUpdateEmail } from "~/queries/emails";
 import { buildEmailBodyQueryOptions } from "~/queries/email-body";
 import { useFolders } from "~/queries/folders";
 import { useMailbox, useMailboxes } from "~/queries/mailboxes";
@@ -33,7 +33,6 @@ import { useLabels, useMutateLabels } from "~/queries/labels";
 import { useUnsnooze } from "~/queries/snooze";
 import { useFollowUpReminders } from "~/queries/follow-up-reminders";
 import { useUIStore } from "~/hooks/useUIStore";
-import { useSendOutcomeToast } from "~/hooks/useSendOutcomeToast";
 import type { Email, Folder, Label, Mailbox } from "~/types";
 import { LogicalSendIdentity } from "~/lib/compose-send-identity";
 
@@ -62,7 +61,6 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const sendEmailMut = useSendEmail();
 	const replyMut = useReplyToEmail();
 	const saveDraftMut = useSaveDraft();
-	const cancelOutboundMut = useCancelOutboundDelivery();
 	const aiDraftMut = useAiDraftReply();
 	const mutateLabels = useMutateLabels();
 	const unsnooze = useUnsnooze();
@@ -87,11 +85,11 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		isComposing,
 		composeOptions,
 		selectedEmailId,
+		trackSend,
 	} = useUIStore();
 	const isInlineComposing = isComposing &&
 		composeSurface(composeOptions, selectedEmailId) === "inline";
 	const toastManager = useKumoToastManager();
-	const { beginSendWatch } = useSendOutcomeToast(mailboxId);
 	const [isSending, setIsSending] = useState(false);
 	const [isDrafting, setIsDrafting] = useState(false);
 	const draftSendIdentityRef = useRef(new LogicalSendIdentity());
@@ -455,24 +453,15 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				toastManager.add({ title: message, variant: "error" });
 				return;
 			}
-			beginSendWatch({
+			// Handed to the mailbox-level watcher: this panel closes on the next line
+			// when sending from Drafts, so it cannot see the delivery settle.
+			trackSend({
 				deliveryId: result.deliveryId,
 				emailId: result.id,
-				scheduledFor: result.scheduledFor,
+				mailboxId,
+				scheduledFor: result.scheduledFor ?? undefined,
 				title: enqueuePlan.title,
 				canUndo: enqueuePlan.canUndo,
-				onUndo: () =>
-					cancelOutboundMut.mutate(
-						{ mailboxId, deliveryId: result.deliveryId },
-						{
-							onSuccess: () => toastManager.add({ title: "Send cancelled" }),
-							onError: (error) =>
-								toastManager.add({
-									title: error instanceof Error ? error.message : "Could not cancel send",
-									variant: "error",
-								}),
-						},
-					),
 			});
 			if (isDraftFolder) closePanel();
 		} catch (err) {

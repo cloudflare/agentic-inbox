@@ -136,8 +136,8 @@ test("terminal delivery replay never closes as a fresh queue and safe resend ren
 	);
 	assert.match(
 		form,
-		/beginSendWatch\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id/,
-		"an accepted send must be watched to a truthful outcome, not announced and abandoned",
+		/trackSend\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id[\s\S]*?mailboxId: composeMailboxId/,
+		"an accepted send must outlive this composer, which finishClose unmounts on the next line",
 	);
 	assert.doesNotMatch(form, /Submitting email/);
 });

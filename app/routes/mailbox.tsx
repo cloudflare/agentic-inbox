@@ -12,6 +12,7 @@ import Header from "~/components/Header";
 import LazyLoadBoundary from "~/components/LazyLoadBoundary";
 import MailKeyboardController from "~/components/MailKeyboardController";
 import MailCommandPalette from "~/components/MailCommandPalette";
+import SendOutcomeWatcher from "~/components/SendOutcomeWatcher";
 import Sidebar from "~/components/Sidebar";
 import { useMailNotifications } from "~/hooks/useMailNotifications";
 import { useRebindExistingPushSubscription } from "~/hooks/pwa/usePushSubscription";
@@ -209,6 +210,7 @@ export default function MailboxRoute() {
 		<div className="flex h-screen overflow-hidden">
 			<MailKeyboardController />
 			<MailCommandPalette />
+			<SendOutcomeWatcher />
 			{/* Mobile sidebar overlay backdrop */}
 			{isSidebarOpen && (
 				<div

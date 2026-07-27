@@ -23,14 +23,14 @@ export type SendOutcome =
 
 export type ResolvedSendOutcome = Exclude<SendOutcome, "pending" | "cancelled">;
 
-export interface SendToastCopy {
+export type SendToastCopy = {
 	title: string;
 	variant?: "error";
 	/** A zero timeout keeps the toast up until the user dismisses it. */
 	timeout: number;
 	/** Whether the toast should offer the Outbox as the recovery route. */
 	openOutbox: boolean;
-}
+};
 
 export function resolveSendOutcome({
 	status,

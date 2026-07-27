@@ -25,8 +25,13 @@ test("Send Draft keeps blocked terminal outcomes open and only exposes policy-ap
 	assert.match(panel, /canUndo: enqueuePlan\.canUndo/);
 	assert.match(
 		panel,
-		/beginSendWatch\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id/,
-		"the draft-send path must share the compose send toast lifecycle",
+		/trackSend\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id[\s\S]*?mailboxId,/,
+		"the draft-send path must hand the send to the mailbox-level watcher",
+	);
+	assert.doesNotMatch(
+		panel,
+		/useCancelOutboundDelivery/,
+		"this panel closes on send, so it must not own the undo callbacks",
 	);
 	assert.match(
 		panel,

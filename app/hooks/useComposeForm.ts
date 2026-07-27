@@ -17,7 +17,6 @@ import {
   toEmailListValue,
 } from "~/lib/utils";
 import {
-  useCancelOutboundDelivery,
   useDiscardDraft,
   useForwardEmail,
   useReplyToEmail,
@@ -28,7 +27,6 @@ import { useMailbox } from "~/queries/mailboxes";
 import { useMailboxSignatureSettings } from "~/queries/mailbox-signature-settings";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useAttachments } from "~/hooks/useAttachments";
-import { useSendOutcomeToast } from "~/hooks/useSendOutcomeToast";
 import type { AttachmentRef, OutboundEnqueueResponse } from "~/types";
 import { LogicalSendIdentity } from "~/lib/compose-send-identity";
 import { planComposeEnqueueResult } from "~/lib/outbound-enqueue-outcome";
@@ -97,7 +95,7 @@ type PendingMissingAttachment = {
 
 export function useComposeForm(mailboxId?: string, _folder?: string) {
   const toastManager = useKumoToastManager();
-  const { composeOptions, closeCompose } = useUIStore();
+  const { composeOptions, closeCompose, trackSend } = useUIStore();
   const recoveryAtMountRef = useRef(peekComposeRecovery());
   const composeMailboxIdRef = useRef(
 		recoveryAtMountRef.current?.mailboxId ?? mailboxId,
@@ -106,7 +104,6 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
     composeMailboxIdRef.current = mailboxId;
   }
   const composeMailboxId = composeMailboxIdRef.current ?? mailboxId;
-  const { beginSendWatch } = useSendOutcomeToast(composeMailboxId);
   const mailboxChanged = Boolean(
     composeMailboxId && mailboxId && composeMailboxId !== mailboxId,
   );
@@ -125,7 +122,6 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
   const discardDraftMutation = useDiscardDraft();
   const replyMutation = useReplyToEmail();
   const forwardMutation = useForwardEmail();
-  const cancelOutboundMutation = useCancelOutboundDelivery();
   const {
     attachments,
     addFiles,
@@ -940,27 +936,15 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 				toastManager.add({ title: message, variant: "error" });
 				return;
 			}
-      beginSendWatch({
+      // Handed to the mailbox-level watcher: this composer unmounts on the very
+      // next line, so it can never see the delivery reach its outcome.
+      trackSend({
         deliveryId: result.deliveryId,
         emailId: result.id,
-        scheduledFor: result.scheduledFor,
+        mailboxId: composeMailboxId,
+        scheduledFor: result.scheduledFor ?? undefined,
         title: enqueuePlan.title,
         canUndo: enqueuePlan.canUndo,
-        onUndo: () =>
-          cancelOutboundMutation.mutate(
-            { mailboxId: composeMailboxId, deliveryId: result.deliveryId },
-            {
-              onSuccess: () => toastManager.add({ title: "Send cancelled" }),
-              onError: (cancelError) =>
-                toastManager.add({
-                  title:
-                    cancelError instanceof Error
-                      ? cancelError.message
-                      : "Could not cancel send",
-                  variant: "error",
-                }),
-            },
-          ),
       });
       finishClose();
     } catch (sendError) {
