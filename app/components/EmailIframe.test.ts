@@ -60,13 +60,37 @@ test("only images the reader can actually reveal offer the opt-in", () => {
 	// <img> walk runs too early to see, so the <source> walk clears the mark.
 	assert.match(
 		source,
-		/\} else if \(remoteSourceSet\) \{[\s\S]*?const drawn = picture\?\.querySelector\("img"\);[\s\S]*?drawn\.removeAttribute\("data-remote-image-blocked"\);[\s\S]*?drawn\.setAttribute\("data-remote-image-drawn", "true"\);/,
+		/\} else if \(remoteSourceSet && sourceCanDraw\(source\)\) \{[\s\S]*?const drawn = picture\?\.querySelector\("img"\);[\s\S]*?drawn\.removeAttribute\("data-remote-image-blocked"\);[\s\S]*?drawn\.setAttribute\("data-remote-image-drawn", "true"\);/,
 	);
 	// Only ever reached under the opt-in: the branch above claims every
 	// remote-srcset source while loadRemoteImages is false.
 	assert.match(
 		source,
 		/if \(cidOwned \|\| \(remoteSourceSet && !loadRemoteImages\)\) \{\s*source\.removeAttribute\("srcset"\);/,
+	);
+	// A source the picture can never select draws nothing, so surviving the
+	// opt-in is not on its own proof the image renders.
+	assert.match(source, /} else if \(remoteSourceSet && sourceCanDraw\(source\)\) \{/);
+	assert.match(source, /if \(!window\.matchMedia\(media\)\.matches\) return false;/);
+	assert.match(source, /return !type \|\| DRAWABLE_IMAGE_TYPES\.has\(type\);/);
+	// Fails closed: an unparseable media query leaves the image blocked.
+	assert.match(source, /\} catch \{\s*return false;\s*\}/);
+});
+
+test("sender markup cannot forge the internal image markers", () => {
+	// DOMPurify allows data-* through by default, so these have to be cleared
+	// from sanitized sender HTML before policy stamps them.
+	assert.match(
+		source,
+		/querySelectorAll\(\s*"\[data-remote-image-blocked\], \[data-remote-image-drawn\]",\s*\)/,
+	);
+	assert.match(source, /forged\.removeAttribute\("data-remote-image-blocked"\)/);
+	assert.match(source, /forged\.removeAttribute\("data-remote-image-drawn"\)/);
+	// Cleared before the walks that re-stamp them, never after.
+	assert.ok(
+		source.indexOf('"[data-remote-image-blocked], [data-remote-image-drawn]"') <
+			source.indexOf('for (const image of template.content.querySelectorAll("img"))'),
+		"forged markers must be cleared before the img walk applies policy",
 	);
 	assert.match(source, /if \(sourceKind === "loadable" \|\| remoteSourceSet\)/);
 	assert.match(source, /setHasRemoteImages\(togglesRemoteImages\)/);

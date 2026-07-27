@@ -63,6 +63,41 @@ function sourceSetContainsRemoteImage(value: string): boolean {
 	return /(?:^|,)\s*(?:https?:)?\/\//i.test(value);
 }
 
+const DRAWABLE_IMAGE_TYPES: ReadonlySet<string> = new Set([
+	"image/apng",
+	"image/avif",
+	"image/gif",
+	"image/jpeg",
+	"image/png",
+	"image/svg+xml",
+	"image/webp",
+]);
+
+/**
+ * Whether a `<picture>` source the reader opted into could actually be the
+ * candidate the browser picks. One the picture can never select - a `media`
+ * query that does not match, or a format with no decoder - draws nothing, so
+ * treating it as proof the image renders would clear the `<img>`'s blocked mark
+ * and reveal an empty alt box instead of a picture. Fails closed.
+ *
+ * ponytail: matched against the parent window, not the srcdoc frame, so a
+ * width-based query is judged at the wrong viewport. `prefers-color-scheme`
+ * (the realistic case) is identical in both. Evaluate inside the frame if a
+ * width-conditional source ever matters.
+ */
+function sourceCanDraw(source: Element): boolean {
+	const media = source.getAttribute("media")?.trim();
+	if (media) {
+		try {
+			if (!window.matchMedia(media).matches) return false;
+		} catch {
+			return false;
+		}
+	}
+	const type = source.getAttribute("type")?.trim().toLowerCase();
+	return !type || DRAWABLE_IMAGE_TYPES.has(type);
+}
+
 /**
  * How the srcdoc document can treat an `<img src>`:
  * - `null` — nothing to do. `cid:` is served over the inline-image bridge,
@@ -319,6 +354,16 @@ export default function EmailIframe({
 
 		const template = document.createElement("template");
 		template.innerHTML = cleanBody;
+		// DOMPurify allows data-* through by default, so a sender can ship these
+		// internal markers themselves and forge the rendering contract - claiming
+		// an image is already drawn, or blocking one to hide content. They mean
+		// nothing until the walks below stamp them from actual policy.
+		for (const forged of template.content.querySelectorAll(
+			"[data-remote-image-blocked], [data-remote-image-drawn]",
+		)) {
+			forged.removeAttribute("data-remote-image-blocked");
+			forged.removeAttribute("data-remote-image-drawn");
+		}
 		const referencedCids: string[] = [];
 		const cidPictures = new Set<Element>();
 		// Set by the same walk that strips, so the privacy banner offers "Load
@@ -374,7 +419,7 @@ export default function EmailIframe({
 			if (remoteSourceSet) togglesRemoteImages = true;
 			if (cidOwned || (remoteSourceSet && !loadRemoteImages)) {
 				source.removeAttribute("srcset");
-			} else if (remoteSourceSet) {
+			} else if (remoteSourceSet && sourceCanDraw(source)) {
 				// This <source> survived the opt-in, so the picture still draws even
 				// though the <img>'s own unloadable src blocked it above: that walk
 				// runs first and cannot see a sibling. Reaching here at all means
