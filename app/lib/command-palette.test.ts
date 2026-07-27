@@ -78,3 +78,21 @@ test("Cmd/Ctrl+K never opens while typing, composing, or using unrelated modifie
 	assert.equal(shouldOpenMailCommandPalette({ ...base, altKey: true }), false);
 	assert.equal(shouldOpenMailCommandPalette({ ...base, key: "j" }), false);
 });
+
+test("palette offers the star and snooze commands the list already handles", () => {
+	const inbox = buildMailPaletteCommands({ folderId: "inbox", hasSelectedMessage: true });
+	assert.ok(inbox.some((command) => command.id === "toggle-star"));
+	assert.ok(inbox.some((command) => command.id === "snooze"));
+
+	// Snoozed mail returns instead of snoozing again.
+	const snoozed = buildMailPaletteCommands({ folderId: "snoozed", hasSelectedMessage: true });
+	assert.ok(snoozed.some((command) => command.id === "unsnooze"));
+	assert.ok(!snoozed.some((command) => command.id === "snooze"));
+
+	// Sent mail can be starred but never snoozed; the Outbox stays action-free.
+	const sent = buildMailPaletteCommands({ folderId: "sent", hasSelectedMessage: true });
+	assert.ok(sent.some((command) => command.id === "toggle-star"));
+	assert.ok(!sent.some((command) => command.id === "snooze"));
+	const outbox = buildMailPaletteCommands({ folderId: "outbox", hasSelectedMessage: true });
+	assert.ok(!outbox.some((command) => command.id === "toggle-star"));
+});

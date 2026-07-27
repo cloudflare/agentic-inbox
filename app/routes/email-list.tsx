@@ -63,6 +63,7 @@ import {
 	shouldLoadOutboundState,
 } from "~/lib/outbound-folder-state";
 import {
+	canSnoozeFromFolder,
 	reconcileSnoozedSelection,
 	snoozeScopeAffectsRow,
 	type SnoozedSelectionTracker,
@@ -420,21 +421,6 @@ function deliveryBadgeClass(status: OutboundDelivery["status"]) {
 		return "bg-kumo-brand/10 text-kumo-brand";
 	}
 	return "bg-kumo-fill text-kumo-subtle";
-}
-
-function canSnoozeFromFolder(folderId: string | undefined): boolean {
-	return Boolean(
-		folderId &&
-			!folderId.startsWith("_") &&
-			!new Set<string>([
-				Folders.SNOOZED,
-				Folders.SENT,
-				Folders.DRAFT,
-				Folders.OUTBOX,
-				Folders.TRASH,
-				Folders.SPAM,
-			]).has(folderId),
-	);
 }
 
 function snoozeReturnLabel(value: string | null | undefined): string | null {

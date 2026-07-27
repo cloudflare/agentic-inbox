@@ -35,6 +35,7 @@ const SHORTCUT_GROUPS: ReadonlyArray<{
 			["S", "Star / unstar"],
 			["Z", "Snooze / return"],
 			["/", "Search"],
+			["⌘K / Ctrl K", "Open the command palette"],
 		],
 	},
 	{

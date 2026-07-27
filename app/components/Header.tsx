@@ -291,6 +291,16 @@ export default function Header() {
 					/>
 					<DropdownMenu.Content align="end">
 						<DropdownMenu.Label>Mail actions</DropdownMenu.Label>
+						{/* The ⌘K trigger is xl-only, so keep the palette reachable here. */}
+						<DropdownMenu.Item
+							icon={CommandIcon}
+							className="min-h-11"
+							onSelect={() =>
+								window.dispatchEvent(new Event(MAIL_COMMAND_PALETTE_OPEN_EVENT))
+							}
+						>
+							Command palette
+						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							icon={RobotIcon}
 							className="min-h-11"
