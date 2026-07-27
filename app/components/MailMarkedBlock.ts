@@ -39,7 +39,13 @@ export const MailMarkedBlock = Node.create({
 	name: "mailMarkedBlock",
 	group: "block",
 	content: "block+",
+	// `defining` keeps the wrapper when content is replaced or pasted into it.
+	// It does NOT protect the boundary: TipTap binds Backspace to joinBackward,
+	// and ProseMirror's deleteBarrier consults `isolating` alone, so one
+	// Backspace at the first character used to unwrap the block and take the
+	// marker and styling with it. Both are needed, they guard different things.
 	defining: true,
+	isolating: true,
 
 	addAttributes() {
 		return {

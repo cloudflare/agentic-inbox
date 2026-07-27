@@ -8,6 +8,10 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getSchema } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import { EditorState, NodeSelection, TextSelection } from "@tiptap/pm/state";
+import { joinBackward, joinForward } from "@tiptap/pm/commands";
 import { MailMarkedBlock } from "./MailMarkedBlock.ts";
 import {
 	buildInitialComposeFields,
@@ -161,4 +165,86 @@ test("the schema covers the exact markers the compose bodies write", () => {
 		rules.some((rule) => rule.tag.includes(`[${QUOTED_REPLY_ATTRIBUTE}]`)),
 		"older drafts still contain quote blocks and must survive an edit",
 	);
+});
+
+// ── Editing the boundary ──────────────────────────────────────────────
+//
+// Schema-level assertions above cannot see what a keystroke does. These build
+// the real ProseMirror schema and run the very commands TipTap binds, which
+// needs no DOM: only EditorView does.
+
+const schema = getSchema([StarterKit, MailMarkedBlock]);
+
+function documentWithBlock(marker = MAIL_SIGNATURE_ATTRIBUTE) {
+	return schema.node("doc", null, [
+		schema.node("paragraph", null, [schema.text("My reply")]),
+		schema.nodes.mailMarkedBlock.create(
+			{ marker, style: "color: #666;" },
+			[schema.node("paragraph", null, [schema.text("Hesham")])],
+		),
+		schema.node("paragraph", null, [schema.text("after")]),
+	]);
+}
+
+function markedBlocks(doc: import("@tiptap/pm/model").Node) {
+	const found: string[] = [];
+	doc.descendants((node) => {
+		if (node.type.name === "mailMarkedBlock") found.push(node.attrs.marker);
+	});
+	return found;
+}
+
+function runAt(position: number, command: typeof joinBackward) {
+	let state = EditorState.create({ doc: documentWithBlock(), schema });
+	state = state.apply(
+		state.tr.setSelection(TextSelection.create(state.doc, position)),
+	);
+	command(state, (tr) => {
+		state = state.apply(tr);
+	});
+	return state;
+}
+
+/** Offset of the first text position inside the marked block. */
+const insideBlockStart = documentWithBlock().child(0).nodeSize + 2;
+
+test("Backspace at the block's first character cannot dissolve the wrapper", () => {
+	// TipTap's Keymap routes Backspace to joinBackward, and ProseMirror's
+	// deleteBarrier honours `isolating` alone - `defining` does not stop it. One
+	// Backspace here used to unwrap the block, taking the marker and the style
+	// with it and leaving compose-signature unable to find the block again.
+	const state = runAt(insideBlockStart, joinBackward);
+	assert.deepEqual(markedBlocks(state.doc), [MAIL_SIGNATURE_ATTRIBUTE]);
+	assert.equal(schema.nodes.mailMarkedBlock.spec.isolating, true);
+});
+
+test("forward Delete at the block's last character cannot dissolve it either", () => {
+	// The mirror image of the same barrier, which joinForward also routes through.
+	const doc = documentWithBlock();
+	const blockEnd = doc.child(0).nodeSize + doc.child(1).nodeSize - 2;
+	const state = runAt(blockEnd, joinForward);
+	assert.deepEqual(markedBlocks(state.doc), [MAIL_SIGNATURE_ATTRIBUTE]);
+});
+
+test("the reader can still select the whole block and delete it outright", () => {
+	// Isolating protects the boundary, not the block: an explicit selection over
+	// it must still remove it, or the quote becomes impossible to get rid of.
+	let state = EditorState.create({ doc: documentWithBlock(), schema });
+	state = state.apply(
+		state.tr.setSelection(
+			NodeSelection.create(state.doc, state.doc.child(0).nodeSize),
+		),
+	);
+	state = state.apply(state.tr.deleteSelection());
+	assert.deepEqual(markedBlocks(state.doc), []);
+});
+
+test("a caret can still be placed in the paragraph after a marked block", () => {
+	// Gapcursor ships with StarterKit, but the block is followed by a real
+	// paragraph here: plain text positions after it must stay reachable.
+	const doc = documentWithBlock();
+	const afterBlock = doc.child(0).nodeSize + doc.child(1).nodeSize + 1;
+	const selection = TextSelection.create(doc, afterBlock);
+	assert.equal(selection.$from.parent.type.name, "paragraph");
+	assert.equal(selection.$from.parent.textContent, "after");
 });
