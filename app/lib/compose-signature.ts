@@ -1,6 +1,14 @@
-export const MAIL_SIGNATURE_MARKER = 'data-mail-signature="v1"';
-export const FORWARDED_MESSAGE_MARKER = 'data-mail-forwarded-message="v1"';
-export const QUOTED_REPLY_MARKER = 'data-mail-quoted-reply="v1"';
+// The blocks compose seeds and then has to find again. The attribute names are
+// exported separately because the editor schema matches on the bare attribute,
+// while the body builders write the whole `name="value"` pair inline.
+export const MAIL_BLOCK_VERSION = "v1";
+export const MAIL_SIGNATURE_ATTRIBUTE = "data-mail-signature";
+export const FORWARDED_MESSAGE_ATTRIBUTE = "data-mail-forwarded-message";
+export const QUOTED_REPLY_ATTRIBUTE = "data-mail-quoted-reply";
+
+export const MAIL_SIGNATURE_MARKER = `${MAIL_SIGNATURE_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
+export const FORWARDED_MESSAGE_MARKER = `${FORWARDED_MESSAGE_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
+export const QUOTED_REPLY_MARKER = `${QUOTED_REPLY_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
 
 export type ComposeSignatureMode =
 	| "new"

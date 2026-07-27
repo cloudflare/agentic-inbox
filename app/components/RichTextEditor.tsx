@@ -33,6 +33,7 @@ import {
 	type InlineImageInsertion,
 } from "~/lib/compose-inline-images";
 import { InlineImagePreviewRegistry } from "~/lib/inline-image-preview-registry";
+import { MailMarkedBlock } from "./MailMarkedBlock";
 import { ManagedInlineImage } from "./ManagedInlineImage";
 
 interface RichTextEditorProps {
@@ -109,6 +110,7 @@ export default function RichTextEditor({
 		autofocus: autoFocus ? "start" : false,
 		extensions: [
 			StarterKit,
+			MailMarkedBlock,
 			Underline,
 			TextAlign.configure({ types: ["heading", "paragraph"] }),
 			LinkExtension.configure({ openOnClick: false }),
