@@ -54,7 +54,8 @@ export function splitRecipientValues(value: string): string[] {
 	return value.split(",").map((entry) => entry.trim()).filter(Boolean);
 }
 
-function normalizedAddress(value: string): string {
+/** Compare addresses by the bare mailbox part, so `A Name <a@x>` equals `a@x`. */
+export function normalizedAddress(value: string): string {
 	const trimmed = value.trim();
 	const bracketed = trimmed.match(/<([^<>]+)>\s*$/)?.[1];
 	return (bracketed ?? trimmed).trim().toLowerCase();

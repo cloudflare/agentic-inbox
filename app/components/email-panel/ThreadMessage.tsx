@@ -12,6 +12,7 @@ import {
 	TrashIcon,
 } from "@phosphor-icons/react";
 import EmailAttachmentList from "~/components/EmailAttachmentList";
+import { normalizedAddress } from "~/lib/recipient-input";
 import {
 	formatDetailDate,
 	formatShortDate,
@@ -71,7 +72,9 @@ export default function ThreadMessage({
 	onPreviewImage,
 	bodyState,
 }: ThreadMessageProps) {
-	const isSelf = email.sender === mailboxEmail;
+	const normalizedMailbox = normalizedAddress(mailboxEmail ?? "");
+	const isSelf = normalizedMailbox !== "" &&
+		normalizedAddress(email.sender) === normalizedMailbox;
 	const containerClassName = `${!isLast ? "border-b border-kumo-line" : ""} ${isDraft ? "border-l-2 border-l-kumo-warning bg-kumo-warning/[0.02]" : ""}`;
 	const senderLabel = isDraft ? "Draft reply" : isSelf ? "You" : email.sender;
 

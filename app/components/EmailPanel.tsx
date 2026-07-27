@@ -20,6 +20,7 @@ import ConversationActivity from "~/components/ConversationActivity";
 import SnoozeDialog from "~/components/SnoozeDialog";
 import { FollowUpReminderControl } from "~/components/FollowUpReminderDialog";
 import { splitEmailList, toEmailListValue } from "~/lib/utils";
+import { normalizedAddress } from "~/lib/recipient-input";
 import { evaluateStoredDraftAttachments } from "~/lib/compose-attachment-policy";
 import { planComposeEnqueueResult } from "~/lib/outbound-enqueue-outcome";
 import api from "~/services/api";
@@ -109,9 +110,10 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		return threadRepliesRaw.filter((e) => e.id !== email.id);
 	}, [threadRepliesRaw, email]);
 
+	// A thread reads like a chat: oldest at the top, newest at the bottom.
 	const allMessages = useMemo(() => {
 		if (!email) return [];
-		return [email, ...threadReplies].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+		return [email, ...threadReplies].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 	}, [email, threadReplies]);
 	const activeExternalBodyIds = useMemo(() => {
 		if (!email) return [];
@@ -146,11 +148,22 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	);
 
 	const currentEmailId = email?.id;
+	const newestMessageId = allMessages.at(-1)?.id;
+	const seededSelectionRef = useRef<string | null>(null);
 	useEffect(() => {
 		if (!currentEmailId) return;
 		pendingMessageFocusRef.current = currentEmailId;
+		seededSelectionRef.current = null;
 		setExpandedMessages(new Set([currentEmailId]));
 	}, [currentEmailId]);
+	// The newest message joins the opened one exactly once per selection, so a
+	// reply arriving later never re-collapses what the reader has opened.
+	useEffect(() => {
+		if (!currentEmailId || !newestMessageId) return;
+		if (seededSelectionRef.current === currentEmailId) return;
+		seededSelectionRef.current = currentEmailId;
+		setExpandedMessages((current) => new Set(current).add(newestMessageId));
+	}, [currentEmailId, newestMessageId]);
 	useEffect(() => {
 		const pendingId = pendingMessageFocusRef.current;
 		const container = conversationScrollRef.current;
@@ -178,13 +191,18 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		return ids;
 	}, [allMessages, isDraftFolder, emailId]);
 
+	// Route-level mailboxId is often the address itself, so it is a truthful
+	// fallback while the mailbox record loads. Unresolved means nothing is self.
+	const selfAddress = normalizedAddress(currentMailbox?.email ?? mailboxId ?? "");
 	const lastReceivedMessage = useMemo(() => {
-		const ce = currentMailbox?.email;
-		const received = allMessages.filter((msg) => !draftMessageIds.has(msg.id) && msg.sender !== ce);
-		if (received.length > 0) return received[0];
+		const received = allMessages.filter(
+			(msg) => !draftMessageIds.has(msg.id) &&
+				normalizedAddress(msg.sender) !== selfAddress,
+		);
+		if (received.length > 0) return received.at(-1);
 		const nonDrafts = allMessages.filter((msg) => !draftMessageIds.has(msg.id));
-		return nonDrafts.length > 0 ? nonDrafts[0] : email;
-	}, [allMessages, draftMessageIds, currentMailbox?.email, email]);
+		return nonDrafts.at(-1) ?? email;
+	}, [allMessages, draftMessageIds, selfAddress, email]);
 
 	const moveToFolders = useMemo(() => {
 		const cur = folder || email?.folder_id;
