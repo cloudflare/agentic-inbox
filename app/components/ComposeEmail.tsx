@@ -824,22 +824,24 @@ export default function ComposeEmail() {
                       }
                     />
                     <DropdownMenu.Content>
-                      <DropdownMenu.Label>Send later</DropdownMenu.Label>
-                      {sendLaterPresets.map((preset) => (
-                        <DropdownMenu.Item
-                          key={preset.id}
-                          icon={ClockIcon}
-                          className="min-h-11"
-                          onSelect={() => choosePreset(preset.date)}
-                        >
-                          <span className="flex min-w-0 flex-col">
-                            <span className="font-medium">{preset.title}</span>
-                            <span className="text-xs text-kumo-subtle">
-                              {formatScheduledTime(preset.date)}
+                      <DropdownMenu.Group>
+                        <DropdownMenu.Label>Send later</DropdownMenu.Label>
+                        {sendLaterPresets.map((preset) => (
+                          <DropdownMenu.Item
+                            key={preset.id}
+                            icon={ClockIcon}
+                            className="min-h-11"
+                            onSelect={() => choosePreset(preset.date)}
+                          >
+                            <span className="flex min-w-0 flex-col">
+                              <span className="font-medium">{preset.title}</span>
+                              <span className="text-xs text-kumo-subtle">
+                                {formatScheduledTime(preset.date)}
+                              </span>
                             </span>
-                          </span>
-                        </DropdownMenu.Item>
-                      ))}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Group>
                       <DropdownMenu.Separator />
                       <DropdownMenu.Item
                         className="min-h-11"

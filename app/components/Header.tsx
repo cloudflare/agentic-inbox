@@ -290,68 +290,70 @@ export default function Header() {
 						}
 					/>
 					<DropdownMenu.Content align="end">
-						<DropdownMenu.Label>Mail actions</DropdownMenu.Label>
-						{/* The ⌘K trigger is xl-only, so keep the palette reachable here. */}
-						<DropdownMenu.Item
-							icon={CommandIcon}
-							className="min-h-11"
-							onSelect={() =>
-								window.dispatchEvent(new Event(MAIL_COMMAND_PALETTE_OPEN_EVENT))
-							}
-						>
-							Command palette
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							icon={RobotIcon}
-							className="min-h-11"
-							onSelect={toggleAgentPanel}
-						>
-							{isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							icon={GearSixIcon}
-							className="min-h-11"
-							onSelect={() =>
-								navigate(
-									isSettingsActive
-										? `/mailbox/${mailboxId}/emails/inbox`
-										: `/mailbox/${mailboxId}/settings`,
-								)
-							}
-						>
-							{isSettingsActive ? "Back to inbox" : "Settings"}
-						</DropdownMenu.Item>
-						{quizEnabled && (
+						<DropdownMenu.Group>
+							<DropdownMenu.Label>Mail actions</DropdownMenu.Label>
+							{/* The ⌘K trigger is xl-only, so keep the palette reachable here. */}
 							<DropdownMenu.Item
-								icon={ExamIcon}
+								icon={CommandIcon}
+								className="min-h-11"
+								onSelect={() =>
+									window.dispatchEvent(new Event(MAIL_COMMAND_PALETTE_OPEN_EVENT))
+								}
+							>
+								Command palette
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								icon={RobotIcon}
+								className="min-h-11"
+								onSelect={toggleAgentPanel}
+							>
+								{isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								icon={GearSixIcon}
+								className="min-h-11"
+								onSelect={() =>
+									navigate(
+										isSettingsActive
+											? `/mailbox/${mailboxId}/emails/inbox`
+											: `/mailbox/${mailboxId}/settings`,
+									)
+								}
+							>
+								{isSettingsActive ? "Back to inbox" : "Settings"}
+							</DropdownMenu.Item>
+							{quizEnabled && (
+								<DropdownMenu.Item
+									icon={ExamIcon}
+									className="min-h-11"
+									onSelect={() => {
+										window.location.href = me?.role === "ADMIN" ? "/admin/quizzes" : "/quizzes";
+									}}
+								>
+									Quizzes
+								</DropdownMenu.Item>
+							)}
+							<DropdownMenu.Item
+								icon={PaperPlaneTiltIcon}
 								className="min-h-11"
 								onSelect={() => {
-									window.location.href = me?.role === "ADMIN" ? "/admin/quizzes" : "/quizzes";
+									window.location.href = "/bulk";
 								}}
 							>
-								Quizzes
+								Bulk send
 							</DropdownMenu.Item>
-						)}
-						<DropdownMenu.Item
-							icon={PaperPlaneTiltIcon}
-							className="min-h-11"
-							onSelect={() => {
-								window.location.href = "/bulk";
-							}}
-						>
-							Bulk send
-						</DropdownMenu.Item>
-						{me?.role === "ADMIN" && (
-							<DropdownMenu.Item
-								icon={ShieldCheckIcon}
-								className="min-h-11"
-								onSelect={() => {
-									window.location.href = "/admin/users";
-								}}
-							>
-								Admin
-							</DropdownMenu.Item>
-						)}
+							{me?.role === "ADMIN" && (
+								<DropdownMenu.Item
+									icon={ShieldCheckIcon}
+									className="min-h-11"
+									onSelect={() => {
+										window.location.href = "/admin/users";
+									}}
+								>
+									Admin
+								</DropdownMenu.Item>
+							)}
+						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Item
 							icon={SignOutIcon}
