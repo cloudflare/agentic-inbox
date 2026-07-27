@@ -111,7 +111,7 @@ export default function HomeRoute() {
 		setIsCreating(true);
 		try {
 			await createMailbox.mutateAsync({ email, name });
-			toastManager.add({ title: "Mailbox created successfully!" });
+			toastManager.add({ title: "Mailbox created" });
 			setIsCreateOpen(false);
 			setNewPrefix("");
 			setNewName("");

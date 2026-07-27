@@ -79,7 +79,7 @@ test("send copy is specific and never describes a queue", () => {
 	assert.equal(sendPendingToast().title, "Sending…");
 	assert.equal(sendPendingToast().timeout, 0, "pending must outlive the undo window");
 	assert.equal(sendOutcomeToast("sent").title, "Sent");
-	assert.match(sendOutcomeToast("failed").title, /^Couldn't send/);
+	assert.match(sendOutcomeToast("failed").title, /^Couldn’t send/);
 	assert.match(sendOutcomeToast("unclear").title, /^Send status unclear/);
 	assert.match(sendOutcomeToast("timeout").title, /^Still sending/);
 	for (const copy of [

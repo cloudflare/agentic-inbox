@@ -118,7 +118,7 @@ export default function EmailPanelToolbar({
 						onClick={onSendDraft}
 						loading={isSending}
 					>
-						{isSending ? "Sending..." : "Send"}
+						{isSending ? "Sending…" : "Send"}
 					</Button>
 					<Button
 						variant="secondary"

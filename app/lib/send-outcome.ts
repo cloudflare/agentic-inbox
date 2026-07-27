@@ -88,7 +88,7 @@ export function sendOutcomeToast(outcome: ResolvedSendOutcome): SendToastCopy {
 			return { title: "Sent", timeout: 4_000, openOutbox: false };
 		case "failed":
 			return {
-				title: "Couldn't send — open Outbox",
+				title: "Couldn’t send — open Outbox",
 				variant: "error",
 				timeout: 0,
 				openOutbox: true,

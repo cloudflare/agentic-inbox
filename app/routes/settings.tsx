@@ -113,7 +113,7 @@ export default function SettingsRoute() {
 		};
 		try {
 			await updateMailboxMutation.mutateAsync({ mailboxId, settings });
-			toastManager.add({ title: "Settings saved!" });
+			toastManager.add({ title: "Settings saved" });
 		} catch {
 			toastManager.add({
 				title: "Failed to save settings",
@@ -243,7 +243,7 @@ export default function SettingsRoute() {
 					/>
 					<p className="text-xs text-kumo-subtle mt-2">
 						The prompt is sent as the system message to the AI model.
-						It controls the agent's personality, writing style, and behavior rules.
+						It controls the agent’s personality, writing style, and behavior rules.
 					</p>
 				</div>
 

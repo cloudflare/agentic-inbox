@@ -105,7 +105,7 @@ export function getSnippetText(
 		.trim();
 
 	if (!clean) return "";
-	return clean.length > maxLength ? `${clean.slice(0, maxLength)}...` : clean;
+	return clean.length > maxLength ? `${clean.slice(0, maxLength)}…` : clean;
 }
 
 /**

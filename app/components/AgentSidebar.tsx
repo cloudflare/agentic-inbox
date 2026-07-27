@@ -34,7 +34,7 @@ function LazyAgentPanel() {
 		return (
 			<div className="flex flex-col items-center justify-center h-full gap-2">
 				<Loader size="base" />
-				<span className="text-xs text-kumo-subtle">Loading agent...</span>
+				<span className="text-xs text-kumo-subtle">Loading agent…</span>
 			</div>
 		);
 	}

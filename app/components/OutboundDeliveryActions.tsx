@@ -134,8 +134,8 @@ export default function OutboundDeliveryActions({
 					)}
 					{isPending
 						? action.kind === "cancel"
-							? "Cancelling..."
-							: "Retrying..."
+							? "Cancelling…"
+							: "Retrying…"
 						: compact
 							? compactActionLabel
 							: action.label}

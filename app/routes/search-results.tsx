@@ -270,7 +270,7 @@ export default function SearchResultsRoute() {
 							<p className="mt-2 text-sm text-kumo-subtle">
 								{error instanceof Error
 									? error.message
-									: "We couldn't complete this search."}
+									: "We couldn’t complete this search."}
 							</p>
 							<Button
 								className="mt-4"

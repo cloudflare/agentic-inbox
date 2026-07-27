@@ -297,18 +297,18 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const handleMove = (folderId: string) => { if (mailboxId) { moveEmailMut.mutate({ mailboxId, id: email.id, folderId }); closePanel(); } };
 	const handleDelete = () => {
 		if (!mailboxId) return;
-		const confirmed = window.confirm("Move this email to Trash?");
+		const confirmed = window.confirm("Move this conversation to Trash?");
 		if (!confirmed) return;
 		deleteEmailMut.mutate(
 			{ mailboxId, id: email.id },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Email moved to Trash" });
+					toastManager.add({ title: "Conversation moved to Trash" });
 					closePanel();
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Failed to move email to Trash",
+						title: "Failed to move the conversation to Trash",
 						variant: "error",
 					}),
 			},
@@ -320,12 +320,12 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			{ mailboxId, id: email.id },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Email restored" });
+					toastManager.add({ title: "Conversation restored" });
 					closePanel();
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Failed to restore email",
+						title: "Failed to restore the conversation",
 						variant: "error",
 					}),
 			},
@@ -337,12 +337,12 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			{ mailboxId, scope: snoozeScope },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Mail returned" });
+					toastManager.add({ title: "Conversation returned" });
 					closePanel();
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Could not unsnooze mail",
+						title: "Could not return the conversation",
 						variant: "error",
 					}),
 			},
@@ -509,7 +509,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		} catch (err) {
 			const message =
 				(err instanceof Error ? err.message : null) ||
-				"AI couldn't draft a reply. Try again.";
+				"AI couldn’t draft a reply. Try again.";
 			toastManager.add({ title: message, variant: "error" });
 		} finally {
 			setIsDrafting(false);

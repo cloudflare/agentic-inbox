@@ -458,7 +458,7 @@ function AgentChatConnected({
 								<div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-kumo-elevated border border-kumo-line rounded-bl-sm">
 									<Loader size="sm" />
 									<span className="text-xs text-kumo-subtle">
-										Thinking...
+										Thinking…
 									</span>
 								</div>
 							</div>
@@ -489,7 +489,7 @@ function AgentChatConnected({
 							value={inputValue}
 							onChange={(e) => setInputValue(e.target.value)}
 							onKeyDown={handleKeyDown}
-							placeholder="Ask your email agent..."
+							placeholder="Ask your email agent…"
 							rows={1}
 							aria-label="Chat message input"
 							className="flex-1 resize-none rounded-lg border border-kumo-line bg-kumo-control px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring min-h-[36px] max-h-[100px]"
@@ -555,7 +555,7 @@ export default function AgentPanel() {
 			<div className="flex flex-col items-center justify-center h-full gap-2">
 				<Loader size="base" />
 				<span className="text-xs text-kumo-subtle">
-					Connecting...
+					Connecting…
 				</span>
 			</div>
 		);

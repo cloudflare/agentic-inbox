@@ -110,7 +110,7 @@ export default function SavedViewResultsRoute() {
               <p className="mt-2 text-sm text-kumo-subtle">
                 {view?.filters.labelId
                   ? "This view includes a label filter. If that label was removed, the view stays empty rather than showing unrelated mail."
-                  : "No mail currently matches this view's filters."}
+                  : "No mail currently matches this view’s filters."}
               </p>
             </div>
           ) : (

@@ -129,7 +129,7 @@ export default function Header() {
 					<Input
 						className="w-full"
 						aria-label="Search emails"
-						placeholder="Search emails... (try from:name, is:unread, has:attachment)"
+						placeholder="Search emails… (try from:name, is:unread, has:attachment)"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						onKeyDown={handleKeyDown}

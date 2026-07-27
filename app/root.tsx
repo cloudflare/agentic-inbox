@@ -165,7 +165,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 		if (error.status === 404) {
 			title = "Page not found";
 			description =
-				"The page you're looking for doesn't exist or has been moved.";
+				"The page you’re looking for doesn’t exist or has been moved.";
 		} else {
 			title = `Error ${error.status}`;
 			description = error.statusText || description;

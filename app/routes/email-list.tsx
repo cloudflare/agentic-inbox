@@ -133,7 +133,7 @@ const FOLDER_EMPTY_STATES: Record<
 	[Folders.DRAFT]: {
 		icon: <FileIcon size={48} weight="thin" className="text-kumo-subtle" />,
 		title: "No drafts",
-		description: "Emails you're still working on will be saved here.",
+		description: "Emails you’re still working on will be saved here.",
 		showCompose: true,
 	},
 	[Folders.OUTBOX]: {
@@ -571,7 +571,7 @@ export default function EmailListRoute() {
 			{ mailboxId, scope },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Mail returned" });
+					toastManager.add({ title: "Conversation returned" });
 					if (selectedRow && snoozeScopeAffectsRow(scope, selectedRow)) {
 						setKeyboardTargetId(null);
 						closePanel();
@@ -579,7 +579,7 @@ export default function EmailListRoute() {
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Could not unsnooze mail",
+						title: "Could not return the conversation",
 						variant: "error",
 					}),
 			},
@@ -755,18 +755,18 @@ export default function EmailListRoute() {
 		e.preventDefault();
 		e.stopPropagation();
 		if (mailboxId) {
-			const confirmed = window.confirm("Move this email to Trash?");
+			const confirmed = window.confirm("Move this conversation to Trash?");
 			if (!confirmed) return;
 			deleteEmail.mutate(
 				{ mailboxId, id: emailId },
 				{
 					onSuccess: () => {
-						toastManager.add({ title: "Email moved to Trash" });
+						toastManager.add({ title: "Conversation moved to Trash" });
 						if (selectedEmailId === emailId) closePanel();
 					},
 					onError: () =>
 						toastManager.add({
-							title: "Failed to move email to Trash",
+							title: "Failed to move the conversation to Trash",
 							variant: "error",
 						}),
 				},
@@ -782,12 +782,12 @@ export default function EmailListRoute() {
 			{ mailboxId, id: emailId },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Email restored" });
+					toastManager.add({ title: "Conversation restored" });
 					if (selectedEmailId === emailId) closePanel();
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Failed to restore email",
+						title: "Failed to restore the conversation",
 						variant: "error",
 					}),
 			},
@@ -1143,7 +1143,7 @@ export default function EmailListRoute() {
 						</span>
 					)}
 					<Tooltip
-						content={isRefreshing ? "Refreshing..." : "Refresh"}
+						content={isRefreshing ? "Refreshing…" : "Refresh"}
 						side="bottom"
 						asChild
 					>

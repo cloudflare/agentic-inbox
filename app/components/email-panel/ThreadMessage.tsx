@@ -205,7 +205,7 @@ export default function ThreadMessage({
 								loading={isSending}
 								disabled={isSending}
 							>
-								{isSending ? "Sending..." : "Send"}
+								{isSending ? "Sending…" : "Send"}
 							</Button>
 						)}
 						{onEditDraft && (

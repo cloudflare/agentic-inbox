@@ -592,7 +592,7 @@ export default function ComposeEmail() {
               <Input
                 label="Subject"
                 type="text"
-                placeholder="What's this about?"
+                placeholder="What’s this about?"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 required

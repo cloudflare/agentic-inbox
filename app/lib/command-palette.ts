@@ -111,7 +111,7 @@ export function buildMailPaletteCommands(context: {
 		commands.push({
 			id: "toggle-read",
 			title: "Mark read / unread",
-			description: "Toggle the current conversation's read state",
+			description: "Toggle the current conversation’s read state",
 			group: "Current conversation",
 			keywords: ["read", "unread", "seen"],
 			shortcut: "U",
