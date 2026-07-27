@@ -10,10 +10,14 @@ import {
 	FORWARDED_MESSAGE_MARKER,
 	MAIL_SIGNATURE_MARKER,
 	planDelayedComposeSignature,
+	QUOTED_REPLY_MARKER,
 	removeComposeSignatures,
 	replaceAiAuthoredContent,
 	renderComposeSignature,
 } from "./compose-signature.ts";
+
+const quotedReply =
+	'<blockquote data-mail-quoted-reply="v1">On Monday, a@example.com wrote:<br>Original</blockquote>';
 
 test("AI context contains only authored content, never signatures or forwarded mail", () => {
 	const signature = '<div data-mail-signature="v1">Hesham<br>Wiser</div>';
@@ -209,4 +213,54 @@ test("marked signatures can be detected, extracted, and completely removed", () 
 	assert.equal(extractComposeSignature(body), signature);
 	assert.equal(removeComposeSignatures(body), "<p>Hello</p><p>Middle</p>");
 	assert.equal(hasComposeSignature("<p>data-mail-signature=\"v1\"</p>"), false);
+});
+
+test("a quoted reply is treated as the same untouchable tail as a forward", () => {
+	assert.equal(QUOTED_REPLY_MARKER, 'data-mail-quoted-reply="v1"');
+
+	// The quote is someone else's words: never sent to the model as context...
+	assert.equal(
+		extractAiAuthoredContent(`<p>My reply</p>${quotedReply}`),
+		"<p>My reply</p>",
+	);
+	assert.equal(hasAiAuthoredContent(`<p>&nbsp;</p>${quotedReply}`), false);
+
+	// ...and never lost when the model rewrites what the author did write.
+	const signature = renderComposeSignature("Hesham");
+	assert.equal(
+		replaceAiAuthoredContent(
+			`<p>Old text</p>${signature}${quotedReply}`,
+			"<p>AI replacement</p>",
+		),
+		`<p>AI replacement</p>${signature}${quotedReply}`,
+	);
+});
+
+test("reply signatures are inserted above the quoted original", () => {
+	const signature = renderComposeSignature("Team");
+
+	assert.equal(
+		insertComposeSignature(`<p>My reply</p>${quotedReply}`, "Team", "reply")
+			.bodyHtml,
+		`<p>My reply</p>${signature}${quotedReply}`,
+	);
+	// Settings that resolve after the reply was seeded land in the same place.
+	assert.deepEqual(
+		planDelayedComposeSignature({
+			bodyHtml: `<p><br></p>${quotedReply}`,
+			signatureText: "Team",
+			enabled: true,
+			mode: "reply",
+			pristine: true,
+		}),
+		{ action: "insert", bodyHtml: `<p><br></p>${signature}${quotedReply}` },
+	);
+
+	// A signature quoted from the sender is not this author's signature.
+	const quotedSignature =
+		`<blockquote data-mail-quoted-reply="v1">${renderComposeSignature("Sender")}</blockquote>`;
+	assert.equal(
+		insertComposeSignature(quotedSignature, "Team", "reply").bodyHtml,
+		`${signature}${quotedSignature}`,
+	);
 });

@@ -1,5 +1,6 @@
 export const MAIL_SIGNATURE_MARKER = 'data-mail-signature="v1"';
 export const FORWARDED_MESSAGE_MARKER = 'data-mail-forwarded-message="v1"';
+export const QUOTED_REPLY_MARKER = 'data-mail-quoted-reply="v1"';
 
 export type ComposeSignatureMode =
 	| "new"
@@ -25,24 +26,26 @@ export type DelayedComposeSignaturePlan =
 
 const SIGNATURE_BLOCK_SOURCE =
 	String.raw`<div\b(?=[^>]*\bdata-mail-signature\s*=\s*(["'])v1\1)[^>]*>[\s\S]*?<\/div\s*>`;
-const FORWARDED_MESSAGE_OPEN_SOURCE =
-	String.raw`<div\b(?=[^>]*\bdata-mail-forwarded-message\s*=\s*(["'])v1\1)[^>]*>`;
+// A forwarded block and a quoted reply are both "someone else's words, at the
+// end". Signatures go above them and AI rewrites never touch them.
+const QUOTED_TAIL_OPEN_SOURCE =
+	String.raw`<(?:div|blockquote)\b(?=[^>]*\b(?:data-mail-forwarded-message|data-mail-quoted-reply)\s*=\s*(["'])v1\1)[^>]*>`;
 
 function signatureBlockPattern(global = false): RegExp {
 	return new RegExp(SIGNATURE_BLOCK_SOURCE, global ? "gi" : "i");
 }
 
-function forwardedMessageIndex(bodyHtml: string): number {
-	return bodyHtml.search(new RegExp(FORWARDED_MESSAGE_OPEN_SOURCE, "i"));
+function quotedTailIndex(bodyHtml: string): number {
+	return bodyHtml.search(new RegExp(QUOTED_TAIL_OPEN_SOURCE, "i"));
 }
 
 function authoredContent(bodyHtml: string): string {
-	const index = forwardedMessageIndex(bodyHtml);
+	const index = quotedTailIndex(bodyHtml);
 	return index >= 0 ? bodyHtml.slice(0, index) : bodyHtml;
 }
 
-export function extractForwardedMessageTail(bodyHtml: string): string | null {
-	const index = forwardedMessageIndex(bodyHtml);
+function quotedTail(bodyHtml: string): string | null {
+	const index = quotedTailIndex(bodyHtml);
 	return index >= 0 ? bodyHtml.slice(index) : null;
 }
 
@@ -104,16 +107,14 @@ export function insertComposeSignature(
 	if (mode === "draft") {
 		return { bodyHtml, inserted: false, reason: "draft" };
 	}
-	if (hasComposeSignature(mode === "forward" ? authoredContent(bodyHtml) : bodyHtml)) {
+	if (hasComposeSignature(authoredContent(bodyHtml))) {
 		return { bodyHtml, inserted: false, reason: "duplicate" };
 	}
 	const signature = renderComposeSignature(signatureText);
-	const forwardMarkerIndex = mode === "forward"
-		? forwardedMessageIndex(bodyHtml)
-		: -1;
+	const tailIndex = quotedTailIndex(bodyHtml);
 	return {
-		bodyHtml: forwardMarkerIndex >= 0
-			? `${bodyHtml.slice(0, forwardMarkerIndex)}${signature}${bodyHtml.slice(forwardMarkerIndex)}`
+		bodyHtml: tailIndex >= 0
+			? `${bodyHtml.slice(0, tailIndex)}${signature}${bodyHtml.slice(tailIndex)}`
 			: `${bodyHtml}${signature}`,
 		inserted: true,
 		reason: "inserted",
@@ -133,13 +134,7 @@ export function planDelayedComposeSignature(input: {
 	if (!input.enabled) {
 		return { action: "none", bodyHtml: input.bodyHtml, reason: "disabled" };
 	}
-	if (
-		hasComposeSignature(
-			input.mode === "forward"
-				? authoredContent(input.bodyHtml)
-				: input.bodyHtml,
-		)
-	) {
+	if (hasComposeSignature(authoredContent(input.bodyHtml))) {
 		return { action: "none", bodyHtml: input.bodyHtml, reason: "duplicate" };
 	}
 	if (!input.pristine) {
@@ -168,7 +163,7 @@ export function replaceAiAuthoredContent(
 	aiAuthoredHtml: string,
 ): string {
 	const signature = extractComposeSignature(authoredContent(currentBodyHtml));
-	const forwarded = extractForwardedMessageTail(currentBodyHtml);
+	const tail = quotedTail(currentBodyHtml);
 	const replacement = extractAiAuthoredContent(aiAuthoredHtml);
-	return `${replacement}${signature ?? ""}${forwarded ?? ""}`;
+	return `${replacement}${signature ?? ""}${tail ?? ""}`;
 }
