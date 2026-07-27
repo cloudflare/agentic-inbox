@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { decodeBase64Url } from "../../../shared/base64url";
 import {
 	useAppConfig,
-	useCurrentPushActor,
+	useCurrentActor,
 	useRegisterPushDevice,
 } from "~/queries/push";
 import { ApiError } from "~/services/api";
@@ -100,7 +100,7 @@ export function useRebindExistingPushSubscription(
 	onAccessRevoked?: (mailboxId: string) => void,
 ) {
 	const { data: config } = useAppConfig();
-	const actorQuery = useCurrentPushActor();
+	const actorQuery = useCurrentActor();
 	const register = useRegisterPushDevice(mailboxId, actorQuery.data?.email);
 	const registerRef = useRef(register.mutateAsync);
 	registerRef.current = register.mutateAsync;
