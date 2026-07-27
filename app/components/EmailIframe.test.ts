@@ -14,6 +14,64 @@ test("remote email images require explicit per-message consent", () => {
 	assert.match(source, /image\.removeAttribute\("src"\)/);
 	assert.match(source, /Remote images are blocked to protect your privacy/);
 	assert.match(source, /loadRemoteImages \? " https:" : ""/);
+	// Opted-in image loads must not carry the portal URL to the sender's host.
+	assert.match(source, /<meta name="referrer" content="no-referrer">/);
+});
+
+test("a blocked image leaves no glyph, box, or rewritten alt behind", () => {
+	assert.match(source, /img\[data-remote-image-blocked\],/);
+	// An image stripped down to no source at all must not show a glyph either,
+	// while one still awaiting its inline-image blob stays visible.
+	assert.match(
+		source,
+		/img:not\(\[src\]\):not\(\[srcset\]\):not\(\[data-email-inline-cid\]\) \{ display: none; \}/,
+	);
+	// Overwriting the author's alt was what put "Remote image blocked for
+	// privacy" text where the picture should be; the banner says it instead.
+	assert.doesNotMatch(source, /Remote image blocked for privacy/);
+	assert.doesNotMatch(source, /image\.setAttribute\(\s*"alt"/);
+});
+
+test("only images the reader can actually reveal offer the opt-in", () => {
+	// https: and protocol-relative resolve under the opt-in CSP, so they are
+	// blocked-but-recoverable and drive the banner.
+	assert.match(source, /if \(\/\^https:\\\/\\\/\/i\.test\(source\) \|\| source\.startsWith\("\/\/"\)\) return "loadable";/);
+	// http: and relative srcs can never load; they stay stripped in both states
+	// instead of turning into broken images the "Load images" button can't fix.
+	assert.match(source, /return "unloadable";/);
+	assert.match(
+		source,
+		/sourceKind === "unloadable" \|\|\s*\(sourceKind === "loadable" && !loadRemoteImages\)/,
+	);
+	assert.match(source, /if \(sourceKind === "loadable" \|\| remoteSourceSet\)/);
+	assert.match(source, /setHasRemoteImages\(togglesRemoteImages\)/);
+	// The banner must come from the sanitize walk, never a second regex over
+	// the raw body that can disagree with what was actually stripped.
+	assert.doesNotMatch(source, /useMemo/);
+	assert.doesNotMatch(source, /test\(body\)/);
+	// Protocol-relative candidates are remote too, in srcset as well as src.
+	assert.match(source, /\(\?:\^\|,\)\\s\*\(\?:https\?:\)\?\\\/\\\//);
+});
+
+test("the frame follows its content instead of a fixed report schedule", () => {
+	assert.match(source, /new ResizeObserver/);
+	assert.match(source, /heightObserver\.observe\(document\.documentElement\)/);
+	assert.match(source, /heightObserver\.observe\(document\.body\)/);
+	assert.match(source, /document\.images\[loadIndex\]\.addEventListener\("load", reportHeight\)/);
+	assert.match(source, /document\.images\[loadIndex\]\.addEventListener\("error", reportHeight\)/);
+	assert.match(source, /window\.addEventListener\("load", reportHeight\)/);
+	// The timer ladder is gone; one fallback remains for engines that never
+	// deliver a resize record.
+	assert.doesNotMatch(source, /setTimeout\(reportHeight, 50\)/);
+	assert.doesNotMatch(source, /setTimeout\(reportHeight, 150\)/);
+	assert.match(source, /setTimeout\(reportHeight, 400\)/);
+	// Height still crosses the bridge on the same nonce-bound contract.
+	assert.match(source, /__emailIframeHeight: true, nonce: nonce, height: height/);
+});
+
+test("the privacy banner never remounts the iframe it sits above", () => {
+	assert.doesNotMatch(source, /if \(!hasRemoteImages\) return frame;/);
+	assert.match(source, /\{hasRemoteImages && \(/);
 });
 
 test("every email renderer passes explicit message identity", () => {
