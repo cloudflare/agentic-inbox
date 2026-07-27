@@ -32,12 +32,26 @@ class Statement {
     };
   }
   runSync() {
-    const result = this.statement().run(...this.#values);
-    return { success: true, meta: { changes: Number(result.changes) } };
+    const before = totalChanges(this.#db);
+    const results = this.statement().all(...this.#values);
+    return {
+      success: true,
+      results,
+      meta: { changes: totalChanges(this.#db) - before },
+    };
   }
   private statement(): StatementSync {
     return this.#db.prepare(this.#sql);
   }
+}
+
+// D1 reports trigger-caused row changes in meta.changes, so the shim reports the
+// total_changes() delta rather than the trigger-excluding sqlite3_changes count.
+function totalChanges(db: DatabaseSync): number {
+  const row = db.prepare("SELECT total_changes() AS total").get() as {
+    total: number;
+  };
+  return Number(row.total);
 }
 
 function d1(db: DatabaseSync): D1Database {
