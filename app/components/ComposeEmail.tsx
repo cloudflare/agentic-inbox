@@ -58,7 +58,13 @@ export default function ComposeEmail() {
     folder: string;
   }>();
 
-  const { isComposing, composeOptions } = useUIStore();
+  const {
+    isComposing,
+    composeOptions,
+    queuedCompose,
+    applyQueuedCompose,
+    cancelQueuedCompose,
+  } = useUIStore();
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [aiActivityLabel, setAiActivityLabel] = useState("");
   const [aiPanelRetryKey, setAiPanelRetryKey] = useState(0);
@@ -137,6 +143,7 @@ export default function ComposeEmail() {
   const recipientValues = { to, cc, bcc };
   const navigationBlocker = useBlocker(isComposing && hasUnconfirmedWork);
   const handledBlockedNavigationRef = useRef(false);
+  const handledQueuedComposeRef = useRef(false);
   const composeFormRef = useRef<HTMLFormElement>(null);
   const fileDragDepthRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
@@ -172,6 +179,18 @@ export default function ComposeEmail() {
       void requestClose(() => navigationBlocker.proceed());
     }
   }, [navigationBlocker, requestClose]);
+
+  // A compose request made while this composer holds unsaved work waits here
+  // until the same close flow that guards navigation resolves it.
+  useEffect(() => {
+    if (!queuedCompose) {
+      handledQueuedComposeRef.current = false;
+      return;
+    }
+    if (handledQueuedComposeRef.current) return;
+    handledQueuedComposeRef.current = true;
+    void requestClose(applyQueuedCompose);
+  }, [applyQueuedCompose, queuedCompose, requestClose]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -229,6 +248,7 @@ export default function ComposeEmail() {
 
   const handleKeepEditing = () => {
     keepEditing();
+    cancelQueuedCompose();
     if (navigationBlocker.state === "blocked") navigationBlocker.reset();
   };
 

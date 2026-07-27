@@ -4,7 +4,10 @@
 
 import { create } from "zustand";
 import type { Email } from "~/types";
-import { clearComposeRecovery } from "../lib/compose-recovery.ts";
+import {
+	clearComposeRecovery,
+	hasComposeRecovery,
+} from "../lib/compose-recovery.ts";
 import {
 	DEFAULT_WORKSPACE_PREFERENCES,
 	WORKSPACE_PREFERENCES_VERSION,
@@ -27,6 +30,36 @@ export interface ComposeOptions {
 
 const AGENT_PANEL_STORAGE_KEY = "whispyr.agentPanelOpen";
 
+/** Two compose requests aim at the same thing when mode and both anchors match. */
+function isSameComposeTarget(a: ComposeOptions, b: ComposeOptions): boolean {
+	return (
+		a.mode === b.mode &&
+		(a.originalEmail?.id ?? null) === (b.originalEmail?.id ?? null) &&
+		(a.draftEmail?.id ?? null) === (b.draftEmail?.id ?? null) &&
+		(a.initialTo ?? "") === (b.initialTo ?? "")
+	);
+}
+
+/** The unconditional "open the composer on this target" transition. */
+function openComposeState(
+	selectedEmailId: string | null,
+	next: ComposeOptions,
+): Partial<UIState> {
+	clearComposeRecovery();
+	const isReplyOrForward = next.mode === "reply" ||
+		next.mode === "reply-all" ||
+		next.mode === "forward";
+	return {
+		isComposing: true,
+		queuedCompose: null,
+		_previousEmailId: selectedEmailId,
+		// Keep selectedEmailId when replying/forwarding so the thread stays visible
+		selectedEmailId: isReplyOrForward ? selectedEmailId : null,
+		composeOptions: next,
+		isSidebarOpen: false,
+	};
+}
+
 interface UIState {
 	// Side panel state
 	selectedEmailId: string | null;
@@ -39,6 +72,11 @@ interface UIState {
 
 	// Compose options
 	composeOptions: ComposeOptions;
+
+	// A compose request parked behind the open composer's discard confirmation.
+	queuedCompose: ComposeOptions | null;
+	applyQueuedCompose: () => void;
+	cancelQueuedCompose: () => void;
 
 	// Mobile sidebar
 	isSidebarOpen: boolean;
@@ -94,6 +132,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 	isComposing: false,
 	_previousEmailId: null,
 	composeOptions: { mode: "new", originalEmail: null },
+	queuedCompose: null,
 	isSidebarOpen: false,
 	// Start collapsed so the panel never hides content on first paint. The real
 	// preference is loaded client-side via hydrateAgentPanel() to avoid an SSR
@@ -112,18 +151,25 @@ export const useUIStore = create<UIState>((set, get) => ({
 
 	startCompose: (options) =>
 		set((state) => {
-			clearComposeRecovery();
-			const mode = options?.mode || "new";
-			const isReplyOrForward = mode === "reply" || mode === "reply-all" || mode === "forward";
-			return {
-				isComposing: true,
-				_previousEmailId: state.selectedEmailId,
-				// Keep selectedEmailId when replying/forwarding so the thread stays visible behind the modal
-				selectedEmailId: isReplyOrForward ? state.selectedEmailId : null,
-				composeOptions: options || { mode: "new", originalEmail: null },
-				isSidebarOpen: false,
-			};
+			const next: ComposeOptions = options ?? { mode: "new", originalEmail: null };
+			if (state.isComposing) {
+				// Re-asking for the composer that is already open changes nothing.
+				if (isSameComposeTarget(state.composeOptions, next)) return {};
+				// Unsaved work is never discarded silently: park the request and let
+				// the open composer resolve it through its own discard confirmation.
+				if (hasComposeRecovery()) return { queuedCompose: next };
+			}
+			return openComposeState(state.selectedEmailId, next);
 		}),
+
+	applyQueuedCompose: () =>
+		set((state) =>
+			state.queuedCompose
+				? openComposeState(state.selectedEmailId, state.queuedCompose)
+				: {},
+		),
+
+	cancelQueuedCompose: () => set({ queuedCompose: null }),
 
 	closePanel: () =>
 		set((state) =>
