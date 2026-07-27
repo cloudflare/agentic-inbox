@@ -4,6 +4,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { resolveEmailListRefetchInterval } from "~/lib/email-list-read-state";
+import {
+	countDeliveriesNeedingAttention,
+	SEND_OUTCOME_POLL_MS,
+} from "~/lib/send-outcome";
 import api from "~/services/api";
 import type { Email, AttachmentRef, OutboundDelivery } from "~/types";
 import type { BatchTriageCommand } from "../../shared/batch-triage";
@@ -89,8 +93,34 @@ export function useOutboundDeliveries(
 		queryFn: async () =>
 			(await api.listOutboundDeliveries(mailboxId!, emailIds, threadIds)).deliveries,
 		enabled: Boolean(mailboxId) && enabled && emailIds.length > 0,
-		refetchInterval: enabled ? 2_000 : false,
+		refetchInterval: (query) =>
+			resolveEmailListRefetchInterval({
+				isError: query.state.status === "error",
+				interval: enabled ? SEND_OUTCOME_POLL_MS : undefined,
+			}),
 	});
+}
+
+/**
+ * Mailbox-wide delivery snapshot backing ambient failure surfacing. Deliberately
+ * slow: the send toast owns the fast path, this only has to notice a delivery
+ * that failed while the user was elsewhere.
+ */
+export function useOutboundAttentionCount(mailboxId: string | undefined) {
+	const { data = [] } = useQuery<OutboundDelivery[]>({
+		queryKey: mailboxId
+			? queryKeys.outbound.list(mailboxId, "mailbox")
+			: ["outbound", "_disabled_mailbox"],
+		queryFn: async () =>
+			(await api.listOutboundDeliveries(mailboxId!)).deliveries,
+		enabled: Boolean(mailboxId),
+		refetchInterval: (query) =>
+			resolveEmailListRefetchInterval({
+				isError: query.state.status === "error",
+				interval: 60_000,
+			}),
+	});
+	return countDeliveriesNeedingAttention(data);
 }
 
 export function useCancelOutboundDelivery() {
