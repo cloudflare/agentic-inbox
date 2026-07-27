@@ -8,7 +8,9 @@ export const QUOTED_REPLY_ATTRIBUTE = "data-mail-quoted-reply";
 
 export const MAIL_SIGNATURE_MARKER = `${MAIL_SIGNATURE_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
 export const FORWARDED_MESSAGE_MARKER = `${FORWARDED_MESSAGE_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
-export const QUOTED_REPLY_MARKER = `${QUOTED_REPLY_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
+// No writer pairs QUOTED_REPLY_ATTRIBUTE with a value any more - replies stopped
+// quoting the message they answer - but the attribute stays: drafts saved before
+// that change still carry a quote block and must keep being read as a tail.
 
 export type ComposeSignatureMode =
 	| "new"
@@ -35,7 +37,9 @@ export type DelayedComposeSignaturePlan =
 const SIGNATURE_BLOCK_SOURCE =
 	String.raw`<div\b(?=[^>]*\bdata-mail-signature\s*=\s*(["'])v1\1)[^>]*>[\s\S]*?<\/div\s*>`;
 // A forwarded block and a quoted reply are both "someone else's words, at the
-// end". Signatures go above them and AI rewrites never touch them.
+// end". Signatures go above them and AI rewrites never touch them. Only forwards
+// still seed one; the quoted-reply arm is kept for drafts persisted back when
+// replies quoted their original.
 const QUOTED_TAIL_OPEN_SOURCE =
 	String.raw`<(?:div|blockquote)\b(?=[^>]*\b(?:data-mail-forwarded-message|data-mail-quoted-reply)\s*=\s*(["'])v1\1)[^>]*>`;
 

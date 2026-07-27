@@ -2,7 +2,6 @@ import type { ComposeOptions } from "../hooks/useUIStore.ts";
 import { replyAllRecipientFields } from "./recipient-input.ts";
 import {
 	FORWARDED_MESSAGE_MARKER,
-	QUOTED_REPLY_MARKER,
 	insertComposeSignature,
 } from "./compose-signature.ts";
 import {
@@ -59,27 +58,6 @@ function forwardBody(original: NonNullable<ComposeOptions["originalEmail"]>) {
 	);
 
 	return `<p><br></p><div ${FORWARDED_MESSAGE_MARKER} style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatQuotedDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
-}
-
-function quotedReplyBlock(
-	original: NonNullable<ComposeOptions["originalEmail"]>,
-) {
-	const body = original.body || "";
-	if (!body) return "";
-	// The original renders safely in the sandboxed iframe, but the quote is
-	// injected into the compose editor where raw HTML would execute. Escaped
-	// plain text is the only thing that crosses. The sender is escaped too, so
-	// `<john@example.com>` is not eaten as a tag.
-	const quoted = escapeHtml(stripHtml(body)).replace(/\n/g, "<br>");
-	return `<blockquote ${QUOTED_REPLY_MARKER} style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${formatQuotedDate(original.date)}, ${escapeHtml(original.sender)} wrote:<br><br>${quoted}</blockquote>`;
-}
-
-/**
- * An empty paragraph to write in, then the original underneath. The signature is
- * inserted into the gap between them, never below the quote.
- */
-function replyBody(original: NonNullable<ComposeOptions["originalEmail"]>) {
-	return `<p><br></p>${quotedReplyBlock(original)}`;
 }
 
 function withSignature(

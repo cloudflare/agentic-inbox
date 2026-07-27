@@ -10,7 +10,7 @@ import {
 	FORWARDED_MESSAGE_MARKER,
 	MAIL_SIGNATURE_MARKER,
 	planDelayedComposeSignature,
-	QUOTED_REPLY_MARKER,
+	QUOTED_REPLY_ATTRIBUTE,
 	removeComposeSignatures,
 	replaceAiAuthoredContent,
 	renderComposeSignature,
@@ -216,7 +216,9 @@ test("marked signatures can be detected, extracted, and completely removed", () 
 });
 
 test("a quoted reply is treated as the same untouchable tail as a forward", () => {
-	assert.equal(QUOTED_REPLY_MARKER, 'data-mail-quoted-reply="v1"');
+	// Replies no longer seed a quote, but drafts saved before that change still
+	// carry one, so the tail machinery must keep recognising it.
+	assert.equal(QUOTED_REPLY_ATTRIBUTE, "data-mail-quoted-reply");
 
 	// The quote is someone else's words: never sent to the model as context...
 	assert.equal(

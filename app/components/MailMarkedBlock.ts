@@ -11,10 +11,10 @@ import {
 } from "../lib/compose-signature.ts";
 
 /**
- * Which element each marked block is written as by the compose body builders.
- * The tag is part of the contract: `compose-signature` matches the quoted tail
- * on `<div|blockquote ... data-mail-*>`, and the reply quote is styled as a
- * blockquote in both the editor and the sent mail.
+ * Which element each marked block is written as. The tag is part of the
+ * contract: `compose-signature` matches the quoted tail on
+ * `<div|blockquote ... data-mail-*>`, and a legacy reply quote is a blockquote
+ * in both the editor and the sent mail.
  */
 const TAG_BY_MARKER: Readonly<Record<string, "blockquote" | "div">> = {
 	[QUOTED_REPLY_ATTRIBUTE]: "blockquote",
@@ -23,8 +23,10 @@ const TAG_BY_MARKER: Readonly<Record<string, "blockquote" | "div">> = {
 };
 
 /**
- * The three blocks compose seeds and then navigates by: the quoted reply, the
- * forwarded original and the signature.
+ * The blocks compose navigates by: the forwarded original, the signature, and
+ * the quoted reply. Only the first two are still seeded - replies stopped
+ * quoting the message they answer - but the quote rule stays so a draft saved
+ * before that change keeps its marker and styling when the reader edits it.
  *
  * Without this node the editor loses all three the moment the user types.
  * StarterKit has no `div` node at all, so the forwarded and signature blocks are
