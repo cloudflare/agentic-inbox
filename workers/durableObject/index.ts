@@ -73,6 +73,9 @@ import {
   ATTACHMENT_LIMITS,
   validateAttachmentSet,
 } from "../../shared/attachments";
+// Shared with push notifications: both surfaces reduce the same raw-HTML body
+// to one line of human text, so they must agree on what counts as prose.
+import { htmlToSnippet } from "../lib/push/payload";
 import { vapidConfig } from "../lib/push/transport";
 import { sendWebPush } from "../lib/push/send";
 import type { PushPayload } from "../lib/push/types";
@@ -333,6 +336,25 @@ const NORMALIZED_SUBJECT_SQL = `LOWER(TRIM(
 		'aw: ', ''), 'wg: ', ''), 'réf: ', ''), 'sv: ', ''),
 		're: ', ''), 'fwd: ', ''), 'fw: ', '')
 ))`;
+
+/**
+ * SQL expression for the prose-bearing slice of a stored body. Bodies are raw
+ * HTML, so this anchors at `<body` when present — otherwise a large `<head>`
+ * of `<style>` rules eats the whole budget and the list renders a blank
+ * snippet. The slice stays generous because `htmlToSnippet` does the real
+ * text extraction; SQL only keeps the row payload bounded.
+ */
+const snippetSourceSql = (alias: string) =>
+  `SUBSTR(${alias}.body, CASE WHEN INSTR(LOWER(${alias}.body), '<body') > 0 THEN INSTR(LOWER(${alias}.body), '<body') ELSE 1 END, 4000)`;
+
+/** Attachment presence for one message, served by idx_attachments_email_id_id. */
+const hasAttachmentsSql = (alias: string) =>
+  `EXISTS(SELECT 1 FROM attachments a WHERE a.email_id = ${alias}.id)`;
+
+/** Display name when the ingest captured a usable one, else the raw address. */
+const SENDER_DISPLAY_SQL = `COALESCE(NULLIF(TRIM(sender_name), ''), sender)`;
+
+const SNIPPET_LENGTH = 160;
 
 const ALLOWED_SORT_COLUMNS = [
   "id",
@@ -744,6 +766,7 @@ export class MailboxDO extends DurableObject<Env> {
         id: schema.emails.id,
         subject: schema.emails.subject,
         sender: schema.emails.sender,
+        sender_name: schema.emails.sender_name,
         recipient: schema.emails.recipient,
         cc: schema.emails.cc,
         bcc: schema.emails.bcc,
@@ -756,7 +779,8 @@ export class MailboxDO extends DurableObject<Env> {
         folder_id: schema.emails.folder_id,
         snooze_source_folder_id: schema.emails.snooze_source_folder_id,
         snoozed_until: schema.emails.snoozed_until,
-        snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
+        snippet: sql<string>`${sql.raw(snippetSourceSql("emails"))}`,
+        has_attachments: sql<number>`${sql.raw(hasAttachmentsSql("emails"))}`,
       })
       .from(schema.emails)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -772,6 +796,8 @@ export class MailboxDO extends DurableObject<Env> {
       ...email,
       read: !!email.read,
       starred: !!email.starred,
+      has_attachments: !!email.has_attachments,
+      snippet: htmlToSnippet(email.snippet, SNIPPET_LENGTH),
       labels: labelsByEmail.get(email.id) ?? [],
     }));
   }
@@ -892,11 +918,12 @@ export class MailboxDO extends DurableObject<Env> {
 					FROM folder_emails fe
 				)
 				SELECT
-					lp.id, lp.subject, lp.sender, lp.recipient, lp.date,
+					lp.id, lp.subject, lp.sender, lp.sender_name, lp.recipient, lp.date,
 					lp.read, lp.starred, lp.thread_id, lp.folder_id,
 					lp.draft_group_key as conversation_id,
 					lp.in_reply_to, lp.email_references,
-					SUBSTR(lp.body, 1, 300) as snippet,
+					${snippetSourceSql("lp")} as snippet,
+					${hasAttachmentsSql("lp")} as has_attachments,
 					ds.thread_count, ds.thread_unread_count, ds.participants
 				FROM latest_per_group lp
 				JOIN draft_stats ds ON lp.draft_group_key = ds.draft_group_key
@@ -920,6 +947,8 @@ export class MailboxDO extends DurableObject<Env> {
         thread_count: row.thread_count || 1,
         thread_unread_count: row.thread_unread_count || 0,
         participants: row.participants || row.sender,
+        has_attachments: !!row.has_attachments,
+        snippet: htmlToSnippet(row.snippet, SNIPPET_LENGTH),
         labels: labelsByEmail.get(String(row.id)) ?? [],
       }));
     }
@@ -962,6 +991,11 @@ export class MailboxDO extends DurableObject<Env> {
 					SUM(CASE WHEN read = 0 THEN 1 ELSE 0 END) as thread_unread_count,
 					SUM(CASE WHEN read = 1 THEN 1 ELSE 0 END) as thread_read_count,
 					GROUP_CONCAT(DISTINCT sender) as participants,
+					GROUP_CONCAT(DISTINCT ${SENDER_DISPLAY_SQL}) as participant_names,
+					SUM(CASE WHEN EXISTS(
+						SELECT 1 FROM attachments a
+						WHERE a.email_id = all_emails_with_conversation.id
+					) THEN 1 ELSE 0 END) as attachment_count,
 					SUM(CASE WHEN folder_id = (SELECT id FROM folders WHERE name = 'draft' LIMIT 1) THEN 1 ELSE 0 END) as has_draft
 				FROM all_emails_with_conversation
 				WHERE conversation_id IN (
@@ -990,13 +1024,15 @@ export class MailboxDO extends DurableObject<Env> {
 					ON fe.raw_thread_id = tc.raw_thread_id
 			)
 			SELECT
-				lif.id, lif.subject, lif.sender, lif.recipient, lif.date,
+				lif.id, lif.subject, lif.sender, lif.sender_name, lif.recipient, lif.date,
 				lif.read, lif.starred, lif.thread_id, lif.folder_id,
 				lif.snooze_source_folder_id, lif.snoozed_until,
 				lif.conversation_id,
 				lif.in_reply_to, lif.email_references,
-				SUBSTR(lif.body, 1, 300) as snippet,
+				${snippetSourceSql("lif")} as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
+				cs.participant_names,
+				CASE WHEN cs.attachment_count > 0 THEN 1 ELSE 0 END as has_attachments,
 				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
 					AND lmc.folder_id != (SELECT id FROM folders WHERE name = 'draft' LIMIT 1)
 					AND cs.thread_read_count > 0
@@ -1026,6 +1062,9 @@ export class MailboxDO extends DurableObject<Env> {
       thread_count: row.thread_count || 1,
       thread_unread_count: row.thread_unread_count || 0,
       participants: row.participants || row.sender,
+      participant_names: row.participant_names || row.sender,
+      has_attachments: !!row.has_attachments,
+      snippet: htmlToSnippet(row.snippet, SNIPPET_LENGTH),
       needs_reply: !!row.needs_reply,
       has_draft: !!row.has_draft,
       labels: labelsByEmail.get(String(row.id)) ?? [],
