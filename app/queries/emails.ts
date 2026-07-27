@@ -2,7 +2,9 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import { useKumoToastManager } from "@cloudflare/kumo";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { updateEmailFailureTitle } from "~/lib/conversation-actions";
 import { resolveEmailListRefetchInterval } from "~/lib/email-list-read-state";
 import {
 	countDeliveriesNeedingAttention,
@@ -218,6 +220,7 @@ export function useSendEmail() {
 
 export function useUpdateEmail() {
 	const qc = useQueryClient();
+	const toastManager = useKumoToastManager();
 	return useMutation({
 		mutationFn: ({
 			mailboxId,
@@ -266,7 +269,7 @@ export function useUpdateEmail() {
 
 			return { listQueries, prevDetail, detailKey };
 		},
-		onError: (_err, _vars, context) => {
+		onError: (_err, { data }, context) => {
 			// Roll back optimistic updates on failure
 			if (context?.listQueries) {
 				for (const [key, cached] of context.listQueries) {
@@ -276,6 +279,12 @@ export function useUpdateEmail() {
 			if (context?.prevDetail) {
 				qc.setQueryData(context.detailKey, context.prevDetail);
 			}
+			// The rollback is visible, so the reason has to be too. Owning this
+			// here keeps every bare .mutate() call site honest.
+			toastManager.add({
+				title: updateEmailFailureTitle(data),
+				variant: "error",
+			});
 		},
 		onSettled: (_data, _err, { mailboxId }) => {
 			// Always refetch to ensure server truth

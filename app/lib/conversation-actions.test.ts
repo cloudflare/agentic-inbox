@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Email } from "../types/index.ts";
-import { planKeyboardConversationAction } from "./conversation-actions.ts";
+import {
+	planKeyboardConversationAction,
+	updateEmailFailureTitle,
+} from "./conversation-actions.ts";
 
 const threadRow = {
 	id: "latest-1",
@@ -66,4 +69,28 @@ test("keeps singleton rows on the existing per-email mutation seam", () => {
 		),
 		{ kind: "email-archive", emailId: "latest-1" },
 	);
+});
+
+test("names the failed write so a reverted optimistic update explains itself", () => {
+	assert.equal(
+		updateEmailFailureTitle({ starred: true }),
+		"Couldn’t star the conversation",
+	);
+	assert.equal(
+		updateEmailFailureTitle({ starred: false }),
+		"Couldn’t remove the star",
+	);
+	assert.equal(
+		updateEmailFailureTitle({ read: true }),
+		"Couldn’t mark the conversation as read",
+	);
+	assert.equal(
+		updateEmailFailureTitle({ read: false }),
+		"Couldn’t mark the conversation as unread",
+	);
+	assert.equal(
+		updateEmailFailureTitle({ labels: ["x"] }),
+		"Couldn’t update the conversation",
+	);
+	assert.equal(updateEmailFailureTitle(undefined), "Couldn’t update the conversation");
 });

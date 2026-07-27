@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { onlineManager } from "@tanstack/react-query";
 import { createMailQueryClient } from "./mail-query-client.ts";
@@ -39,4 +40,19 @@ test("offline mail actions fail immediately and are never replayed after reconne
 		queryClient.unmount();
 		queryClient.clear();
 	}
+});
+
+test("a failed conversation update names the action instead of reverting silently", () => {
+	const queries = readFileSync(
+		new URL("../queries/emails.ts", import.meta.url),
+		"utf8",
+	);
+	const updateEmail = queries.slice(
+		queries.indexOf("export function useUpdateEmail"),
+		queries.indexOf("export function useMarkThreadRead"),
+	);
+	assert.match(
+		updateEmail,
+		/onError:[\s\S]*?toastManager\.add\(\{\s*title: updateEmailFailureTitle\(data\),\s*variant: "error",/,
+	);
 });
