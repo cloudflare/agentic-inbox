@@ -822,12 +822,13 @@ async function verifyInlineReply(page, baseUrl, name) {
 		if (!geometry.editorFocused) {
 			problems.push(`focus is not in the editor; active element is ${geometry.activeElement}`);
 		}
-		if (!/blockquote|MESSAGE FOUR NEWEST|wrote:/i.test(geometry.editorHtml)) {
-			problems.push("quoted original is missing from the composer body");
+		// The reply opens on a clean body: the message being answered is already
+		// on screen in the thread right above the composer.
+		if (/data-mail-quoted-reply|MESSAGE FOUR NEWEST|wrote:/i.test(geometry.editorHtml)) {
+			problems.push(`the composer seeded a quoted original: ${geometry.editorHtml.slice(0, 200)}`);
 		}
-		const caretBeforeQuote = geometry.editorHtml.search(/<blockquote|MESSAGE FOUR NEWEST/i);
-		if (caretBeforeQuote === 0) {
-			problems.push("no empty caret area above the quoted original");
+		if (geometry.editorText.trim()) {
+			problems.push(`the reply body is not empty: "${geometry.editorText.trim().slice(0, 120)}"`);
 		}
 		const subject = geometry.subjectValue ?? (await page.evaluate(() => {
 			const inputs = Array.from(document.querySelectorAll("input"));
@@ -994,7 +995,7 @@ async function verifyInlineReply(page, baseUrl, name) {
 		}
 
 		record(item, name, problems.length === 0 ? "PASS" : "FAIL", problems.length === 0
-			? "composer mounts into #inline-compose-host below the newest message, thread stays mounted, editor focused, quote present under an empty caret area, subject Re:-prefixed once, no overflow at default or narrowest split, Escape restores focus to the thread"
+			? "composer mounts into #inline-compose-host below the newest message, thread stays mounted, editor focused, body clean with no quoted original, subject Re:-prefixed once, no overflow at default or narrowest split, Escape restores focus to the thread"
 			: problems.join(" | "), shots);
 	} catch (error) {
 		const failShot = shot(name, item, "error");
@@ -1005,10 +1006,11 @@ async function verifyInlineReply(page, baseUrl, name) {
 }
 
 /**
- * The reply quote and the forwarded original are marked blocks: compose seeds
- * them, and signature placement plus AI rewrites navigate by those markers. The
- * editor schema has to carry them through a real edit, so this types into the
- * composer before reading the marker back.
+ * The forwarded original is a marked block: compose seeds it, and signature
+ * placement plus AI rewrites navigate by that marker, so the editor schema has
+ * to carry it through a real edit. A reply seeds no quote at all - the message
+ * being answered is already in the thread above the composer - so the same walk
+ * proves its absence survives editing too.
  */
 async function verifyQuotedBlocks(page, baseUrl, name) {
 	const item = "03b-quoted-blocks";
@@ -1017,8 +1019,8 @@ async function verifyQuotedBlocks(page, baseUrl, name) {
 	const observed = [];
 	try {
 		for (const scenario of [
-			{ action: "Reply", marker: "data-mail-quoted-reply", tag: "blockquote" },
-			{ action: "Forward", marker: "data-mail-forwarded-message", tag: "div" },
+			{ action: "Forward", marker: "data-mail-forwarded-message", tag: "div", expect: "kept" },
+			{ action: "Reply", marker: "data-mail-quoted-reply", tag: null, expect: "absent" },
 		]) {
 			await openThread(page, baseUrl);
 			await clickThreadAction(page, scenario.action);
@@ -1037,6 +1039,7 @@ async function verifyQuotedBlocks(page, baseUrl, name) {
 					tag: block?.tagName.toLowerCase() ?? null,
 					version: block?.getAttribute(marker) ?? null,
 					styled: Boolean(block?.getAttribute("style")),
+					quotesAnyone: /wrote:|MESSAGE FOUR NEWEST/i.test(body?.textContent ?? ""),
 					typedThrough: (body?.textContent ?? "").includes("Confirming the date."),
 					html: (body?.innerHTML ?? "").slice(0, 300),
 				};
@@ -1050,7 +1053,14 @@ async function verifyQuotedBlocks(page, baseUrl, name) {
 			if (!state.typedThrough) {
 				problems.push(`${scenario.action}: typed text never reached the editor`);
 			}
-			if (!state.found) {
+			if (scenario.expect === "absent") {
+				if (state.found) {
+					problems.push(`${scenario.action}: seeded ${scenario.marker}, which replies must no longer do`);
+				}
+				if (state.quotesAnyone) {
+					problems.push(`${scenario.action}: the original leaked into the reply body ("${state.html}")`);
+				}
+			} else if (!state.found) {
 				problems.push(
 					`${scenario.action}: ${scenario.marker} was dropped once the user typed; body starts "${state.html}"`,
 				);
@@ -1069,7 +1079,7 @@ async function verifyQuotedBlocks(page, baseUrl, name) {
 		}
 
 		record(item, name, problems.length === 0 ? "PASS" : "FAIL", problems.length === 0
-			? `after a real edit the reply quote keeps <blockquote data-mail-quoted-reply="v1" style> and the forward keeps <div data-mail-forwarded-message="v1" style>: ${JSON.stringify(observed)}`
+			? `after a real edit the forward keeps <div data-mail-forwarded-message="v1" style> and the reply body stays clean of any quote: ${JSON.stringify(observed)}`
 			: problems.join(" | "), shots);
 	} catch (error) {
 		const failShot = shot(name, item, "error");

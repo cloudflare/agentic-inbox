@@ -104,49 +104,51 @@ test("forward escapes original metadata and keeps the signature before the forwa
 	assert.doesNotMatch(fields.body, /<strong>team<\/strong>/);
 });
 
-test("a reply quotes the message it answers, with the caret above the quote", () => {
+test("a reply quotes nothing: the thread above the composer already holds it", () => {
 	const fields = buildInitialComposeFields({
 		composeOptions: { mode: "reply", originalEmail: original },
 	});
 
-	assert.match(fields.body, /^<p><br><\/p><blockquote /);
-	assert.match(fields.body, /data-mail-quoted-reply="v1"/);
-	assert.match(fields.body, /On .*, Sender &lt;sender@example\.com&gt; wrote:/);
-	// The original crosses into the editor as escaped plain text, never markup.
-	assert.match(fields.body, /Hello team/);
-	assert.doesNotMatch(fields.body, /<strong>/);
+	assert.equal(fields.body, "");
+	assert.doesNotMatch(fields.body, /blockquote/);
+	assert.doesNotMatch(fields.body, /data-mail-quoted-reply/);
+	assert.doesNotMatch(fields.body, /wrote:/);
+	// Recipient and subject are still derived from the original.
+	assert.equal(fields.to, "Sender <sender@example.com>");
+	assert.equal(fields.subject, "Re: Quarterly <update>");
 });
 
-test("reply-all quotes the same original and keeps every other recipient", () => {
+test("reply-all quotes nothing either and keeps every other recipient", () => {
 	const fields = buildInitialComposeFields({
 		composeOptions: { mode: "reply-all", originalEmail: original },
 		mailboxEmail: "team@example.com",
 	});
 
-	assert.match(fields.body, /data-mail-quoted-reply="v1"/);
+	assert.doesNotMatch(fields.body, /data-mail-quoted-reply/);
 	assert.equal(fields.to, "Sender <sender@example.com>, colleague@example.com");
 	assert.equal(fields.cc, "copy@example.com");
 });
 
-test("a signature sits between the reply and the quote, never below it", () => {
-	const fields = buildInitialComposeFields({
-		composeOptions: { mode: "reply", originalEmail: original },
-		signature: { enabled: true, text: "Hesham" },
-	});
-
-	assert.ok(
-		fields.body.indexOf("data-mail-signature") <
-			fields.body.indexOf("data-mail-quoted-reply"),
-		"the signature must be written above the quoted original",
-	);
+test("a reply seeds the same clean writing space as a new mail", () => {
+	for (const mode of ["new", "reply", "reply-all"] as const) {
+		const fields = buildInitialComposeFields({
+			composeOptions: { mode, originalEmail: original },
+			signature: { enabled: true, text: "Hesham" },
+		});
+		assert.equal(
+			fields.body,
+			'<p><br></p><div data-mail-signature="v1">Hesham</div>',
+			`${mode} must open on an empty paragraph above the signature`,
+		);
+	}
 });
 
-test("an original with no body yields a reply with nothing to quote", () => {
+test("an original with no body still yields an empty reply", () => {
 	const fields = buildInitialComposeFields({
 		composeOptions: { mode: "reply", originalEmail: { ...original, body: "" } },
 	});
 
-	assert.equal(fields.body, "<p><br></p>");
+	assert.equal(fields.body, "");
 });
 
 test("reply and forward prefixes are absorbed instead of stacked", () => {

@@ -137,22 +137,28 @@ test("the schema covers the exact markers the compose bodies write", () => {
 		}).body,
 	].join("");
 
-	for (const rule of rules) {
-		const attribute = rule.tag.slice(rule.tag.indexOf("[") + 1, -1);
+	// Everything compose writes today must have a rule, or the editor drops it.
+	for (const attribute of [FORWARDED_MESSAGE_ATTRIBUTE, MAIL_SIGNATURE_ATTRIBUTE]) {
 		assert.ok(
 			seeded.includes(`${attribute}="${MAIL_BLOCK_VERSION}"`),
-			`compose never writes ${attribute}, so the schema rule is dead`,
+			`compose no longer writes ${attribute}; retire its rule deliberately`,
 		);
-	}
-	// And nothing compose writes is missing a rule.
-	for (const attribute of [
-		QUOTED_REPLY_ATTRIBUTE,
-		FORWARDED_MESSAGE_ATTRIBUTE,
-		MAIL_SIGNATURE_ATTRIBUTE,
-	]) {
 		assert.ok(
 			rules.some((rule) => rule.tag.includes(`[${attribute}]`)),
 			`${attribute} is written into compose bodies but the editor would drop it`,
 		);
 	}
+
+	// Replies stopped quoting the message they answer, so nothing writes this
+	// marker any more. The rule stays regardless: drafts persisted before that
+	// change still carry a quote block, and losing the rule would strip its
+	// marker and styling the first time the reader edits one.
+	assert.ok(
+		!seeded.includes(`${QUOTED_REPLY_ATTRIBUTE}=`),
+		"replies must not seed a quoted original",
+	);
+	assert.ok(
+		rules.some((rule) => rule.tag.includes(`[${QUOTED_REPLY_ATTRIBUTE}]`)),
+		"older drafts still contain quote blocks and must survive an edit",
+	);
 });

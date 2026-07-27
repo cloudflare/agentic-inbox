@@ -92,6 +92,18 @@ function withSignature(
 		: bodyHtml;
 }
 
+/**
+ * A clean writing space and nothing else. Replies deliberately quote nothing:
+ * the message being answered is already in the thread above the composer, so
+ * repeating it only pushes the reply out of view.
+ */
+function blankBody(
+	mode: "new" | "reply" | "reply-all",
+	signature: MailboxSignature | undefined,
+) {
+	return withSignature(signature?.enabled ? "<p><br></p>" : "", mode, signature);
+}
+
 export function buildInitialComposeFields(input: {
 	composeOptions: ComposeOptions;
 	mailboxEmail?: string;
@@ -115,7 +127,7 @@ export function buildInitialComposeFields(input: {
 		return {
 			...EMPTY_FIELDS,
 			to: mode === "new" ? composeOptions.initialTo ?? "" : "",
-			body: withSignature(signature?.enabled ? "<p><br></p>" : "", "new", signature),
+			body: blankBody("new", signature),
 		};
 	}
 
@@ -124,7 +136,7 @@ export function buildInitialComposeFields(input: {
 			...EMPTY_FIELDS,
 			to: original.sender,
 			subject: prefixedSubject(original.subject, "Re"),
-			body: withSignature(replyBody(original), "reply", signature),
+			body: blankBody("reply", signature),
 		};
 	}
 
@@ -138,7 +150,7 @@ export function buildInitialComposeFields(input: {
 				mailboxAddress: mailboxEmail ?? "",
 			}),
 			subject: prefixedSubject(original.subject, "Re"),
-			body: withSignature(replyBody(original), "reply-all", signature),
+			body: blankBody("reply-all", signature),
 		};
 	}
 
@@ -152,6 +164,6 @@ export function buildInitialComposeFields(input: {
 
 	return {
 		...EMPTY_FIELDS,
-		body: withSignature(signature?.enabled ? "<p><br></p>" : "", "new", signature),
+		body: blankBody("new", signature),
 	};
 }
