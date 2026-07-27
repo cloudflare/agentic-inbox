@@ -43,6 +43,17 @@ test("only images the reader can actually reveal offer the opt-in", () => {
 		source,
 		/sourceKind === "unloadable" \|\|\s*\(sourceKind === "loadable" && !loadRemoteImages\)/,
 	);
+	// `<img src="/fallback.png" srcset="https://cdn/hero.png 1x">`: the src can
+	// never load, the srcset can. Marking it blocked anyway offered "Load
+	// images" and then kept the image hidden with a live srcset attached.
+	assert.match(source, /const drawnBySourceSet = remoteSourceSet && loadRemoteImages;/);
+	assert.match(
+		source,
+		/image\.removeAttribute\("src"\);\s*if \(!drawnBySourceSet\) \{\s*image\.setAttribute\("data-remote-image-blocked", "true"\);/,
+	);
+	// Blocked state is untouched: `drawnBySourceSet` can only be true under the
+	// opt-in, and the srcset is still stripped whenever the reader has not.
+	assert.match(source, /if \(remoteSourceSet && !loadRemoteImages\) \{\s*image\.removeAttribute\("srcset"\);/);
 	assert.match(source, /if \(sourceKind === "loadable" \|\| remoteSourceSet\)/);
 	assert.match(source, /setHasRemoteImages\(togglesRemoteImages\)/);
 	// The banner must come from the sanitize walk, never a second regex over

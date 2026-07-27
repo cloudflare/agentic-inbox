@@ -347,12 +347,18 @@ export default function EmailIframe({
 			if (sourceKind === "loadable" || remoteSourceSet) {
 				togglesRemoteImages = true;
 			}
+			// An opted-in srcset still draws this image, so stripping an unloadable
+			// src must not also mark it blocked - the stylesheet would hide a
+			// picture the reader just asked for and "Load images" would do nothing.
+			const drawnBySourceSet = remoteSourceSet && loadRemoteImages;
 			if (
 				sourceKind === "unloadable" ||
 				(sourceKind === "loadable" && !loadRemoteImages)
 			) {
 				image.removeAttribute("src");
-				image.setAttribute("data-remote-image-blocked", "true");
+				if (!drawnBySourceSet) {
+					image.setAttribute("data-remote-image-blocked", "true");
+				}
 			}
 			if (remoteSourceSet && !loadRemoteImages) {
 				image.removeAttribute("srcset");
