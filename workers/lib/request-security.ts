@@ -14,7 +14,10 @@ export function workersDevRequestDecision(
 	request: Request,
 ): "allow" | "not-found" {
 	const url = new URL(request.url);
-	if (!url.hostname.endsWith(".workers.dev")) return "allow";
+	// A fully-qualified name keeps its root dot ("…workers.dev."), which resolves
+	// to the same host but would slip past a bare suffix match.
+	const hostname = url.hostname.replace(/\.+$/, "");
+	if (!hostname.endsWith(".workers.dev")) return "allow";
 	return request.method.toUpperCase() === "POST" &&
 		url.pathname === "/webhooks/ses"
 		? "allow"

@@ -127,3 +127,24 @@ test("zone hostnames are untouched by the workers.dev guard", () => {
 		"allow",
 	);
 });
+
+test("a fully-qualified workers.dev name cannot slip past the guard", () => {
+	// The trailing root dot resolves to the same host, so it must not read as a
+	// different one and reopen everything the guard closes.
+	assert.equal(
+		workersDevRequestDecision(
+			new Request("https://wiser-mail-portal.acme.workers.dev./login", {
+				method: "GET",
+			}),
+		),
+		"not-found",
+	);
+	assert.equal(
+		workersDevRequestDecision(
+			new Request("https://wiser-mail-portal.acme.workers.dev./webhooks/ses", {
+				method: "POST",
+			}),
+		),
+		"allow",
+	);
+});
