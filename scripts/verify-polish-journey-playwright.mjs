@@ -168,6 +168,14 @@ const MARKETING_BODY = [
 	// which the <img> walk runs too early to see.
 	'<picture><source srcset="https://cdn.brightmail.example/picture.svg 1x">',
 	'<img alt="Marketing picture" src="/journey-relative-fallback.png"></picture>',
+	// A source the picture can never select: surviving the opt-in is not proof
+	// anything renders, so this img must stay hidden rather than become an
+	// empty alt box.
+	'<picture><source media="not all" srcset="https://cdn.brightmail.example/ineligible.svg 1x">',
+	'<img alt="Marketing ineligible" src="/journey-relative-fallback.png"></picture>',
+	// Sender-forged internal markers: DOMPurify passes data-* through, and these
+	// must mean nothing until the sanitize walk stamps them from real policy.
+	'<img alt="Marketing forged" data-remote-image-drawn="true" src="https://cdn.brightmail.example/forged.svg">',
 	`<p>${MARKETING_TAIL}</p>`,
 	"</div>",
 ].join("");
@@ -363,6 +371,16 @@ async function installFixture(page, counters) {
 
 	await page.route("https://cdn.brightmail.example/**", async (route) => {
 		const url = route.request().url();
+		if (url.endsWith("ineligible.svg")) {
+			counters.ineligible += 1;
+			await route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="120"></svg>' });
+			return;
+		}
+		if (url.endsWith("forged.svg")) {
+			counters.forged += 1;
+			await route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="120"></svg>' });
+			return;
+		}
 		if (url.endsWith("picture.svg")) {
 			counters.picture += 1;
 			await route.fulfill({
@@ -410,6 +428,14 @@ async function installFixture(page, counters) {
 				await route.continue();
 				return;
 			}
+			await route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ emails: conversations, totalCount: conversations.length }),
+			});
+			return;
+		}
+		if (path === `${prefix}/search`) {
 			await route.fulfill({
 				status: 200,
 				contentType: "application/json",
@@ -1074,6 +1100,46 @@ async function verifyQuotedBlocks(page, baseUrl, name) {
 				if (!state.styled) {
 					problems.push(`${scenario.action}: the quote styling was dropped from the marked block`);
 				}
+
+				// One Backspace at the block's first character used to unwrap it and
+				// take the marker and styling with it.
+				await page.evaluate((marker) => {
+					const block = document.querySelector(`[${marker}]`);
+					const text = block?.querySelector("strong") ?? block;
+					const range = document.createRange();
+					range.setStart(text.firstChild ?? text, 0);
+					range.collapse(true);
+					const selection = window.getSelection();
+					selection?.removeAllRanges();
+					selection?.addRange(range);
+				}, scenario.marker);
+				await page.keyboard.press("Backspace");
+				await delay(500);
+				const afterBackspace = await page.evaluate((marker) => {
+					const body = document.querySelector("[aria-label='Message body']");
+					const block = body?.querySelector(`[${marker}]`) ?? null;
+					return { found: Boolean(block), styled: Boolean(block?.getAttribute("style")) };
+				}, scenario.marker);
+				detail(`${name} ${scenario.action} after Backspace at boundary ${JSON.stringify(afterBackspace)}`);
+				if (!afterBackspace.found || !afterBackspace.styled) {
+					problems.push(
+						`${scenario.action}: Backspace at the block boundary dissolved it (${JSON.stringify(afterBackspace)})`,
+					);
+				}
+
+				// ...but an explicit select-all still removes it, so the block is
+				// protected, not permanent.
+				await page.locator("[aria-label='Message body']").first().click();
+				await page.keyboard.press("ControlOrMeta+a");
+				await page.keyboard.press("Delete");
+				await delay(500);
+				const afterSelectAll = await page.evaluate((marker) =>
+					Boolean(document.querySelector(`[aria-label='Message body'] [${marker}]`)),
+				scenario.marker);
+				detail(`${name} ${scenario.action} block after select-all delete: ${afterSelectAll}`);
+				if (afterSelectAll) {
+					problems.push(`${scenario.action}: select-all + Delete could not remove the block`);
+				}
 			}
 			await dismissComposer(page);
 		}
@@ -1463,8 +1529,23 @@ async function verifyImages(page, baseUrl, name, counters) {
 			}
 			if (image.src) problems.push(`blocked image "${image.alt}" kept its remote src`);
 		}
-		if (counters.hero !== 0 || counters.tracker !== 0 || counters.mixed !== 0 || counters.picture !== 0) {
-			problems.push(`remote images were fetched before opt-in (hero ${counters.hero}, tracker ${counters.tracker}, mixed ${counters.mixed}, picture ${counters.picture})`);
+		if (Object.values(counters).some((count) => count !== 0)) {
+			problems.push(`remote images were fetched before opt-in: ${JSON.stringify(counters)}`);
+		}
+		// A sender-supplied data-remote-image-drawn must not survive the sanitize
+		// walk and reveal a remote image before consent.
+		const forgedBlocked = await content.evaluate(() => {
+			const image = document.querySelector("img[alt='Marketing forged']");
+			return {
+				present: Boolean(image),
+				display: image ? getComputedStyle(image).display : null,
+				drawn: image?.hasAttribute("data-remote-image-drawn") ?? null,
+				src: image?.getAttribute("src") ?? null,
+			};
+		});
+		detail(`${name} forged marker pre-consent ${JSON.stringify(forgedBlocked)}`);
+		if (forgedBlocked.present && (forgedBlocked.drawn || forgedBlocked.display !== "none" || forgedBlocked.src)) {
+			problems.push(`a sender-forged data-remote-image-drawn survived sanitizing: ${JSON.stringify(forgedBlocked)}`);
 		}
 		const banner = page.getByRole("button", { name: "Load images" });
 		if (!(await banner.count())) {
@@ -1573,6 +1654,28 @@ async function verifyImages(page, baseUrl, name, counters) {
 					problems.push(`"${shape.alt}" never decoded ${shape.carrier}`);
 				}
 			}
+
+			// The ineligible-source picture is the control: opting in must NOT
+			// reveal it, because nothing in it can draw.
+			const ineligible = await optedContent.evaluate(() => {
+				const image = document.querySelector("img[alt='Marketing ineligible']");
+				if (!image) return { present: false };
+				return {
+					present: true,
+					display: getComputedStyle(image).display,
+					blocked: image.hasAttribute("data-remote-image-blocked"),
+					drawn: image.hasAttribute("data-remote-image-drawn"),
+				};
+			});
+			detail(`${name} ineligible source after opt-in ${JSON.stringify(ineligible)} fetches ${counters.ineligible}`);
+			if (ineligible.present) {
+				if (ineligible.drawn) {
+					problems.push("an ineligible <source> (media='not all') was stamped drawn");
+				}
+				if (ineligible.display !== "none") {
+					problems.push("an image with no eligible candidate was revealed as an empty box");
+				}
+			}
 		}
 
 		const geo = await overflowGeometry(page);
@@ -1592,6 +1695,128 @@ async function verifyImages(page, baseUrl, name, counters) {
 // ---------------------------------------------------------------------------
 // 6. KEYBOARD
 // ---------------------------------------------------------------------------
+
+/** Focus a row's open button and report what that row is. */
+async function focusRow(page, index) {
+	return page.evaluate((rowIndex) => {
+		const rows = Array.from(document.querySelectorAll("[data-email-id]"));
+		const row = rows[rowIndex];
+		const button = row?.querySelector("button[aria-label^='Open conversation']");
+		button?.focus();
+		return {
+			rows: rows.length,
+			id: row?.getAttribute("data-email-id") ?? null,
+			subject: (button?.getAttribute("aria-label") ?? "")
+				.replace(/^Open conversation /, "")
+				.replace(/, has attachments$/, ""),
+			focused: document.activeElement === button,
+		};
+	}, index);
+}
+
+async function openedHeadings(page) {
+	return page.evaluate(() =>
+		Array.from(document.querySelectorAll("h1, h2, h3, [role='heading']"))
+			.map((heading) => heading.textContent?.trim())
+			.filter(Boolean)
+			.slice(0, 12),
+	);
+}
+
+/**
+ * Enter belongs to the row that has focus, on every surface. Search and Saved
+ * Views listen for no open-message command at all, so cancelling the native
+ * activation there left Enter doing nothing; in folders it opened the ringed
+ * row rather than the focused one. j/k now moves DOM focus with the ring, so
+ * both agree.
+ */
+async function verifyRowActivation(page, baseUrl, name) {
+	const item = "06c-row-activation";
+	const shots = [];
+	const problems = [];
+	const observed = [];
+	try {
+		for (const surface of [
+			{ label: "folder", url: `${baseUrl}/mailbox/${encodeURIComponent(mailboxId)}/emails/inbox` },
+			{ label: "search", url: `${baseUrl}/mailbox/${encodeURIComponent(mailboxId)}/search?q=renewal` },
+		]) {
+			await page.goto(surface.url, { waitUntil: "domcontentloaded" });
+			await page.locator("[data-email-id]").first().waitFor({ timeout: 20_000 });
+			await delay(700);
+
+			// Focus the SECOND row, so "the focused row" and "the first row" differ.
+			const target = await focusRow(page, 1);
+			if (!target.focused || !target.subject) {
+				problems.push(`${surface.label}: could not focus the second row (${JSON.stringify(target)})`);
+				continue;
+			}
+			await page.keyboard.press("Enter");
+			await delay(1_800);
+			const headings = await openedHeadings(page);
+			observed.push({ surface: surface.label, subject: target.subject, headings: headings.slice(0, 4) });
+			detail(`${name} ${surface.label} Tab+Enter target ${JSON.stringify(target)} headings ${JSON.stringify(headings)}`);
+			const shotPath = shot(name, item, `${surface.label}-enter`);
+			await page.screenshot({ path: shotPath });
+			shots.push(shotPath);
+			const probe = target.subject.slice(0, 24);
+			if (!headings.some((heading) => heading.includes(probe))) {
+				problems.push(
+					`${surface.label}: Enter on the focused row did not open "${target.subject}" (headings ${JSON.stringify(headings)})`,
+				);
+			}
+		}
+
+		// And after j/k the ring carries focus with it, so Enter opens the ringed row.
+		await openInbox(page, baseUrl);
+		await delay(600);
+		await focusRow(page, 0);
+		await page.keyboard.press("j");
+		await delay(500);
+		await page.keyboard.press("j");
+		await delay(500);
+		const ringed = await page.evaluate(() => {
+			const row = Array.from(document.querySelectorAll("[data-email-id]")).find((r) =>
+				String(r.className).includes("ring-inset"),
+			);
+			const button = row?.querySelector("button[aria-label^='Open conversation']");
+			return {
+				id: row?.getAttribute("data-email-id") ?? null,
+				subject: (button?.getAttribute("aria-label") ?? "")
+					.replace(/^Open conversation /, "")
+					.replace(/, has attachments$/, ""),
+				focusIsRinged: document.activeElement === button,
+			};
+		});
+		detail(`${name} ringed after j/k ${JSON.stringify(ringed)}`);
+		observed.push({ surface: "folder j/k", ...ringed });
+		if (!ringed.focusIsRinged) {
+			problems.push(`j/k left DOM focus off the ringed row (${JSON.stringify(ringed)})`);
+		}
+		if (ringed.subject) {
+			await page.keyboard.press("Enter");
+			await delay(1_800);
+			const headings = await openedHeadings(page);
+			const ringShot = shot(name, item, "jk-enter");
+			await page.screenshot({ path: ringShot });
+			shots.push(ringShot);
+			detail(`${name} j/k Enter headings ${JSON.stringify(headings)}`);
+			if (!headings.some((heading) => heading.includes(ringed.subject.slice(0, 24)))) {
+				problems.push(
+					`Enter after j/k did not open the ringed "${ringed.subject}" (headings ${JSON.stringify(headings)})`,
+				);
+			}
+		}
+
+		record(item, name, problems.length === 0 ? "PASS" : "FAIL", problems.length === 0
+			? `Enter opens the focused row on the folder list and on Search, and j/k carries DOM focus with the ring: ${JSON.stringify(observed)}`
+			: problems.join(" | "), shots);
+	} catch (error) {
+		const failShot = shot(name, item, "error");
+		await page.screenshot({ path: failShot, fullPage: true }).catch(() => {});
+		shots.push(failShot);
+		record(item, name, "FAIL", `threw: ${formatFailure(error)}`, shots);
+	}
+}
 
 async function keyboardTargetId(page) {
 	return page.evaluate(() => {
@@ -2242,7 +2467,7 @@ async function runViewport({ browser, baseUrl, storageState, name, viewport }) {
 	const page = await context.newPage();
 	page.setDefaultTimeout(20_000);
 	observe(page, name);
-	const counters = { hero: 0, tracker: 0, mixed: 0, picture: 0 };
+	const counters = { hero: 0, tracker: 0, mixed: 0, picture: 0, ineligible: 0, forged: 0 };
 	const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 	const only = onlyArg ? new Set(onlyArg.slice("--only=".length).split(",")) : null;
 	const run = (key, fn) => (!only || only.has(key) ? fn() : Promise.resolve());
@@ -2254,6 +2479,7 @@ async function runViewport({ browser, baseUrl, storageState, name, viewport }) {
 		await run("quoted", () => verifyQuotedBlocks(page, baseUrl, name));
 		await run("images", () => verifyImages(page, baseUrl, name, counters));
 		await run("keyboard", () => verifyKeyboard(page, baseUrl, name));
+		await run("rowactivation", () => verifyRowActivation(page, baseUrl, name));
 		await run("replysend", () => verifyInlineReplySendAttempt(page, baseUrl, name));
 		await run("undo", () => verifyUndo(page, baseUrl, name));
 		await run("send", () => verifySendFeedback(page, baseUrl, name));
