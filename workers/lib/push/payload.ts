@@ -34,15 +34,21 @@ const ENTITIES: [RegExp, string][] = [
 	[/&amp;/g, "&"], // decode last so "&amp;lt;" → "&lt;", not "<"
 ];
 
+// Elements whose *content* is markup, not prose. Stripping tags alone leaves
+// their text behind, which is how styled marketing mail rendered raw CSS as its
+// preview. The `|$` arm also drops a block left unterminated by an upstream
+// truncation (list snippets slice the body before it reaches here).
+const NON_PROSE_ELEMENTS = /<(script|style|head)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi;
+
 /**
  * Reduce a stored email body (HTML or plain text) to a short, safe one-line
- * preview: strip tags, decode the common entities, collapse whitespace, and
- * truncate with an ellipsis. Not a security sanitizer — the output is a
- * notification string, never rendered as HTML.
+ * preview: drop non-prose elements, strip tags, decode the common entities,
+ * collapse whitespace, and truncate with an ellipsis. Not a security sanitizer
+ * — the output is a notification/list string, never rendered as HTML.
  */
 export function htmlToSnippet(raw: string | null | undefined, maxLength = 120): string {
 	if (!raw) return "";
-	let s = raw.replace(/<[^>]*>/g, " ");
+	let s = raw.replace(NON_PROSE_ELEMENTS, " ").replace(/<[^>]*>/g, " ");
 	for (const [re, ch] of ENTITIES) s = s.replace(re, ch);
 	s = s.replace(/\s+/g, " ").trim();
 	return truncateText(s, maxLength);

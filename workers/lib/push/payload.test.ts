@@ -25,6 +25,24 @@ test("htmlToSnippet truncates with an ellipsis at the limit", () => {
 	assert.equal(htmlToSnippet("abcd", 5), "abcd"); // under limit, untouched
 });
 
+test("htmlToSnippet drops style/script/head content, not just their tags", () => {
+	const marketing = `<!DOCTYPE html><html><head><meta charset="utf-8">
+		<style type="text/css">
+			.btn { background-color: #ff0000; padding: 12px 24px; }
+			@media only screen and (max-width: 600px) { .wrap { width: 100% !important; } }
+		</style></head>
+		<body><div class="wrap"><h1>Your order shipped</h1>
+		<script>window.track("open");</script>
+		<p>Arriving Tuesday.</p></div></body></html>`;
+
+	assert.equal(htmlToSnippet(marketing), "Your order shipped Arriving Tuesday.");
+});
+
+test("htmlToSnippet drops a style block left unterminated by truncation", () => {
+	// A body sliced mid-<style> must not leak the CSS fragment as the preview.
+	assert.equal(htmlToSnippet("<p>Hi</p><style>.a { color: red; } .b { colo"), "Hi");
+});
+
 test("htmlToSnippet handles empty / missing body", () => {
 	assert.equal(htmlToSnippet(""), "");
 	assert.equal(htmlToSnippet(null), "");
