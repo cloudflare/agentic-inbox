@@ -32,7 +32,7 @@
 		"dev": "npm run dev:whispyr",
 		"preview:whispyr": "npm run build:whispyr && vite preview",
 		"preview:wiser": "npm run build:wiser && vite preview",
-		"test": "node --experimental-strip-types --test --test-concurrency=4 'workers/**/*.test.ts' 'app/**/*.test.ts' 'scripts/**/*.test.mjs'",
+		"test": "node --experimental-strip-types --test --test-concurrency=4 'workers/**/*.test.ts' 'app/**/*.test.ts' 'shared/**/*.test.ts' 'scripts/**/*.test.mjs'",
 		"test:workerd:inbound-exact-size": "node scripts/verify-inbound-exact-size-workerd.mjs",
 		"pretest:playwright:folder-create": "npm run test:playwright:install",
 		"test:playwright:folder-create": "node scripts/verify-folder-create-playwright.mjs",
