@@ -21,8 +21,10 @@ test("both surfaces render the one compose form", () => {
 test("the inline chrome never covers the thread it answers", () => {
 	assert.match(
 		compose,
-		/if \(variant === "inline"\) \{[\s\S]*?<section[\s\S]*?ref=\{surfaceRef\}[\s\S]*?\{header\}[\s\S]*?\{children\}/,
+		/if \(variant === "inline" && inlineHost\) \{[\s\S]*?createPortal\([\s\S]*?<section[\s\S]*?ref=\{surfaceRef\}[\s\S]*?\{header\}[\s\S]*?\{children\}[\s\S]*?inlineHost,/,
 	);
+	// No thread to live in means the modal, never a composer rendered nowhere.
+	assert.match(compose, /const isInline = wantsInline && inlineHost !== null/);
 	// Only the modal chrome wraps the form in a dialog.
 	assert.match(
 		compose,

@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useBlocker, useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import { useUIStore } from "~/hooks/useUIStore";
@@ -41,7 +42,11 @@ import {
   planComposeShortcut,
   type ComposeShortcutOrigin,
 } from "~/lib/compose-shortcuts";
-import type { ComposeSurface } from "~/lib/compose-surface";
+import {
+  composeSurface,
+  INLINE_COMPOSE_HOST_ID,
+  type ComposeSurface,
+} from "~/lib/compose-surface";
 import {
   consumeComposeFileTransfer,
   transferContainsFiles,
@@ -56,6 +61,7 @@ import RecipientCombobox from "./RecipientCombobox";
  */
 function ComposeChrome({
   variant,
+  inlineHost,
   open,
   title,
   status,
@@ -66,6 +72,7 @@ function ComposeChrome({
   children,
 }: {
   variant: ComposeSurface;
+  inlineHost: HTMLElement | null;
   open: boolean;
   title: string;
   status: string;
@@ -112,8 +119,8 @@ function ComposeChrome({
     </div>
   );
 
-  if (variant === "inline") {
-    return (
+  if (variant === "inline" && inlineHost) {
+    return createPortal(
       <section
         ref={surfaceRef}
         aria-label={title}
@@ -122,7 +129,8 @@ function ComposeChrome({
       >
         {header}
         {children}
-      </section>
+      </section>,
+      inlineHost,
     );
   }
 
@@ -150,27 +158,35 @@ function ComposeChrome({
  * Driven by the shared `isComposing` UI state, so the Compose button, the thread
  * toolbar, and the AI-draft flow all open the same form.
  *
- * Exactly one surface is mounted at a time (see `composeSurface`), which is what
- * keeps `useComposeForm` the single owner of the draft being written.
+ * This is the only mounted composer either way: the inline chrome is rendered
+ * into the open thread through a portal, so `useComposeForm` stays the single
+ * owner of the draft and the editor is only ever loaded through one module path.
  */
-export default function ComposeEmail({
-  variant = "modal",
-}: {
-  variant?: ComposeSurface;
-}) {
+export default function ComposeEmail() {
   const { mailboxId, folder } = useParams<{
     mailboxId: string;
     folder: string;
   }>();
-  const isInline = variant === "inline";
 
   const {
     isComposing,
     composeOptions,
+    selectedEmailId,
     queuedCompose,
     applyQueuedCompose,
     cancelQueuedCompose,
   } = useUIStore();
+  // The inline chrome needs a thread to live in. If that host is not on screen
+  // (panel still loading, no thread open) the modal is the truthful fallback.
+  const [inlineHost, setInlineHost] = useState<HTMLElement | null>(null);
+  const wantsInline = composeSurface(composeOptions, selectedEmailId) === "inline";
+  useEffect(() => {
+    setInlineHost(
+      wantsInline ? document.getElementById(INLINE_COMPOSE_HOST_ID) : null,
+    );
+  }, [wantsInline, composeOptions]);
+  const isInline = wantsInline && inlineHost !== null;
+  const variant: ComposeSurface = isInline ? "inline" : "modal";
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [aiActivityLabel, setAiActivityLabel] = useState("");
   const [aiPanelRetryKey, setAiPanelRetryKey] = useState(0);
@@ -460,6 +476,7 @@ export default function ComposeEmail({
     <>
       <ComposeChrome
         variant={variant}
+        inlineHost={inlineHost}
         open={isComposing}
         title={formTitle}
         status={draftStatusLabel}

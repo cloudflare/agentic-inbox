@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Email } from "../types.ts";
+import type { Email } from "../types/index.ts";
 import { composeSurface } from "./compose-surface.ts";
 
 const original = { id: "email-1" } as Email;

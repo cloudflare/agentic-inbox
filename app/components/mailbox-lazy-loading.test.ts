@@ -15,11 +15,7 @@ test("the rich composer is loaded only when compose is open", () => {
 	assert.doesNotMatch(mailbox, /import ComposeEmail from/);
 	assert.match(
 		mailbox,
-		/isModalCompose =[\s\S]*?isComposing &&[\s\S]*?composeSurface\(composeOptions, selectedEmailId\) === "modal"/,
-	);
-	assert.match(
-		mailbox,
-		/isModalCompose \? \([\s\S]*?<Suspense[\s\S]*?<ComposeEmail \/>/,
+		/isComposing \? \([\s\S]*?<Suspense[\s\S]*?<ComposeEmail \/>/,
 	);
 	assert.match(mailbox, /role="status"/);
 	assert.match(
@@ -34,26 +30,22 @@ test("the rich composer is loaded only when compose is open", () => {
 	assert.match(mailbox, /onRetry=\{\(\) => setComposeRetryKey/);
 });
 
-test("the inline composer is loaded only when a thread is being answered", () => {
+test("the composer is reached through exactly one import path", () => {
 	const panel = read("./EmailPanel.tsx");
+	const compose = read("./ComposeEmail.tsx");
 
-	assert.match(
-		panel,
-		/lazy\(\(\) => import\("~\/components\/ComposeEmail"\)\)/,
-	);
+	// A second import site makes the editor's dependencies reachable only through
+	// a nested dynamic import, which re-optimizes them into a second React copy
+	// at runtime and crashes the editor with an invalid hook call. The thread
+	// offers a host node instead, and the one mounted composer portals into it.
+	assert.doesNotMatch(panel, /import\("~\/components\/ComposeEmail"\)/);
 	assert.doesNotMatch(panel, /import ComposeEmail from/);
+	assert.match(panel, /<div id=\{INLINE_COMPOSE_HOST_ID\} \/>/);
+	assert.match(compose, /createPortal\(/);
 	assert.match(
-		panel,
-		/isInlineComposing = isComposing &&[\s\S]*?composeSurface\(composeOptions, selectedEmailId\) === "inline"/,
+		compose,
+		/document\.getElementById\(INLINE_COMPOSE_HOST_ID\)/,
 	);
-	assert.match(
-		panel,
-		/isInlineComposing && \([\s\S]*?<Suspense[\s\S]*?<InlineComposer variant="inline" \/>/,
-	);
-	assert.match(panel, /aria-label="Opening the composer"/);
-	assert.match(panel, /The composer could not open/);
-	assert.match(panel, /onRetry=\{\(\) => setInlineComposerRetryKey/);
-	assert.match(panel, /onCancel=\{\(\) => closeCompose\(\)\}/);
 });
 
 test("the optional writing assistant is deferred behind a retryable local boundary", () => {

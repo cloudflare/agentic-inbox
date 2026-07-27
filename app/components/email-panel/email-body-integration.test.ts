@@ -13,7 +13,7 @@ test("EmailPanel owns one selected body query and only expanded nonselected quer
 	assert.match(panel, /useQueries\(\{[\s\S]*activeExternalBodyIds\.map/);
 	assert.doesNotMatch(threadMessage, /useEmailBody|useQuery|useQueries/);
 	// A reply quotes its target, so that body is owned here too, not by a renderer.
-	assert.match(panel, /lastReceivedMessage\?\.body_external\) ids\.add\(lastReceivedMessage\.id\)/);
+	assert.match(panel, /if \(replyTargetBodyId\) ids\.add\(replyTargetBodyId\)/);
 });
 
 test("shared message body never falls back to an external preview and exposes exact recovery", () => {
