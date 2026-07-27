@@ -25,3 +25,20 @@ test("Shared members get clear managed read-only copy and admin-only access does
 	assert.match(page, /mailboxId/);
 	assert.doesNotMatch(source, /useMailbox\(/);
 });
+
+test("mailbox settings track dirty state and never lose in-progress edits", () => {
+	// Save is only offered when there is something to save.
+	assert.match(page, /disabled=\{!isDirty \|\| isSaving\}/);
+	// A background refetch reseeds only a clean form, or a different mailbox.
+	assert.match(
+		page,
+		/if \(seededMailboxRef\.current === mailbox\.id && isDirty\) return;/,
+	);
+	// Leaving with unsaved edits asks first, in-app and on unload.
+	assert.match(page, /useBlocker\(isDirty && !revokedByFeature\)/);
+	assert.match(
+		page,
+		/navigationBlocker\.state !== "blocked"[\s\S]*?window\.confirm\([\s\S]*?navigationBlocker\.proceed\(\)[\s\S]*?navigationBlocker\.reset\(\)/,
+	);
+	assert.match(page, /addEventListener\("beforeunload", warnBeforeUnload\)/);
+});

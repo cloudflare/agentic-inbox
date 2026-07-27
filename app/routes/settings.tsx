@@ -11,7 +11,7 @@ import {
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useBlocker, useNavigate, useParams } from "react-router";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
 import { PushNotificationsSection } from "~/components/settings/push-notifications/PushNotificationsSection";
 import { SignatureSettingsCard } from "~/components/settings/SignatureSettingsCard";
@@ -63,12 +63,46 @@ export default function SettingsRoute() {
 		setRevokedByFeature(false);
 	}, [mailboxId]);
 
+	const savedDisplayName = mailbox
+		? mailbox.settings?.fromName || mailbox.name || ""
+		: "";
+	const savedAgentPrompt = mailbox?.settings?.agentSystemPrompt || "";
+	// Save trims the prompt, so compare what would be sent, not what is typed.
+	const isDirty = Boolean(mailbox) &&
+		(displayName !== savedDisplayName ||
+			agentPrompt.trim() !== savedAgentPrompt.trim());
+
+	// Seed the form from the server, but never over edits in progress: the
+	// change feed refetches this mailbox while the user is typing. Switching
+	// mailbox always reseeds, because those edits belong to the other mailbox.
+	const seededMailboxRef = useRef<string | undefined>(undefined);
 	useEffect(() => {
-		if (mailbox) {
-			setDisplayName(mailbox.settings?.fromName || mailbox.name || "");
-			setAgentPrompt(mailbox.settings?.agentSystemPrompt || "");
+		if (!mailbox) return;
+		if (seededMailboxRef.current === mailbox.id && isDirty) return;
+		seededMailboxRef.current = mailbox.id;
+		setDisplayName(savedDisplayName);
+		setAgentPrompt(savedAgentPrompt);
+	}, [mailbox, isDirty, savedDisplayName, savedAgentPrompt]);
+
+	// Leaving with unsaved edits asks first, in-app and on a full unload.
+	const navigationBlocker = useBlocker(isDirty && !revokedByFeature);
+	useEffect(() => {
+		if (navigationBlocker.state !== "blocked") return;
+		if (window.confirm("Discard your unsaved settings changes?")) {
+			navigationBlocker.proceed();
+		} else {
+			navigationBlocker.reset();
 		}
-	}, [mailbox]);
+	}, [navigationBlocker]);
+	useEffect(() => {
+		if (!isDirty) return;
+		const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+			event.preventDefault();
+			event.returnValue = "";
+		};
+		window.addEventListener("beforeunload", warnBeforeUnload);
+		return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+	}, [isDirty]);
 
 	const handleSave = async () => {
 		if (!mailbox || !mailboxId) return;
@@ -215,7 +249,12 @@ export default function SettingsRoute() {
 
 				{/* Save */}
 				<div className="flex justify-end">
-					<Button variant="primary" onClick={handleSave} loading={isSaving}>
+					<Button
+						variant="primary"
+						onClick={handleSave}
+						loading={isSaving}
+						disabled={!isDirty || isSaving}
+					>
 						Save Changes
 					</Button>
 				</div>
