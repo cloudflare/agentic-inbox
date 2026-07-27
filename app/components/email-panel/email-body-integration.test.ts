@@ -36,3 +36,10 @@ test("Forward is both disabled and handler-guarded until the selected body is au
 	assert.match(toolbar, /disabled=\{!canForward\}/);
 	assert.match(toolbar, /Forward unavailable:/);
 });
+
+test("the move-to-folder menu scrolls instead of clipping past a few folders", () => {
+	assert.match(
+		toolbar,
+		/function MoveToFolderMenu[\s\S]*?max-h-\[min\(22rem,calc\(100vh-6rem\)\)\][\s\S]*?overflow-y-auto/,
+	);
+});
