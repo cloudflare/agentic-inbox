@@ -160,6 +160,10 @@ const MARKETING_BODY = [
 	"<h1>Your July product update is here</h1>",
 	"<p>Save 30% on annual plans this week only.</p>",
 	'<img alt="Marketing tracker" src="https://cdn.brightmail.example/pixel.png" width="1" height="1">',
+	// Mixed source: the src can never load under either CSP, the srcset can once
+	// the reader opts in. Offering "Load images" and then still hiding it is the
+	// defect this fixture exists to catch.
+	'<img alt="Marketing mixed" src="/journey-relative-fallback.png" srcset="https://cdn.brightmail.example/mixed.svg 1x">',
 	`<p>${MARKETING_TAIL}</p>`,
 	"</div>",
 ].join("");
@@ -355,6 +359,15 @@ async function installFixture(page, counters) {
 
 	await page.route("https://cdn.brightmail.example/**", async (route) => {
 		const url = route.request().url();
+		if (url.endsWith("mixed.svg")) {
+			counters.mixed += 1;
+			await route.fulfill({
+				status: 200,
+				contentType: "image/svg+xml",
+				body: '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="180"><rect width="480" height="180" fill="#15803d"/><text x="30" y="105" fill="#fff" font-size="26">MIXED SRCSET LOADED</text></svg>',
+			});
+			return;
+		}
 		if (url.endsWith("hero.svg")) {
 			counters.hero += 1;
 			// Answers late so the frame can only fit it by following the reflow.
@@ -708,16 +721,29 @@ async function openThread(page, baseUrl) {
 	await delay(1_200);
 }
 
-async function clickReply(page) {
-	const reply = page.getByRole("button", { name: "Reply", exact: true });
-	if (await reply.count()) {
-		await reply.first().click();
+async function clickThreadAction(page, label) {
+	const direct = page.getByRole("button", { name: label, exact: true });
+	if (await direct.count()) {
+		await direct.first().click();
 		return;
 	}
 	// Sub-xl the toolbar collapses actions into an overflow menu.
 	const more = page.getByRole("button", { name: /More actions|More/ }).first();
 	await more.click();
-	await page.getByRole("menuitem", { name: /^Reply$/ }).click();
+	await page.getByRole("menuitem", { name: new RegExp(`^${label}$`) }).click();
+}
+
+async function clickReply(page) {
+	await clickThreadAction(page, "Reply");
+}
+
+/** Escape, then answer the discard prompt if one appears. */
+async function dismissComposer(page) {
+	await page.keyboard.press("Escape").catch(() => {});
+	await delay(700);
+	const discard = page.getByRole("button", { name: /^Discard$/i }).first();
+	if (await discard.count()) await discard.click().catch(() => {});
+	await delay(500);
 }
 
 async function inlineComposerGeometry(page) {
@@ -965,6 +991,81 @@ async function verifyInlineReply(page, baseUrl, name) {
 	}
 }
 
+/**
+ * The reply quote and the forwarded original are marked blocks: compose seeds
+ * them, and signature placement plus AI rewrites navigate by those markers. The
+ * editor schema has to carry them through a real edit, so this types into the
+ * composer before reading the marker back.
+ */
+async function verifyQuotedBlocks(page, baseUrl, name) {
+	const item = "03b-quoted-blocks";
+	const shots = [];
+	const problems = [];
+	const observed = [];
+	try {
+		for (const scenario of [
+			{ action: "Reply", marker: "data-mail-quoted-reply", tag: "blockquote" },
+			{ action: "Forward", marker: "data-mail-forwarded-message", tag: "div" },
+		]) {
+			await openThread(page, baseUrl);
+			await clickThreadAction(page, scenario.action);
+			await delay(1_500);
+			const editor = page.locator("[aria-label='Message body']").first();
+			await editor.waitFor({ timeout: 10_000 });
+			await editor.click();
+			await page.keyboard.type("Confirming the date.");
+			await delay(600);
+
+			const state = await page.evaluate((marker) => {
+				const body = document.querySelector("[aria-label='Message body']");
+				const block = body?.querySelector(`[${marker}]`) ?? null;
+				return {
+					found: Boolean(block),
+					tag: block?.tagName.toLowerCase() ?? null,
+					version: block?.getAttribute(marker) ?? null,
+					styled: Boolean(block?.getAttribute("style")),
+					typedThrough: (body?.textContent ?? "").includes("Confirming the date."),
+					html: (body?.innerHTML ?? "").slice(0, 300),
+				};
+			}, scenario.marker);
+			observed.push({ action: scenario.action, ...state, html: undefined });
+			detail(`${name} ${scenario.action} marked block ${JSON.stringify(state)}`);
+			const blockShot = shot(name, item, scenario.action.toLowerCase());
+			await page.screenshot({ path: blockShot });
+			shots.push(blockShot);
+
+			if (!state.typedThrough) {
+				problems.push(`${scenario.action}: typed text never reached the editor`);
+			}
+			if (!state.found) {
+				problems.push(
+					`${scenario.action}: ${scenario.marker} was dropped once the user typed; body starts "${state.html}"`,
+				);
+			} else {
+				if (state.version !== "v1") {
+					problems.push(`${scenario.action}: marker value is "${state.version}", expected "v1"`);
+				}
+				if (state.tag !== scenario.tag) {
+					problems.push(`${scenario.action}: marker landed on <${state.tag}>, expected <${scenario.tag}>`);
+				}
+				if (!state.styled) {
+					problems.push(`${scenario.action}: the quote styling was dropped from the marked block`);
+				}
+			}
+			await dismissComposer(page);
+		}
+
+		record(item, name, problems.length === 0 ? "PASS" : "FAIL", problems.length === 0
+			? `after a real edit the reply quote keeps <blockquote data-mail-quoted-reply="v1" style> and the forward keeps <div data-mail-forwarded-message="v1" style>: ${JSON.stringify(observed)}`
+			: problems.join(" | "), shots);
+	} catch (error) {
+		const failShot = shot(name, item, "error");
+		await page.screenshot({ path: failShot, fullPage: true }).catch(() => {});
+		shots.push(failShot);
+		record(item, name, "FAIL", `threw: ${formatFailure(error)}`, shots);
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 4. SEND FEEDBACK
 // ---------------------------------------------------------------------------
@@ -1134,6 +1235,53 @@ async function verifySendFeedback(page, baseUrl, name) {
 			problems.push(`"Sending…" toast has no Undo action; buttons ${JSON.stringify(sendingToast.buttons)}`);
 		}
 
+		// Leaving the mailbox mid-send must not strand the watch. In-app
+		// navigation only (the sidebar's own button), because a full load would
+		// reset the store this is meant to exercise.
+		const leftMailbox = await page.evaluate(() => {
+			const back = Array.from(document.querySelectorAll("button")).find(
+				(button) => button.textContent?.trim() === "Mailboxes",
+			);
+			back?.click();
+			return Boolean(back);
+		});
+		await delay(2_000);
+		const awayUrl = page.url();
+		const awayToasts = await readToasts(page);
+		const awayShot = shot(name, item, "away-mid-send");
+		await page.screenshot({ path: awayShot });
+		shots.push(awayShot);
+		await page.goBack();
+		await delay(2_500);
+		const backToasts = await readToasts(page);
+		const pendingToastElements = await page.evaluate(() =>
+			Array.from(document.querySelectorAll("[data-toast-title]")).filter((title) =>
+				/Sending…|Sending\.\.\./.test((title.textContent ?? "").trim()),
+			).length,
+		);
+		const backShot = shot(name, item, "back-mid-send");
+		await page.screenshot({ path: backShot });
+		shots.push(backShot);
+		timeline.push({ at: "away", url: awayUrl, toasts: awayToasts });
+		timeline.push({ at: "back", url: page.url(), toasts: backToasts, pendingToastElements });
+		detail(`${name} away ${awayUrl} ${JSON.stringify(awayToasts)} back ${JSON.stringify(backToasts)} pending elements ${pendingToastElements}`);
+
+		if (!leftMailbox) {
+			problems.push("no in-app Mailboxes control to leave the mailbox mid-send");
+		} else if (!/\/mailboxes/.test(awayUrl)) {
+			problems.push(`leaving the mailbox mid-send did not reach /mailboxes (url ${awayUrl})`);
+		}
+		if (awayToasts.length === 0) {
+			problems.push("the in-flight send lost its toast when the mailbox route unmounted");
+		}
+		// readToasts collapses identical copy, so count the real toast elements:
+		// an orphaned "Sending…" plus a freshly created one read the same.
+		if (pendingToastElements > 1) {
+			problems.push(
+				`returning mid-send left ${pendingToastElements} "Sending…" toasts (the first was orphaned and a second was raised)`,
+			);
+		}
+
 		// Watch the lifecycle resolve. The cap is 90s in send-outcome.ts.
 		let resolved = null;
 		const deadline = Date.now() + 105_000;
@@ -1292,8 +1440,8 @@ async function verifyImages(page, baseUrl, name, counters) {
 			}
 			if (image.src) problems.push(`blocked image "${image.alt}" kept its remote src`);
 		}
-		if (counters.hero !== 0 || counters.tracker !== 0) {
-			problems.push(`remote images were fetched before opt-in (hero ${counters.hero}, tracker ${counters.tracker})`);
+		if (counters.hero !== 0 || counters.tracker !== 0 || counters.mixed !== 0) {
+			problems.push(`remote images were fetched before opt-in (hero ${counters.hero}, tracker ${counters.tracker}, mixed ${counters.mixed})`);
 		}
 		const banner = page.getByRole("button", { name: "Load images" });
 		if (!(await banner.count())) {
@@ -1349,6 +1497,35 @@ async function verifyImages(page, baseUrl, name, counters) {
 			}
 			if (grown.tailBottom > grown.clientHeight + 1) {
 				problems.push(`text below the images is clipped (tail bottom ${grown.tailBottom} > client ${grown.clientHeight})`);
+			}
+
+			// An image whose src can never load but whose srcset can must reveal
+			// itself on opt-in, not stay marked blocked with a live srcset.
+			await pollValue(() => counters.mixed, (v) => v === 1, "mixed srcset opt-in fetch", 15_000)
+				.catch(() => counters.mixed);
+			await delay(600);
+			const mixed = await optedContent.evaluate(() => {
+				const image = document.querySelector("img[alt='Marketing mixed']");
+				if (!image) return { present: false };
+				return {
+					present: true,
+					display: getComputedStyle(image).display,
+					blocked: image.hasAttribute("data-remote-image-blocked"),
+					src: image.getAttribute("src"),
+					srcset: image.getAttribute("srcset"),
+					height: image.getBoundingClientRect().height,
+					naturalWidth: image.naturalWidth,
+				};
+			});
+			detail(`${name} mixed src/srcset after opt-in ${JSON.stringify(mixed)} fetches ${counters.mixed}`);
+			if (!mixed.present) {
+				problems.push("the mixed src/srcset image is missing from the opted-in document");
+			} else {
+				if (mixed.blocked) problems.push("mixed src/srcset image is still marked blocked after opt-in");
+				if (mixed.display === "none") problems.push("mixed src/srcset image stayed hidden after Load images");
+				if (mixed.src) problems.push(`mixed image kept its unloadable src "${mixed.src}"`);
+				if (!mixed.srcset) problems.push("mixed image lost the srcset the reader opted in to");
+				if (mixed.naturalWidth === 0) problems.push("mixed image never decoded its srcset candidate");
 			}
 		}
 
@@ -1417,6 +1594,34 @@ async function verifyKeyboard(page, baseUrl, name) {
 		if (afterJ === null) problems.push("j did not move a keyboard target onto any row (shortcut dead with row focused)");
 		if (afterJJ === afterJ) problems.push(`second j did not advance (stuck on ${afterJ})`);
 		if (afterK !== afterJ) problems.push(`k did not step back (j=${afterJ}, jj=${afterJJ}, k=${afterK})`);
+
+		// Enter belongs to whatever control has focus. The list shortcut must not
+		// cancel a focused button's own activation.
+		const buttonFocused = await page.evaluate(() => {
+			const compose = Array.from(document.querySelectorAll("button")).find(
+				(button) => button.textContent?.trim() === "Compose",
+			);
+			compose?.focus();
+			return Boolean(compose) && document.activeElement === compose;
+		});
+		if (!buttonFocused) {
+			problems.push("could not focus the Compose button for the Enter activation check");
+		} else {
+			await page.keyboard.press("Enter");
+			await delay(1_400);
+			const enterState = await page.evaluate(() => ({
+				composers: document.querySelectorAll("[aria-label='Message body']").length,
+				url: location.pathname,
+			}));
+			detail(`${name} Enter on focused button ${JSON.stringify(enterState)}`);
+			const enterShot = shot(name, item, "enter-on-button");
+			await page.screenshot({ path: enterShot });
+			shots.push(enterShot);
+			if (enterState.composers === 0) {
+				problems.push("Enter on the focused Compose button did not activate it (global shortcut cancelled the native default)");
+			}
+			await dismissComposer(page);
+		}
 
 		// Command palette.
 		await page.keyboard.press("Meta+k");
@@ -1991,7 +2196,7 @@ async function runViewport({ browser, baseUrl, storageState, name, viewport }) {
 	const page = await context.newPage();
 	page.setDefaultTimeout(20_000);
 	observe(page, name);
-	const counters = { hero: 0, tracker: 0 };
+	const counters = { hero: 0, tracker: 0, mixed: 0 };
 	const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 	const only = onlyArg ? new Set(onlyArg.slice("--only=".length).split(",")) : null;
 	const run = (key, fn) => (!only || only.has(key) ? fn() : Promise.resolve());
@@ -2000,6 +2205,7 @@ async function runViewport({ browser, baseUrl, storageState, name, viewport }) {
 		await run("list", () => verifyList(page, baseUrl, name));
 		await run("thread", () => verifyThreadOrder(page, baseUrl, name));
 		await run("reply", () => verifyInlineReply(page, baseUrl, name));
+		await run("quoted", () => verifyQuotedBlocks(page, baseUrl, name));
 		await run("images", () => verifyImages(page, baseUrl, name, counters));
 		await run("keyboard", () => verifyKeyboard(page, baseUrl, name));
 		await run("replysend", () => verifyInlineReplySendAttempt(page, baseUrl, name));
