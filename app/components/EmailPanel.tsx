@@ -551,7 +551,6 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		<div className="flex flex-col h-full">
 			<EmailPanelToolbar
 				email={email}
-				mailboxId={mailboxId}
 				isDraftFolder={isDraftFolder}
 				isOutboxFolder={isOutboxFolder}
 				isSnoozedFolder={isSnoozedFolder}

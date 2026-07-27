@@ -26,7 +26,6 @@ import type { Folder, Email } from "~/types";
 
 interface EmailPanelToolbarProps {
 	email: Email;
-	mailboxId?: string;
 	isDraftFolder: boolean;
 	isOutboxFolder: boolean;
 	isSnoozedFolder: boolean;
@@ -60,7 +59,6 @@ interface EmailPanelToolbarProps {
 
 export default function EmailPanelToolbar({
 	email,
-	mailboxId,
 	isDraftFolder,
 	isOutboxFolder,
 	isSnoozedFolder,
