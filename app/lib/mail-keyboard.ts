@@ -100,9 +100,22 @@ export function resolveMailShortcut(
 export const TEXT_ENTRY_SELECTOR =
 	"input:not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox']";
 
+/**
+ * A dialog owns the keyboard for as long as it is open, so mail shortcuts must
+ * never reach the list behind it. Base UI traps focus on the dialog's own
+ * buttons, and buttons are deliberately unprotected above, so the surface has to
+ * be matched explicitly. Roles are the emitted contract: Dialog renders
+ * role="dialog" and AlertDialog role="alertdialog"; neither sets aria-modal.
+ * The inline reply composer is not a dialog and keeps its shortcuts.
+ */
+export const MODAL_SURFACE_SELECTOR = '[role="dialog"], [role="alertdialog"]';
+
 export function isMailShortcutProtectedTarget(
 	target: EventTarget | null,
 ): boolean {
 	if (!(target instanceof Element)) return false;
-	return target.closest(TEXT_ENTRY_SELECTOR) !== null;
+	return (
+		target.closest(TEXT_ENTRY_SELECTOR) !== null ||
+		target.closest(MODAL_SURFACE_SELECTOR) !== null
+	);
 }

@@ -2,10 +2,34 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	isMailShortcutProtectedTarget,
+	MODAL_SURFACE_SELECTOR,
 	resolveMailShortcut,
 	resolveVisibleMailTargetId,
 	TEXT_ENTRY_SELECTOR,
 } from "./mail-keyboard.ts";
+
+// Node has no DOM: stand in a tag-name element carrying an optional ancestor
+// role, so the real predicate runs against the real selectors. Focus behaviour
+// itself is covered by Playwright.
+class StubElement {
+	tag: string;
+	ancestorRole?: string;
+	constructor(tag: string, ancestorRole?: string) {
+		this.tag = tag;
+		this.ancestorRole = ancestorRole;
+	}
+	closest(selector: string) {
+		const parts = selector.split(", ").map((part) => part.trim());
+		if (parts.some((part) => part.startsWith(this.tag))) return this;
+		if (this.ancestorRole && parts.includes(`[role="${this.ancestorRole}"]`)) {
+			return this;
+		}
+		return null;
+	}
+}
+(globalThis as { Element?: unknown }).Element = StubElement;
+const target = (tag: string, ancestorRole?: string) =>
+	new StubElement(tag, ancestorRole) as unknown as EventTarget;
 
 function shortcut(
 	key: string,
@@ -97,27 +121,28 @@ test("focusable mail chrome never blocks shortcuts or the command palette", () =
 });
 
 test("the protected-target check reads the element tree, not the event", () => {
-	// Node has no DOM: stand in a tag-name element so the real predicate runs
-	// against the real selector. Focus behaviour itself is covered by Playwright.
-	class StubElement {
-		tag: string;
-		constructor(tag: string) {
-			this.tag = tag;
-		}
-		closest(selector: string) {
-			return selector.split(", ").some((part) => part.startsWith(this.tag))
-				? this
-				: null;
-		}
-	}
-	(globalThis as { Element?: unknown }).Element = StubElement;
-	const target = (tag: string) => new StubElement(tag) as unknown as EventTarget;
-
 	assert.equal(isMailShortcutProtectedTarget(target("input")), true);
 	assert.equal(isMailShortcutProtectedTarget(target("textarea")), true);
 	assert.equal(isMailShortcutProtectedTarget(target("button")), false);
 	assert.equal(isMailShortcutProtectedTarget(target("a")), false);
 	assert.equal(isMailShortcutProtectedTarget(null), false);
+});
+
+test("an open dialog owns the keyboard, so triage never lands behind it", () => {
+	// The Snooze dialog puts focus on its own buttons; e must not archive the
+	// conversation still sitting in the list behind it.
+	assert.equal(isMailShortcutProtectedTarget(target("button", "dialog")), true);
+	assert.equal(
+		isMailShortcutProtectedTarget(target("button", "alertdialog")),
+		true,
+	);
+	// A mail row is a button too, and it must keep every shortcut working.
+	assert.equal(isMailShortcutProtectedTarget(target("button")), false);
+	assert.equal(
+		MODAL_SURFACE_SELECTOR.includes('[role="dialog"]'),
+		true,
+		"Base UI Dialog emits role=dialog; aria-modal is never set",
+	);
 });
 
 test("current-conversation commands never fall back to an unrelated first row", () => {
