@@ -46,8 +46,8 @@ export class D1AiCostControlStore implements AiCostControlStore {
 		return row ? mapMonth(row) : null;
 	}
 
-	async reapExpiredReservations(now: number): Promise<number> {
-		const result = await this.#db
+	async reapExpiredReservations(now: number): Promise<void> {
+		await this.#db
 			.prepare(
 				`UPDATE ai_usage_events
 				 SET state = 'failed', error_code = 'reservation_expired',
@@ -60,7 +60,6 @@ export class D1AiCostControlStore implements AiCostControlStore {
 			)
 			.bind(now, now)
 			.run();
-		return changes(result);
 	}
 
 	async recordEvent(event: AiUsageEvent): Promise<void> {
@@ -127,7 +126,8 @@ export class D1AiCostControlStore implements AiCostControlStore {
 					 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?, ?
 					 FROM ai_usage_months
 					 WHERE environment = ? AND month_key = ?
-					   AND spent_micros + reserved_micros + ? <= ?`,
+					   AND spent_micros + reserved_micros + ? <= ?
+					 RETURNING id`,
 				)
 				.bind(
 					reservation.id,
@@ -155,7 +155,7 @@ export class D1AiCostControlStore implements AiCostControlStore {
 			reservation.environment,
 			reservation.monthKey,
 		);
-		return { reserved: changes(results[1]) === 1, month };
+		return { reserved: rowCount(results[1]) === 1, month };
 	}
 
 	async completeReservation(
@@ -174,7 +174,8 @@ export class D1AiCostControlStore implements AiCostControlStore {
 					`UPDATE ai_usage_events
 					 SET state = 'completed', actual_cost_micros = ?, prompt_tokens = ?,
 					     completion_tokens = ?, completed_at = ?
-					 WHERE id = ? AND state = 'reserved'`,
+					 WHERE id = ? AND state = 'reserved'
+					 RETURNING id`,
 				)
 				.bind(
 					actual.actualCostMicros,
@@ -191,15 +192,16 @@ export class D1AiCostControlStore implements AiCostControlStore {
 					   AND spent_micros >= ?
 					   AND (environment, month_key) = (
 					     SELECT environment, month_key FROM ai_usage_events WHERE id = ?
-					   )`,
+					   )
+					 RETURNING month_key`,
 				)
 				.bind(completedAt, completedAt, alertThresholdMicros, reservationId),
 		]);
 		const month = await this.#monthForEvent(reservationId);
 		return {
-			completed: changes(results[0]) === 1,
+			completed: rowCount(results[0]) === 1,
 			month,
-			emitAlert: changes(results[1]) === 1,
+			emitAlert: rowCount(results[1]) === 1,
 		};
 	}
 
@@ -208,11 +210,12 @@ export class D1AiCostControlStore implements AiCostControlStore {
 			.prepare(
 				`UPDATE ai_usage_events
 				 SET provider_started_at = COALESCE(provider_started_at, ?)
-				 WHERE id = ? AND state = 'reserved'`,
+				 WHERE id = ? AND state = 'reserved'
+				 RETURNING id`,
 			)
 			.bind(startedAt, reservationId)
 			.run();
-		return changes(result) === 1;
+		return rowCount(result) === 1;
 	}
 
 	async failReservation(
@@ -236,7 +239,8 @@ export class D1AiCostControlStore implements AiCostControlStore {
 				       ELSE 0
 				     END,
 				     prompt_tokens = ?, completion_tokens = ?, completed_at = ?
-				 WHERE id = ? AND state = 'reserved'`,
+				 WHERE id = ? AND state = 'reserved'
+				 RETURNING id`,
 			)
 			.bind(
 				failure.errorCode ?? null,
@@ -248,7 +252,7 @@ export class D1AiCostControlStore implements AiCostControlStore {
 				reservationId,
 			)
 			.run();
-		return changes(result) === 1;
+		return rowCount(result) === 1;
 	}
 
 	async approveBudget(input: {
@@ -277,7 +281,8 @@ export class D1AiCostControlStore implements AiCostControlStore {
 					 FROM ai_usage_months
 					 WHERE environment = ? AND month_key = ?
 					   AND ? > approved_budget_micros
-					   AND ? > spent_micros + reserved_micros`,
+					   AND ? > spent_micros + reserved_micros
+					 RETURNING id`,
 				)
 				.bind(
 					input.reviewId,
@@ -291,7 +296,7 @@ export class D1AiCostControlStore implements AiCostControlStore {
 					input.newApprovedBudgetMicros,
 				),
 		]);
-		if (changes(results[1]) !== 1) {
+		if (rowCount(results[1]) !== 1) {
 			throw new Error("The reviewed AI budget did not raise the active monthly cap");
 		}
 		return this.#requiredMonth(input.environment, input.monthKey);
@@ -473,6 +478,9 @@ function mapMonth(row: MonthRow): AiMonthLedger {
 	};
 }
 
-function changes(result: D1Result<unknown> | undefined): number {
-	return Number(result?.meta?.changes ?? 0);
+// Row counts, not meta.changes: these writes fire the migration 0004 aggregate
+// triggers and D1 folds trigger-caused row changes into meta.changes, so only
+// the RETURNING rows count the statement itself.
+function rowCount(result: D1Result<unknown> | undefined): number {
+	return result?.results.length ?? 0;
 }

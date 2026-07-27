@@ -113,7 +113,7 @@ export type AiUsageFailure = {
 
 export interface AiCostControlStore {
 	getMonth(environment: string, monthKey: string): Promise<AiMonthLedger | null>;
-	reapExpiredReservations(now: number): Promise<number>;
+	reapExpiredReservations(now: number): Promise<void>;
 	recordEvent(event: AiUsageEvent): Promise<void>;
 	tryReserve(
 		reservation: AiUsageReservation,

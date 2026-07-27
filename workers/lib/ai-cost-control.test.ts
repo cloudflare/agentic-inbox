@@ -24,8 +24,7 @@ class MemoryStore implements AiCostControlStore {
 		return this.month ? { ...this.month } : null;
 	}
 
-	async reapExpiredReservations(now: number): Promise<number> {
-		let reaped = 0;
+	async reapExpiredReservations(now: number): Promise<void> {
 		for (const [id, reservation] of this.reservations) {
 			if (reservation.expiresAt > now) continue;
 			this.reservations.delete(id);
@@ -35,9 +34,7 @@ class MemoryStore implements AiCostControlStore {
 					this.month.spentMicros += reservation.estimatedCostMicros;
 				}
 			}
-			reaped++;
 		}
-		return reaped;
 	}
 
 	async recordEvent(event: AiUsageEvent): Promise<void> {
