@@ -90,16 +90,59 @@ export function resolveMailShortcut(
 	return command ? { command } : {};
 }
 
+/**
+ * Only genuine text entry may swallow a shortcut. Buttons, links and menu items
+ * are excluded on purpose: mail rows are buttons, so protecting them killed
+ * every shortcut and the command palette as soon as a row took focus. Checkbox
+ * and radio inputs are excluded for the same reason - the row select control is
+ * a checkbox and holds focus after a click.
+ */
+export const TEXT_ENTRY_SELECTOR =
+	"input:not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox']";
+
+/**
+ * A dialog owns the keyboard for as long as it is open, so mail shortcuts must
+ * never reach the list behind it. Base UI traps focus on the dialog's own
+ * buttons, and buttons are deliberately unprotected above, so the surface has to
+ * be matched explicitly. Roles are the emitted contract: Dialog renders
+ * role="dialog" and AlertDialog role="alertdialog"; neither sets aria-modal.
+ * The inline reply composer is not a dialog and keeps its shortcuts.
+ */
+export const MODAL_SURFACE_SELECTOR = '[role="dialog"], [role="alertdialog"]';
+
+/**
+ * Controls whose native default for an activation key IS their own activation:
+ * cancelling it to run a list shortcut leaves the button visibly dead.
+ * Checkboxes and radios are absent on purpose - Enter does not activate them,
+ * and the row select control is a checkbox.
+ *
+ * Mail rows are included. They are buttons, and Enter must open the row that
+ * actually has focus: Search and Saved Views listen for no `open-message` at
+ * all, so publishing one there did nothing. The folder list keeps focus and its
+ * ring on the same row (see the roving focus in email-list.tsx), so native
+ * activation and the shortcut agree by construction.
+ */
+export const ACTIVATION_TARGET_SELECTOR =
+	'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="tab"], [role="switch"]';
+
+/** Space is included ahead of any mapping: its default is activation too. */
+const ACTIVATION_KEYS: ReadonlySet<string> = new Set(["enter", " ", "spacebar"]);
+
+export function activatesFocusedControl(
+	key: string,
+	target: EventTarget | null,
+): boolean {
+	if (!ACTIVATION_KEYS.has(key.toLowerCase())) return false;
+	if (!(target instanceof Element)) return false;
+	return target.closest(ACTIVATION_TARGET_SELECTOR) !== null;
+}
+
 export function isMailShortcutProtectedTarget(
 	target: EventTarget | null,
 ): boolean {
 	if (!(target instanceof Element)) return false;
-	if (
-		target.closest(
-			"input, textarea, select, button, a[href], summary, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='button'], [role='menuitem']",
-		)
-	) {
-		return true;
-	}
-	return false;
+	return (
+		target.closest(TEXT_ENTRY_SELECTOR) !== null ||
+		target.closest(MODAL_SURFACE_SELECTOR) !== null
+	);
 }

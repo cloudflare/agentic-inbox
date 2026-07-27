@@ -19,10 +19,63 @@ test("htmlToSnippet strips tags, decodes entities, collapses whitespace", () => 
 	assert.equal(htmlToSnippet("a &amp; b &lt;c&gt; &quot;d&quot;"), 'a & b <c> "d"');
 });
 
+test("htmlToSnippet decodes the punctuation entities marketing mail actually sends", () => {
+	// Observed live in a list row, rendered with the entity intact.
+	assert.equal(
+		htmlToSnippet("Save 30% ... &mdash; ends Friday."),
+		"Save 30% ... — ends Friday.",
+	);
+	assert.equal(
+		htmlToSnippet("&lsquo;a&rsquo; &ldquo;b&rdquo; &ndash; c&hellip;"),
+		"\u2018a\u2019 \u201cb\u201d \u2013 c\u2026",
+	);
+	assert.equal(
+		htmlToSnippet("&bull; x &middot; y &copy; &reg; &trade;"),
+		"\u2022 x \u00b7 y \u00a9 \u00ae \u2122",
+	);
+});
+
+test("htmlToSnippet decodes numeric entities in decimal and hex", () => {
+	assert.equal(htmlToSnippet("a &#8212; b"), "a — b");
+	assert.equal(htmlToSnippet("a &#x2014; b"), "a — b");
+	assert.equal(htmlToSnippet("a &#X2014; b"), "a — b");
+	assert.equal(htmlToSnippet("caf&#233;"), "café");
+	// Astral plane still decodes as one code point.
+	assert.equal(htmlToSnippet("&#128512;"), "\u{1F600}");
+});
+
+test("htmlToSnippet leaves undecodable or unknown escapes as written", () => {
+	// Out of Unicode range, lone surrogate, and an entity we do not know.
+	assert.equal(htmlToSnippet("&#1114112;"), "&#1114112;");
+	assert.equal(htmlToSnippet("&#xD800;"), "&#xD800;");
+	assert.equal(htmlToSnippet("&notarealentity;"), "&notarealentity;");
+	// A double-escaped entity must survive one decode, not two.
+	assert.equal(htmlToSnippet("&amp;mdash;"), "&mdash;");
+	assert.equal(htmlToSnippet("&amp;#8212;"), "&#8212;");
+});
+
 test("htmlToSnippet truncates with an ellipsis at the limit", () => {
 	const out = htmlToSnippet("abcdefghij", 5);
 	assert.equal(out, "abcd…"); // 4 chars + ellipsis
 	assert.equal(htmlToSnippet("abcd", 5), "abcd"); // under limit, untouched
+});
+
+test("htmlToSnippet drops style/script/head content, not just their tags", () => {
+	const marketing = `<!DOCTYPE html><html><head><meta charset="utf-8">
+		<style type="text/css">
+			.btn { background-color: #ff0000; padding: 12px 24px; }
+			@media only screen and (max-width: 600px) { .wrap { width: 100% !important; } }
+		</style></head>
+		<body><div class="wrap"><h1>Your order shipped</h1>
+		<script>window.track("open");</script>
+		<p>Arriving Tuesday.</p></div></body></html>`;
+
+	assert.equal(htmlToSnippet(marketing), "Your order shipped Arriving Tuesday.");
+});
+
+test("htmlToSnippet drops a style block left unterminated by truncation", () => {
+	// A body sliced mid-<style> must not leak the CSS fragment as the preview.
+	assert.equal(htmlToSnippet("<p>Hi</p><style>.a { color: red; } .b { colo"), "Hi");
 });
 
 test("htmlToSnippet handles empty / missing body", () => {

@@ -4,7 +4,10 @@
 
 import { create } from "zustand";
 import type { Email } from "~/types";
-import { clearComposeRecovery } from "../lib/compose-recovery.ts";
+import {
+	clearComposeRecovery,
+	hasComposeRecovery,
+} from "../lib/compose-recovery.ts";
 import {
 	DEFAULT_WORKSPACE_PREFERENCES,
 	WORKSPACE_PREFERENCES_VERSION,
@@ -16,6 +19,18 @@ import {
 
 export type ComposeMode = "new" | "reply" | "reply-all" | "forward";
 
+/** One accepted send being watched through to a truthful outcome. */
+export type PendingSend = {
+	deliveryId: string;
+	/** The message the delivery places in Sent; scopes the outcome poll. */
+	emailId: string;
+	mailboxId: string;
+	scheduledFor?: string;
+	/** Replay copy from the enqueue policy, when it supersedes "Sending…". */
+	title?: string;
+	canUndo: boolean;
+};
+
 export interface ComposeOptions {
 	mode: ComposeMode;
 	/** Optional truthful recipient seed for a new message. */
@@ -25,7 +40,42 @@ export interface ComposeOptions {
 	draftEmail?: Email | null;
 }
 
-const AGENT_PANEL_STORAGE_KEY = "whispyr.agentPanelOpen";
+// Brand-neutral: both brands run this portal, so the key never names one.
+// Renamed from the old brand-prefixed key, which drops the stored choice once.
+const AGENT_PANEL_STORAGE_KEY = "mail-portal.agent-panel-open";
+
+/** Two compose requests aim at the same thing when mode and both anchors match. */
+function isSameComposeTarget(a: ComposeOptions, b: ComposeOptions): boolean {
+	// A draft with no id is a freshly seeded body (an AI reply, an agent draft).
+	// Each one is new content, so it is never the request already open.
+	if (b.draftEmail && !b.draftEmail.id) return false;
+	return (
+		a.mode === b.mode &&
+		(a.originalEmail?.id ?? null) === (b.originalEmail?.id ?? null) &&
+		(a.draftEmail?.id ?? null) === (b.draftEmail?.id ?? null) &&
+		(a.initialTo ?? "") === (b.initialTo ?? "")
+	);
+}
+
+/** The unconditional "open the composer on this target" transition. */
+function openComposeState(
+	selectedEmailId: string | null,
+	next: ComposeOptions,
+): Partial<UIState> {
+	clearComposeRecovery();
+	const isReplyOrForward = next.mode === "reply" ||
+		next.mode === "reply-all" ||
+		next.mode === "forward";
+	return {
+		isComposing: true,
+		queuedCompose: null,
+		_previousEmailId: selectedEmailId,
+		// Keep selectedEmailId when replying/forwarding so the thread stays visible
+		selectedEmailId: isReplyOrForward ? selectedEmailId : null,
+		composeOptions: next,
+		isSidebarOpen: false,
+	};
+}
 
 interface UIState {
 	// Side panel state
@@ -39,6 +89,17 @@ interface UIState {
 
 	// Compose options
 	composeOptions: ComposeOptions;
+
+	// A compose request parked behind the open composer's discard confirmation.
+	queuedCompose: ComposeOptions | null;
+	applyQueuedCompose: () => void;
+	cancelQueuedCompose: () => void;
+
+	// Accepted sends still waiting on a provider outcome. Held here, outside the
+	// composer, because the composer unmounts the moment a send is accepted.
+	pendingSends: PendingSend[];
+	trackSend: (send: PendingSend) => void;
+	resolveSend: (deliveryId: string) => void;
 
 	// Mobile sidebar
 	isSidebarOpen: boolean;
@@ -94,6 +155,8 @@ export const useUIStore = create<UIState>((set, get) => ({
 	isComposing: false,
 	_previousEmailId: null,
 	composeOptions: { mode: "new", originalEmail: null },
+	queuedCompose: null,
+	pendingSends: [],
 	isSidebarOpen: false,
 	// Start collapsed so the panel never hides content on first paint. The real
 	// preference is loaded client-side via hydrateAgentPanel() to avoid an SSR
@@ -104,26 +167,43 @@ export const useUIStore = create<UIState>((set, get) => ({
 	conversationIntelligenceExpanded:
 		DEFAULT_WORKSPACE_PREFERENCES.conversationIntelligenceExpanded,
 
-	selectEmail: (id) =>
-		set((state) => ({
-			selectedEmailId: id,
-			isComposing: state.isComposing,
-		})),
+	selectEmail: (id) => set({ selectedEmailId: id }),
 
 	startCompose: (options) =>
 		set((state) => {
-			clearComposeRecovery();
-			const mode = options?.mode || "new";
-			const isReplyOrForward = mode === "reply" || mode === "reply-all" || mode === "forward";
-			return {
-				isComposing: true,
-				_previousEmailId: state.selectedEmailId,
-				// Keep selectedEmailId when replying/forwarding so the thread stays visible behind the modal
-				selectedEmailId: isReplyOrForward ? state.selectedEmailId : null,
-				composeOptions: options || { mode: "new", originalEmail: null },
-				isSidebarOpen: false,
-			};
+			const next: ComposeOptions = options ?? { mode: "new", originalEmail: null };
+			if (state.isComposing) {
+				// Re-asking for the composer that is already open changes nothing.
+				if (isSameComposeTarget(state.composeOptions, next)) return {};
+				// Unsaved work is never discarded silently: park the request and let
+				// the open composer resolve it through its own discard confirmation.
+				if (hasComposeRecovery()) return { queuedCompose: next };
+			}
+			return openComposeState(state.selectedEmailId, next);
 		}),
+
+	applyQueuedCompose: () =>
+		set((state) =>
+			state.queuedCompose
+				? openComposeState(state.selectedEmailId, state.queuedCompose)
+				: {},
+		),
+
+	cancelQueuedCompose: () => set({ queuedCompose: null }),
+
+	trackSend: (send) =>
+		set((state) =>
+			state.pendingSends.some((held) => held.deliveryId === send.deliveryId)
+				? {}
+				: { pendingSends: [...state.pendingSends, send] },
+		),
+
+	resolveSend: (deliveryId) =>
+		set((state) => ({
+			pendingSends: state.pendingSends.filter(
+				(send) => send.deliveryId !== deliveryId,
+			),
+		})),
 
 	closePanel: () =>
 		set((state) =>

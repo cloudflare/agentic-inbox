@@ -113,8 +113,13 @@ export class DraftTestMailboxDO extends MailboxDO {
 		return this.ctx.storage.getAlarm();
 	}
 
-	async readThreadedEmailsForTest(): Promise<void> {
+	// Exercises all three list projections. The draft branch and the flat list
+	// have no other runtime caller in the suite, so a malformed column or
+	// subquery in either only surfaces here.
+	async readListProjectionsForTest(): Promise<void> {
 		await this.getThreadedEmails({ folder: "inbox", page: 1, limit: 25 });
+		await this.getThreadedEmails({ folder: "draft", page: 1, limit: 25 });
+		await this.getEmails({ folder: "inbox", page: 1, limit: 25 });
 	}
 
 	expireDraftSaveClaimForTest(saveKey: string) {
@@ -240,7 +245,7 @@ type DraftTestStub = DurableObjectStub<DraftTestMailboxDO> & {
 	runAlarmAndClearForTest(): Promise<void>;
 	clearAlarmForTest(): Promise<void>;
 	getAlarmForTest(): Promise<number | null>;
-	readThreadedEmailsForTest(): Promise<void>;
+	readListProjectionsForTest(): Promise<void>;
 	expireDraftSaveClaimForTest(saveKey: string): Promise<void>;
 	seedR2DeletionForTest(input: Parameters<
 		DraftTestMailboxDO["seedR2DeletionForTest"]
@@ -287,8 +292,8 @@ export default {
 			await stub.seedR2DeletionForTest(body);
 			return Response.json({ seeded: true });
 		}
-		if (url.pathname === "/read-threaded-emails") {
-			await stub.readThreadedEmailsForTest();
+		if (url.pathname === "/read-list-projections") {
+			await stub.readListProjectionsForTest();
 			return Response.json({ read: true });
 		}
 		if (url.pathname === "/expire-save-claim") {

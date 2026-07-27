@@ -40,3 +40,12 @@ test("palette leaves coarse-pointer search opt-in and provides initial close foc
 	assert.match(palette, /matchMedia\("\(pointer: coarse\)"\)/);
 	assert.match(palette, /aria-label="Close command palette"/);
 });
+
+test("the palette is reachable below xl and named in the shortcut guide", () => {
+	// The dedicated trigger is xl-only, so the overflow menu carries it too.
+	assert.match(
+		header,
+		/icon=\{CommandIcon\}[\s\S]*?MAIL_COMMAND_PALETTE_OPEN_EVENT[\s\S]*?Command palette/,
+	);
+	assert.match(keyboardController, /\["⌘K \/ Ctrl K", "Open the command palette"\]/);
+});

@@ -9,9 +9,9 @@
  * Re-export for backwards compatibility with existing imports.
  */
 import DOMPurify from "dompurify";
-import { formatQuotedDate } from "shared/dates";
+import { decodeHtmlEntities } from "../../shared/html-entities.ts";
 import type { Attachment } from "~/types";
-import { escapeHtml, stripHtml } from "./html-text.ts";
+import { escapeHtml } from "./html-text.ts";
 
 export { escapeHtml, stripHtml } from "./html-text.ts";
 
@@ -19,10 +19,8 @@ export {
 	formatListDate,
 	formatDetailDate,
 	formatShortDate,
+	toIsoDate,
 } from "shared/dates";
-
-/** @deprecated Use `formatQuotedDate` from `shared/dates` directly. */
-export const formatComposeDate = formatQuotedDate;
 
 /**
  * Format a byte count as a human-readable file size.
@@ -74,23 +72,6 @@ export function htmlToPlainText(html: string): string {
 	return (div.textContent || div.innerText || "").trim();
 }
 
-function decodeHtmlEntities(text: string): string {
-	return text
-		.replace(/&#(\d+);/g, (_match: string, code: string) =>
-			String.fromCharCode(Number(code)),
-		)
-		.replace(/&#x([0-9a-f]+);/gi, (_match: string, hex: string) =>
-			String.fromCharCode(Number.parseInt(hex, 16)),
-		)
-		.replace(/&amp;/g, "&")
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">")
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&apos;/g, "'")
-		.replace(/&nbsp;/g, " ");
-}
-
 export function getSnippetText(
 	snippet?: string | null,
 	maxLength = 100,
@@ -108,7 +89,7 @@ export function getSnippetText(
 		.trim();
 
 	if (!clean) return "";
-	return clean.length > maxLength ? `${clean.slice(0, maxLength)}...` : clean;
+	return clean.length > maxLength ? `${clean.slice(0, maxLength)}…` : clean;
 }
 
 /**
@@ -128,29 +109,6 @@ export function getSignatureBlock(settings?: {
 		return `<div style="border-top: 1px solid #ccc; margin-top: 16px; padding-top: 12px;">${content}</div>`;
 	}
 	return "";
-}
-
-/**
- * Build a quoted reply block HTML string from original email data.
- */
-export function buildQuotedReplyBlock(
-	dateStr: string | undefined,
-	sender: string,
-	body: string,
-): string {
-	if (!body) return "";
-	const formattedDate = formatComposeDate(dateStr);
-	
-	// HTML-escape sender to prevent <john@example.com> from disappearing as a tag
-	const escapedSender = escapeHtml(sender);
-
-	// Sanitize the body to plain text to prevent stored XSS.
-	// The original HTML renders safely in the sandboxed iframe, but quoted
-	// reply blocks are injected into the compose editor where raw HTML would
-	// execute. Convert to escaped plain text instead.
-	const bodyToQuote = escapeHtml(stripHtml(body)).replace(/\n/g, "<br>");
-
-	return `<br><blockquote style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${formattedDate}, ${escapedSender} wrote:<br><br>${bodyToQuote}</blockquote>`;
 }
 
 export function getNonInlineAttachments(attachments?: Attachment[]): Attachment[] {

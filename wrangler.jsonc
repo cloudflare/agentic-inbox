@@ -246,6 +246,12 @@
 					"custom_domain": true
 				}
 			],
+			// Bot Fight Mode on the wiserchat.ai zone challenges AWS EventBridge's
+			// SES event POSTs and supports no exceptions on this plan. Requests to
+			// workers.dev never traverse the zone, so the webhook is pointed there
+			// instead. workersDevRequestDecision (workers/lib/request-security.ts)
+			// serves ONLY that webhook on this hostname; everything else 404s.
+			"workers_dev": true,
 			"d1_databases": [
 				{
 					"binding": "DB",

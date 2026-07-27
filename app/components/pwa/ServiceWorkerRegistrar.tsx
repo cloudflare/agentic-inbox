@@ -6,8 +6,9 @@ import { useEffect } from "react";
 
 /**
  * Registers the Web Push / PWA service worker once on mount (WISER-240).
- * Renders nothing. `updateViaCache: "none"` pairs with the SW's no-cache
- * header so a redeploy swaps the worker on the next load.
+ * Renders nothing. `updateViaCache: "none"` makes the browser bypass its HTTP
+ * cache when fetching /sw.js, so a redeploy swaps the worker on the next load
+ * without depending on any response header.
  */
 export function ServiceWorkerRegistrar() {
 	useEffect(() => {

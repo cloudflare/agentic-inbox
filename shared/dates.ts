@@ -51,6 +51,11 @@ export function formatListDate(dateStr: string): string {
 	});
 }
 
+/** Machine-readable value for `<time dateTime>`; undefined when unparseable. */
+export function toIsoDate(dateStr: string): string | undefined {
+	return safeParse(dateStr)?.toISOString();
+}
+
 /**
  * Email detail header.
  * "Tue, Apr 15, 3:42 PM"

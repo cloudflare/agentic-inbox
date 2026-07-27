@@ -1,5 +1,16 @@
-export const MAIL_SIGNATURE_MARKER = 'data-mail-signature="v1"';
-export const FORWARDED_MESSAGE_MARKER = 'data-mail-forwarded-message="v1"';
+// The blocks compose seeds and then has to find again. The attribute names are
+// exported separately because the editor schema matches on the bare attribute,
+// while the body builders write the whole `name="value"` pair inline.
+export const MAIL_BLOCK_VERSION = "v1";
+export const MAIL_SIGNATURE_ATTRIBUTE = "data-mail-signature";
+export const FORWARDED_MESSAGE_ATTRIBUTE = "data-mail-forwarded-message";
+export const QUOTED_REPLY_ATTRIBUTE = "data-mail-quoted-reply";
+
+export const MAIL_SIGNATURE_MARKER = `${MAIL_SIGNATURE_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
+export const FORWARDED_MESSAGE_MARKER = `${FORWARDED_MESSAGE_ATTRIBUTE}="${MAIL_BLOCK_VERSION}"`;
+// No writer pairs QUOTED_REPLY_ATTRIBUTE with a value any more - replies stopped
+// quoting the message they answer - but the attribute stays: drafts saved before
+// that change still carry a quote block and must keep being read as a tail.
 
 export type ComposeSignatureMode =
 	| "new"
@@ -25,24 +36,28 @@ export type DelayedComposeSignaturePlan =
 
 const SIGNATURE_BLOCK_SOURCE =
 	String.raw`<div\b(?=[^>]*\bdata-mail-signature\s*=\s*(["'])v1\1)[^>]*>[\s\S]*?<\/div\s*>`;
-const FORWARDED_MESSAGE_OPEN_SOURCE =
-	String.raw`<div\b(?=[^>]*\bdata-mail-forwarded-message\s*=\s*(["'])v1\1)[^>]*>`;
+// A forwarded block and a quoted reply are both "someone else's words, at the
+// end". Signatures go above them and AI rewrites never touch them. Only forwards
+// still seed one; the quoted-reply arm is kept for drafts persisted back when
+// replies quoted their original.
+const QUOTED_TAIL_OPEN_SOURCE =
+	String.raw`<(?:div|blockquote)\b(?=[^>]*\b(?:data-mail-forwarded-message|data-mail-quoted-reply)\s*=\s*(["'])v1\1)[^>]*>`;
 
 function signatureBlockPattern(global = false): RegExp {
 	return new RegExp(SIGNATURE_BLOCK_SOURCE, global ? "gi" : "i");
 }
 
-function forwardedMessageIndex(bodyHtml: string): number {
-	return bodyHtml.search(new RegExp(FORWARDED_MESSAGE_OPEN_SOURCE, "i"));
+function quotedTailIndex(bodyHtml: string): number {
+	return bodyHtml.search(new RegExp(QUOTED_TAIL_OPEN_SOURCE, "i"));
 }
 
 function authoredContent(bodyHtml: string): string {
-	const index = forwardedMessageIndex(bodyHtml);
+	const index = quotedTailIndex(bodyHtml);
 	return index >= 0 ? bodyHtml.slice(0, index) : bodyHtml;
 }
 
-export function extractForwardedMessageTail(bodyHtml: string): string | null {
-	const index = forwardedMessageIndex(bodyHtml);
+function quotedTail(bodyHtml: string): string | null {
+	const index = quotedTailIndex(bodyHtml);
 	return index >= 0 ? bodyHtml.slice(index) : null;
 }
 
@@ -104,16 +119,14 @@ export function insertComposeSignature(
 	if (mode === "draft") {
 		return { bodyHtml, inserted: false, reason: "draft" };
 	}
-	if (hasComposeSignature(mode === "forward" ? authoredContent(bodyHtml) : bodyHtml)) {
+	if (hasComposeSignature(authoredContent(bodyHtml))) {
 		return { bodyHtml, inserted: false, reason: "duplicate" };
 	}
 	const signature = renderComposeSignature(signatureText);
-	const forwardMarkerIndex = mode === "forward"
-		? forwardedMessageIndex(bodyHtml)
-		: -1;
+	const tailIndex = quotedTailIndex(bodyHtml);
 	return {
-		bodyHtml: forwardMarkerIndex >= 0
-			? `${bodyHtml.slice(0, forwardMarkerIndex)}${signature}${bodyHtml.slice(forwardMarkerIndex)}`
+		bodyHtml: tailIndex >= 0
+			? `${bodyHtml.slice(0, tailIndex)}${signature}${bodyHtml.slice(tailIndex)}`
 			: `${bodyHtml}${signature}`,
 		inserted: true,
 		reason: "inserted",
@@ -133,13 +146,7 @@ export function planDelayedComposeSignature(input: {
 	if (!input.enabled) {
 		return { action: "none", bodyHtml: input.bodyHtml, reason: "disabled" };
 	}
-	if (
-		hasComposeSignature(
-			input.mode === "forward"
-				? authoredContent(input.bodyHtml)
-				: input.bodyHtml,
-		)
-	) {
+	if (hasComposeSignature(authoredContent(input.bodyHtml))) {
 		return { action: "none", bodyHtml: input.bodyHtml, reason: "duplicate" };
 	}
 	if (!input.pristine) {
@@ -168,7 +175,7 @@ export function replaceAiAuthoredContent(
 	aiAuthoredHtml: string,
 ): string {
 	const signature = extractComposeSignature(authoredContent(currentBodyHtml));
-	const forwarded = extractForwardedMessageTail(currentBodyHtml);
+	const tail = quotedTail(currentBodyHtml);
 	const replacement = extractAiAuthoredContent(aiAuthoredHtml);
-	return `${replacement}${signature ?? ""}${forwarded ?? ""}`;
+	return `${replacement}${signature ?? ""}${tail ?? ""}`;
 }

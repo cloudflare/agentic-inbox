@@ -7,6 +7,7 @@
 // the message. Deliberately surfaces email content on the lock screen in
 // exchange for at-a-glance triage. Tapping deep-links to the exact message.
 
+import { decodeHtmlEntities } from "../../../shared/html-entities.ts";
 import type { PushPayload } from "./types";
 
 type BuildPushPayloadInput = {
@@ -25,25 +26,22 @@ const MAX_TITLE_LENGTH = 120;
 const MAX_SUBJECT_LENGTH = 240;
 const UNSAFE_NOTIFICATION_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/gu;
 
-const ENTITIES: [RegExp, string][] = [
-	[/&nbsp;/g, " "],
-	[/&lt;/g, "<"],
-	[/&gt;/g, ">"],
-	[/&quot;/g, '"'],
-	[/&#0*39;|&apos;/g, "'"],
-	[/&amp;/g, "&"], // decode last so "&amp;lt;" → "&lt;", not "<"
-];
+// Elements whose *content* is markup, not prose. Stripping tags alone leaves
+// their text behind, which is how styled marketing mail rendered raw CSS as its
+// preview. The `|$` arm also drops a block left unterminated by an upstream
+// truncation (list snippets slice the body before it reaches here).
+const NON_PROSE_ELEMENTS = /<(script|style|head)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi;
 
 /**
  * Reduce a stored email body (HTML or plain text) to a short, safe one-line
- * preview: strip tags, decode the common entities, collapse whitespace, and
- * truncate with an ellipsis. Not a security sanitizer — the output is a
- * notification string, never rendered as HTML.
+ * preview: drop non-prose elements, strip tags, decode the common entities,
+ * collapse whitespace, and truncate with an ellipsis. Not a security sanitizer
+ * — the output is a notification/list string, never rendered as HTML.
  */
 export function htmlToSnippet(raw: string | null | undefined, maxLength = 120): string {
 	if (!raw) return "";
-	let s = raw.replace(/<[^>]*>/g, " ");
-	for (const [re, ch] of ENTITIES) s = s.replace(re, ch);
+	let s = raw.replace(NON_PROSE_ELEMENTS, " ").replace(/<[^>]*>/g, " ");
+	s = decodeHtmlEntities(s);
 	s = s.replace(/\s+/g, " ").trim();
 	return truncateText(s, maxLength);
 }

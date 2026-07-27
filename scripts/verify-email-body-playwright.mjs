@@ -27,6 +27,7 @@ const cidContentId = "inline-proof@example.com";
 const cidAttachmentId = "inline-proof";
 const cidSrcsetOnlyContentId = "srcset-only@example.com";
 const cidSrcsetOnlyAttachmentId = "srcset-only";
+const remoteTailLine = "TAIL LINE BELOW THE REMOTE BANNER";
 const hostileId = "hostile-inline-metadata";
 const hostileThreadId = "hostile-inline-metadata-thread";
 const hostileSubject = "Hostile metadata switch";
@@ -69,6 +70,14 @@ function delay(milliseconds) {
 	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+/** Rendered state of one image inside the email frame, hidden ones included. */
+function imageBox(frame, alt) {
+	return frame.locator(`img[alt="${alt}"]`).evaluate((image) => ({
+		display: getComputedStyle(image).display,
+		height: image.getBoundingClientRect().height,
+	}));
+}
+
 function deferred() {
 	let resolvePromise;
 	const promise = new Promise((resolve) => {
@@ -85,7 +94,11 @@ async function pollValue(readValue, acceptValue, label, timeoutMilliseconds = 15
 		if (acceptValue(value)) return value;
 		await delay(50);
 	}
-	throw new Error(`${label} did not reach the expected state; last value: ${String(value)}`);
+	throw new Error(
+		`${label} did not reach the expected state; last value: ${
+			value !== null && typeof value === "object" ? JSON.stringify(value) : String(value)
+		}`,
+	);
 }
 
 function localEnvironment(overrides = {}) {
@@ -407,6 +420,28 @@ async function installCidFixture(page, counters) {
 		counters.remoteOverride += 1;
 		await route.fulfill({ status: 204 });
 	});
+	// Answers well after the bridge's last timed height report, so the frame can
+	// only fit this banner by following the document as it actually reflows.
+	await page.route("https://banner.example/**", async (route) => {
+		counters.remoteBanner += 1;
+		await delay(600);
+		await route.fulfill({
+			status: 200,
+			contentType: "image/svg+xml",
+			body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#2563eb"/></svg>',
+		});
+	});
+	// Neither shape can ever render: http: dies on the https-only opt-in CSP and
+	// on mixed content, and a relative src resolves against the portal instead of
+	// the sender. Both must stay stripped even after the reader opts in.
+	await page.route("http://insecure.example/**", async (route) => {
+		counters.insecureRemote += 1;
+		await route.fulfill({ status: 204 });
+	});
+	await page.route("**/relative-remote.png", async (route) => {
+		counters.relativeRemote += 1;
+		await route.fulfill({ status: 204 });
+	});
 	await page.route("**/api/v1/mailboxes/**", async (route) => {
 		const request = route.request();
 		const path = decodeURIComponent(new URL(request.url()).pathname);
@@ -434,6 +469,10 @@ async function installCidFixture(page, counters) {
 					"</picture>",
 					`<img alt="CID srcset only" srcset="CID:${cidSrcsetOnlyContentId.toUpperCase()} 1x">`,
 					'<img alt="Remote tracker" src="https://tracker.example/pixel.png">',
+					'<img alt="Remote banner" src="https://banner.example/banner.svg">',
+					'<img alt="Insecure remote" src="http://insecure.example/pixel.png">',
+					'<img alt="Relative remote" src="/relative-remote.png">',
+					`<p>${remoteTailLine}</p>`,
 				].join(""),
 			});
 			return;
@@ -727,6 +766,9 @@ async function verifyInlineCidRendering({ context, baseUrl, name }) {
 		srcsetOnly: 0,
 		remoteTracker: 0,
 		remoteOverride: 0,
+		remoteBanner: 0,
+		insecureRemote: 0,
+		relativeRemote: 0,
 	};
 	try {
 		await installCidFixture(page, counters);
@@ -878,6 +920,25 @@ async function verifyInlineCidRendering({ context, baseUrl, name }) {
 			path: join(artifactDirectory, `email-body-${runStamp}-${name}-inline-cid.png`),
 		});
 
+		// A blocked message shows no broken-image glyphs and no alt-text boxes:
+		// every image without a usable source is hidden outright.
+		for (const alt of [
+			"Remote tracker",
+			"Remote banner",
+			"Insecure remote",
+			"Relative remote",
+			"CID srcset only",
+		]) {
+			const box = await imageBox(contentFrame, alt);
+			assert.equal(box.display, "none", `${alt} renders a glyph while blocked`);
+		}
+		assert.equal(counters.remoteBanner, 0);
+		assert.equal(counters.insecureRemote, 0);
+		assert.equal(counters.relativeRemote, 0);
+		const blockedFrameHeight = await iframe.evaluate(
+			(element) => element.getBoundingClientRect().height,
+		);
+
 		await page.getByRole("button", { name: "Load images" }).click();
 		await pollValue(
 			() => counters.remoteTracker,
@@ -906,6 +967,51 @@ async function verifyInlineCidRendering({ context, baseUrl, name }) {
 		assert.equal(counters.remoteOverride, 0);
 		assert.equal(counters.srcsetOnly, 0);
 		assert.equal(counters.referenced, 2);
+
+		// Loading images has to visibly work: the banner answers ~600ms after the
+		// document is parsed, so the frame can only fit it — and keep the line
+		// below it unclipped — by following the document as it reflows.
+		await pollValue(
+			() => counters.remoteBanner,
+			(value) => value === 1,
+			"explicit remote banner opt-in",
+		);
+		const bannerBox = await pollValue(
+			() => imageBox(optedInContentFrame, "Remote banner"),
+			(value) => value.display !== "none" && value.height > 100,
+			"opted-in remote banner render",
+		);
+		const grown = await pollValue(
+			() => Promise.all([
+				iframe.evaluate((element) => element.getBoundingClientRect().height),
+				optedInContentFrame.evaluate(() => ({
+					clientHeight: document.documentElement.clientHeight,
+					scrollHeight: document.documentElement.scrollHeight,
+				})),
+			]).then(([frameHeight, content]) => ({ frameHeight, content })),
+			(value) =>
+				value.content.scrollHeight <= value.content.clientHeight + 1 &&
+				value.frameHeight >= bannerBox.height &&
+				value.frameHeight > blockedFrameHeight,
+			"remote opt-in grows the frame to fit late images",
+		);
+		assert.ok(
+			grown.frameHeight >= grown.content.scrollHeight - 1,
+			`opted-in email iframe clips the message body: ${JSON.stringify(grown)}`,
+		);
+		await optedInContentFrame.getByText(remoteTailLine).waitFor();
+		// http: and relative sources can never render, so opting in leaves them
+		// stripped and hidden rather than turning them into broken glyphs.
+		for (const alt of ["Insecure remote", "Relative remote"]) {
+			const box = await imageBox(optedInContentFrame, alt);
+			assert.equal(box.display, "none", `${alt} renders a glyph after opt-in`);
+		}
+		assert.equal(counters.insecureRemote, 0);
+		assert.equal(counters.relativeRemote, 0);
+		await assertNoHorizontalOverflow(page);
+		await page.screenshot({
+			path: join(artifactDirectory, `email-body-${runStamp}-${name}-remote-opt-in.png`),
+		});
 
 		const backToList = page.getByRole("button", { name: "Back to list" });
 		if (await backToList.isVisible()) await backToList.click();

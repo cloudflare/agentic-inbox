@@ -15,6 +15,9 @@ import {
 import {
   type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type RefObject,
   lazy,
   Suspense,
   useEffect,
@@ -22,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useBlocker, useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import { useUIStore } from "~/hooks/useUIStore";
@@ -39,6 +43,11 @@ import {
   type ComposeShortcutOrigin,
 } from "~/lib/compose-shortcuts";
 import {
+  composeSurface,
+  INLINE_COMPOSE_HOST_ID,
+  type ComposeSurface,
+} from "~/lib/compose-surface";
+import {
   consumeComposeFileTransfer,
   transferContainsFiles,
 } from "~/lib/compose-file-transfer";
@@ -47,10 +56,111 @@ import ComposeAttachments from "./ComposeAttachments";
 import RecipientCombobox from "./RecipientCombobox";
 
 /**
- * The composer. A single roomy centered modal used for new mail, replies,
- * forwards and draft edits. Driven by the shared `isComposing` UI state so the
- * Compose button, the thread toolbar, and the AI-draft flow all open the same
- * surface.
+ * The frame around the compose form: a centered dialog, or a card that sits at
+ * the end of a thread. Only the frame differs between the two surfaces.
+ */
+function ComposeChrome({
+  variant,
+  inlineHost,
+  open,
+  title,
+  status,
+  onRequestClose,
+  closeDisabled,
+  surfaceRef,
+  onKeyDown,
+  children,
+}: {
+  variant: ComposeSurface;
+  inlineHost: HTMLElement | null;
+  open: boolean;
+  title: string;
+  status: string;
+  onRequestClose: () => void;
+  closeDisabled: boolean;
+  surfaceRef: RefObject<HTMLElement | null>;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
+  children: ReactNode;
+}) {
+  const header = (
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-kumo-line px-4 py-3 sm:px-6 sm:py-4">
+      <div className="min-w-0">
+        {variant === "inline" ? (
+          <h2 className="truncate text-base font-semibold text-kumo-default">
+            {title}
+          </h2>
+        ) : (
+          <Dialog.Title className="text-lg font-semibold text-kumo-default">
+            {title}
+          </Dialog.Title>
+        )}
+        <div
+          role="status"
+          aria-live="polite"
+          className={`mt-0.5 text-xs ${
+            status === "Save failed"
+              ? "font-semibold text-kumo-danger"
+              : "text-kumo-subtle"
+          }`}
+        >
+          {status}
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        shape="square"
+        size="sm"
+        icon={<XIcon size={18} />}
+        className="min-h-11 min-w-11"
+        onClick={onRequestClose}
+        disabled={closeDisabled}
+        aria-label="Close compose"
+      />
+    </div>
+  );
+
+  if (variant === "inline" && inlineHost) {
+    return createPortal(
+      <section
+        ref={surfaceRef}
+        aria-label={title}
+        onKeyDown={onKeyDown}
+        className="border-t-2 border-kumo-brand/40 bg-kumo-base"
+      >
+        {header}
+        {children}
+      </section>,
+      inlineHost,
+    );
+  }
+
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !closeDisabled) onRequestClose();
+      }}
+    >
+      <Dialog
+        size="lg"
+        className="flex min-w-0 max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col overflow-hidden p-0 sm:min-w-[32rem] sm:w-[min(820px,94vw)]"
+      >
+        {header}
+        {children}
+      </Dialog>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * The composer. One form with two chromes: a centered modal for new mail and
+ * draft edits, and an inline card that answers a thread without covering it.
+ * Driven by the shared `isComposing` UI state, so the Compose button, the thread
+ * toolbar, and the AI-draft flow all open the same form.
+ *
+ * This is the only mounted composer either way: the inline chrome is rendered
+ * into the open thread through a portal, so `useComposeForm` stays the single
+ * owner of the draft and the editor is only ever loaded through one module path.
  */
 export default function ComposeEmail() {
   const { mailboxId, folder } = useParams<{
@@ -58,7 +168,25 @@ export default function ComposeEmail() {
     folder: string;
   }>();
 
-  const { isComposing, composeOptions } = useUIStore();
+  const {
+    isComposing,
+    composeOptions,
+    selectedEmailId,
+    queuedCompose,
+    applyQueuedCompose,
+    cancelQueuedCompose,
+  } = useUIStore();
+  // The inline chrome needs a thread to live in. If that host is not on screen
+  // (panel still loading, no thread open) the modal is the truthful fallback.
+  const [inlineHost, setInlineHost] = useState<HTMLElement | null>(null);
+  const wantsInline = composeSurface(composeOptions, selectedEmailId) === "inline";
+  useEffect(() => {
+    setInlineHost(
+      wantsInline ? document.getElementById(INLINE_COMPOSE_HOST_ID) : null,
+    );
+  }, [wantsInline, composeOptions]);
+  const isInline = wantsInline && inlineHost !== null;
+  const variant: ComposeSurface = isInline ? "inline" : "modal";
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [aiActivityLabel, setAiActivityLabel] = useState("");
   const [aiPanelRetryKey, setAiPanelRetryKey] = useState(0);
@@ -77,11 +205,17 @@ export default function ComposeEmail() {
   );
   const isNewCompose =
     composeOptions.mode === "new" && !composeOptions.draftEmail;
+  // An AI-drafted reply arrives as an unsaved draft; the assistant stays
+  // available for it, and closes only once a stored draft is being edited.
   const isReplyCompose =
-    !composeOptions.draftEmail &&
+    !composeOptions.draftEmail?.id &&
     Boolean(composeOptions.originalEmail?.id) &&
     (composeOptions.mode === "reply" || composeOptions.mode === "reply-all");
   const isAiComposeEligible = isNewCompose || isReplyCompose;
+  // Replying starts in the message, above the quote. Everything else starts at
+  // the recipient the writer still has to choose or confirm.
+  const focusesBody =
+    composeOptions.mode === "reply" || composeOptions.mode === "reply-all";
   const sendLaterPresets = getSendLaterPresets();
   const scheduledLabel = scheduledFor
     ? formatScheduledTime(new Date(scheduledFor))
@@ -137,7 +271,9 @@ export default function ComposeEmail() {
   const recipientValues = { to, cc, bcc };
   const navigationBlocker = useBlocker(isComposing && hasUnconfirmedWork);
   const handledBlockedNavigationRef = useRef(false);
+  const handledQueuedComposeRef = useRef(false);
   const composeFormRef = useRef<HTMLFormElement>(null);
+  const inlineSurfaceRef = useRef<HTMLElement>(null);
   const fileDragDepthRef = useRef(0);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const sendButtonLabel = isSending
@@ -172,6 +308,24 @@ export default function ComposeEmail() {
       void requestClose(() => navigationBlocker.proceed());
     }
   }, [navigationBlocker, requestClose]);
+
+  // The inline composer opens below the last message, so bring it into view.
+  useEffect(() => {
+    if (!isInline) return;
+    inlineSurfaceRef.current?.scrollIntoView({ block: "start" });
+  }, [isInline]);
+
+  // A compose request made while this composer holds unsaved work waits here
+  // until the same close flow that guards navigation resolves it.
+  useEffect(() => {
+    if (!queuedCompose) {
+      handledQueuedComposeRef.current = false;
+      return;
+    }
+    if (handledQueuedComposeRef.current) return;
+    handledQueuedComposeRef.current = true;
+    void requestClose(applyQueuedCompose);
+  }, [applyQueuedCompose, queuedCompose, requestClose]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -229,7 +383,17 @@ export default function ComposeEmail() {
 
   const handleKeepEditing = () => {
     keepEditing();
+    cancelQueuedCompose();
     if (navigationBlocker.state === "blocked") navigationBlocker.reset();
+  };
+
+  // The modal gets Escape from its dialog; the inline card owns its own. Nested
+  // overlays (combobox, menus) mark the event handled before it reaches here.
+  const handleInlineKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (isSending || isResolvingClose) return;
+    event.preventDefault();
+    void requestClose();
   };
 
   const choosePreset = (date: Date) => {
@@ -310,46 +474,17 @@ export default function ComposeEmail() {
 
   return (
     <>
-      <Dialog.Root
+      <ComposeChrome
+        variant={variant}
+        inlineHost={inlineHost}
         open={isComposing}
-        onOpenChange={(open) => {
-          if (!open && !isSending) void requestClose();
-        }}
+        title={formTitle}
+        status={draftStatusLabel}
+        onRequestClose={() => void requestClose()}
+        closeDisabled={isSending || isResolvingClose}
+        surfaceRef={inlineSurfaceRef}
+        onKeyDown={handleInlineKeyDown}
       >
-        <Dialog
-          size="lg"
-          className="flex min-w-0 max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col overflow-hidden p-0 sm:min-w-[32rem] sm:w-[min(820px,94vw)]"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-kumo-line px-4 py-3 sm:px-6 sm:py-4 shrink-0">
-            <div className="min-w-0">
-              <Dialog.Title className="text-lg font-semibold text-kumo-default">
-                {formTitle}
-              </Dialog.Title>
-              <div
-                role="status"
-                aria-live="polite"
-                className={`mt-0.5 text-xs ${
-                  draftStatusLabel === "Save failed"
-                    ? "font-semibold text-kumo-danger"
-                    : "text-kumo-subtle"
-                }`}
-              >
-                {draftStatusLabel}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={<XIcon size={18} />}
-              className="min-h-11 min-w-11"
-              onClick={() => void requestClose()}
-              disabled={isSending || isResolvingClose}
-              aria-label="Close compose"
-            />
-          </div>
-
           <form
             ref={composeFormRef}
             data-compose-shortcut-surface="primary"
@@ -359,7 +494,9 @@ export default function ComposeEmail() {
             onDragOver={handleOuterDragOver}
             onDragLeave={handleOuterDragLeave}
             onDrop={handleOuterDrop}
-            className="relative flex flex-col flex-1 min-h-0"
+            className={`relative flex flex-col ${
+              isInline ? "" : "flex-1 min-h-0"
+            }`}
           >
             {isDraggingFiles && (
               <div
@@ -381,7 +518,12 @@ export default function ComposeEmail() {
                       ? "Attachments need attention"
                       : aiActivityLabel}
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4 sm:px-6 sm:py-5">
+            {/* Inline grows with its content; the thread underneath does the scrolling. */}
+            <div
+              className={`px-4 py-4 space-y-4 sm:px-6 sm:py-5 ${
+                isInline ? "" : "flex-1 min-h-0 overflow-y-auto"
+              }`}
+            >
               {error && (
                 <div role="alert" aria-live="assertive">
                   <Banner variant="error" text={error} />
@@ -406,7 +548,7 @@ export default function ComposeEmail() {
                     recipients={recipientValues}
                     placeholder="recipient@example.com, another@example.com"
                     value={to}
-                    autoFocus
+                    autoFocus={!focusesBody}
                     onChange={setTo}
                     required
                   />
@@ -450,7 +592,7 @@ export default function ComposeEmail() {
               <Input
                 label="Subject"
                 type="text"
-                placeholder="What's this about?"
+                placeholder="What’s this about?"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 required
@@ -560,9 +702,16 @@ export default function ComposeEmail() {
                   </Button>
                 </div>
               )}
-              <div className="h-[38dvh] min-h-[220px] sm:h-[42vh] sm:min-h-[280px]">
+              <div
+                className={
+                  isInline
+                    ? "flex min-h-[220px] flex-col"
+                    : "h-[38dvh] min-h-[220px] sm:h-[42vh] sm:min-h-[280px]"
+                }
+              >
                 <RichTextEditor
                   value={body}
+                  autoFocus={focusesBody}
                   onChange={handleBodyChange}
                   onFiles={acceptTransferredFiles}
                   onInlineImages={addInlineImages}
@@ -675,22 +824,24 @@ export default function ComposeEmail() {
                       }
                     />
                     <DropdownMenu.Content>
-                      <DropdownMenu.Label>Send later</DropdownMenu.Label>
-                      {sendLaterPresets.map((preset) => (
-                        <DropdownMenu.Item
-                          key={preset.id}
-                          icon={ClockIcon}
-                          className="min-h-11"
-                          onSelect={() => choosePreset(preset.date)}
-                        >
-                          <span className="flex min-w-0 flex-col">
-                            <span className="font-medium">{preset.title}</span>
-                            <span className="text-xs text-kumo-subtle">
-                              {formatScheduledTime(preset.date)}
+                      <DropdownMenu.Group>
+                        <DropdownMenu.Label>Send later</DropdownMenu.Label>
+                        {sendLaterPresets.map((preset) => (
+                          <DropdownMenu.Item
+                            key={preset.id}
+                            icon={ClockIcon}
+                            className="min-h-11"
+                            onSelect={() => choosePreset(preset.date)}
+                          >
+                            <span className="flex min-w-0 flex-col">
+                              <span className="font-medium">{preset.title}</span>
+                              <span className="text-xs text-kumo-subtle">
+                                {formatScheduledTime(preset.date)}
+                              </span>
                             </span>
-                          </span>
-                        </DropdownMenu.Item>
-                      ))}
+                          </DropdownMenu.Item>
+                        ))}
+                      </DropdownMenu.Group>
                       <DropdownMenu.Separator />
                       <DropdownMenu.Item
                         className="min-h-11"
@@ -714,8 +865,7 @@ export default function ComposeEmail() {
               </div>
             </div>
           </form>
-        </Dialog>
-      </Dialog.Root>
+      </ComposeChrome>
 
       <Dialog.Root
         open={isMissingAttachmentWarningOpen}

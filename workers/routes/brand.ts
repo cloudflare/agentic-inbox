@@ -288,12 +288,23 @@ export function brandLogo(
 </a>`;
 }
 
-/** Full HTML document with the brand's styles applied. */
+/**
+ * Full HTML document with the brand's styles applied.
+ *
+ * Carries the same install metadata as the SPA shell in app/root.tsx. iOS
+ * snapshots web-app metadata from whichever page is open at Add to Home Screen
+ * time, and a logged-out visitor is redirected to /login — so without this the
+ * saved icon opens in a browser chrome instead of standalone.
+ */
 export function pageShell(b: BrandConfig, title: string, body: string): string {
 	return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="${b.themeColor}">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="${b.appName}">
 <link rel="icon" href="${b.favicon}" type="image/svg+xml">
 <link rel="icon" href="${b.legacyFavicon}" type="${b.legacyFaviconType}" sizes="${b.legacyFaviconSizes}">
 <link rel="apple-touch-icon" href="${b.appleTouchIcon}">

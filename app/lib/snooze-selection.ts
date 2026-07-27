@@ -1,4 +1,25 @@
+import { Folders } from "../../shared/folders.ts";
 import type { SnoozeScope } from "../../shared/snooze.ts";
+
+/**
+ * Snoozing only makes sense for mail that is waiting on the user. Sent, draft,
+ * outbound, discarded, and already-snoozed mail is excluded, as are the
+ * synthetic "_" views that are not folders at all.
+ */
+export function canSnoozeFromFolder(folderId: string | undefined): boolean {
+	return Boolean(
+		folderId &&
+			!folderId.startsWith("_") &&
+			!new Set<string>([
+				Folders.SNOOZED,
+				Folders.SENT,
+				Folders.DRAFT,
+				Folders.OUTBOX,
+				Folders.TRASH,
+				Folders.SPAM,
+			]).has(folderId),
+	);
+}
 
 export interface SnoozeSelectableRow {
 	id: string;

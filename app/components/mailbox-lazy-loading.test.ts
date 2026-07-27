@@ -30,6 +30,24 @@ test("the rich composer is loaded only when compose is open", () => {
 	assert.match(mailbox, /onRetry=\{\(\) => setComposeRetryKey/);
 });
 
+test("the composer is reached through exactly one import path", () => {
+	const panel = read("./EmailPanel.tsx");
+	const compose = read("./ComposeEmail.tsx");
+
+	// A second import site makes the editor's dependencies reachable only through
+	// a nested dynamic import, which re-optimizes them into a second React copy
+	// at runtime and crashes the editor with an invalid hook call. The thread
+	// offers a host node instead, and the one mounted composer portals into it.
+	assert.doesNotMatch(panel, /import\("~\/components\/ComposeEmail"\)/);
+	assert.doesNotMatch(panel, /import ComposeEmail from/);
+	assert.match(panel, /<div id=\{INLINE_COMPOSE_HOST_ID\} \/>/);
+	assert.match(compose, /createPortal\(/);
+	assert.match(
+		compose,
+		/document\.getElementById\(INLINE_COMPOSE_HOST_ID\)/,
+	);
+});
+
 test("the optional writing assistant is deferred behind a retryable local boundary", () => {
 	const compose = read("./ComposeEmail.tsx");
 	const assistant = read("./ComposeAiAssistant.tsx");

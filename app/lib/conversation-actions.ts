@@ -21,6 +21,26 @@ export type PlannedKeyboardConversationAction =
 	| { kind: "email-archive"; emailId: string }
 	| { kind: "email-trash"; emailId: string };
 
+/**
+ * Names the write that failed so a reverted optimistic update is never silent.
+ * Every star/read toggle routes through one mutation, so the copy is derived
+ * from the patch rather than repeated at each call site.
+ */
+export function updateEmailFailureTitle(data: unknown): string {
+	const patch = (data ?? {}) as { starred?: unknown; read?: unknown };
+	if (typeof patch.starred === "boolean") {
+		return patch.starred
+			? "Couldn’t star the conversation"
+			: "Couldn’t remove the star";
+	}
+	if (typeof patch.read === "boolean") {
+		return patch.read
+			? "Couldn’t mark the conversation as read"
+			: "Couldn’t mark the conversation as unread";
+	}
+	return "Couldn’t update the conversation";
+}
+
 export function planKeyboardConversationAction(
 	command: ConversationKeyboardCommand,
 	email: Email,

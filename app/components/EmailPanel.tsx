@@ -10,7 +10,6 @@ import { Folders } from "shared/folders";
 import EmailPanelDialogs from "~/components/email-panel/EmailPanelDialogs";
 import EmailPanelHeader from "~/components/email-panel/EmailPanelHeader";
 import EmailPanelToolbar from "~/components/email-panel/EmailPanelToolbar";
-import SingleMessageView from "~/components/email-panel/SingleMessageView";
 import ThreadMessage from "~/components/email-panel/ThreadMessage";
 import LabelChip from "~/components/labels/LabelChip";
 import LabelPicker from "~/components/labels/LabelPicker";
@@ -20,10 +19,13 @@ import ConversationActivity from "~/components/ConversationActivity";
 import SnoozeDialog from "~/components/SnoozeDialog";
 import { FollowUpReminderControl } from "~/components/FollowUpReminderDialog";
 import { splitEmailList, toEmailListValue } from "~/lib/utils";
+import { normalizedAddress } from "~/lib/recipient-input";
+import { composeSurface, INLINE_COMPOSE_HOST_ID } from "~/lib/compose-surface";
+import { prefixedSubject } from "~/lib/compose-initialization";
 import { evaluateStoredDraftAttachments } from "~/lib/compose-attachment-policy";
 import { planComposeEnqueueResult } from "~/lib/outbound-enqueue-outcome";
 import api from "~/services/api";
-import { useAiDraftReply, useCancelOutboundDelivery, useDeleteEmail, useDiscardDraft, useEmail, useMoveEmail, useOutboundDeliveries, useReplyToEmail, useRestoreEmail, useSaveDraft, useSendEmail, useThreadReplies, useUpdateEmail } from "~/queries/emails";
+import { useAiDraftReply, useDeleteEmail, useDiscardDraft, useEmail, useMoveEmail, useOutboundDeliveries, useReplyToEmail, useRestoreEmail, useSaveDraft, useSendEmail, useThreadReplies, useUpdateEmail } from "~/queries/emails";
 import { buildEmailBodyQueryOptions } from "~/queries/email-body";
 import { useFolders } from "~/queries/folders";
 import { useMailbox, useMailboxes } from "~/queries/mailboxes";
@@ -59,7 +61,6 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const sendEmailMut = useSendEmail();
 	const replyMut = useReplyToEmail();
 	const saveDraftMut = useSaveDraft();
-	const cancelOutboundMut = useCancelOutboundDelivery();
 	const aiDraftMut = useAiDraftReply();
 	const mutateLabels = useMutateLabels();
 	const unsnooze = useUnsnooze();
@@ -78,7 +79,16 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		: undefined;
 	const hasAuthoritativeActivityMailbox =
 		activityMailboxType === "PERSONAL" || activityMailboxType === "SHARED";
-	const { closePanel, startCompose } = useUIStore();
+	const {
+		closePanel,
+		startCompose,
+		isComposing,
+		composeOptions,
+		selectedEmailId,
+		trackSend,
+	} = useUIStore();
+	const isInlineComposing = isComposing &&
+		composeSurface(composeOptions, selectedEmailId) === "inline";
 	const toastManager = useKumoToastManager();
 	const [isSending, setIsSending] = useState(false);
 	const [isDrafting, setIsDrafting] = useState(false);
@@ -109,14 +119,40 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		return threadRepliesRaw.filter((e) => e.id !== email.id);
 	}, [threadRepliesRaw, email]);
 
+	// A thread reads like a chat: oldest at the top, newest at the bottom.
 	const allMessages = useMemo(() => {
 		if (!email) return [];
-		return [email, ...threadReplies].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+		return [email, ...threadReplies].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 	}, [email, threadReplies]);
+	const draftMessageIds = useMemo(() => {
+		const ids = new Set<string>();
+		for (const msg of allMessages) { if (msg.folder_id === Folders.DRAFT) ids.add(msg.id); else if (isDraftFolder && msg.id === emailId) ids.add(msg.id); }
+		return ids;
+	}, [allMessages, isDraftFolder, emailId]);
+
+	// Route-level mailboxId is often the address itself, so it is a truthful
+	// fallback while the mailbox record loads. Unresolved means nothing is self.
+	const selfAddress = normalizedAddress(currentMailbox?.email ?? mailboxId ?? "");
+	const lastReceivedMessage = useMemo(() => {
+		const received = allMessages.filter(
+			(msg) => !draftMessageIds.has(msg.id) &&
+				normalizedAddress(msg.sender) !== selfAddress,
+		);
+		if (received.length > 0) return received.at(-1);
+		const nonDrafts = allMessages.filter((msg) => !draftMessageIds.has(msg.id));
+		return nonDrafts.at(-1) ?? email;
+	}, [allMessages, draftMessageIds, selfAddress, email]);
+
+	// A reply quotes its target, so that body is fetched even while collapsed.
+	// Depended on by id, not by message, to keep the query set identity stable.
+	const replyTargetBodyId = lastReceivedMessage?.body_external
+		? lastReceivedMessage.id
+		: undefined;
 	const activeExternalBodyIds = useMemo(() => {
 		if (!email) return [];
 		const ids = new Set<string>();
 		if (email.body_external) ids.add(email.id);
+		if (replyTargetBodyId) ids.add(replyTargetBodyId);
 		for (const message of allMessages) {
 			if (
 				message.id !== email.id &&
@@ -127,7 +163,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			}
 		}
 		return [...ids];
-	}, [allMessages, email, expandedMessages]);
+	}, [allMessages, email, expandedMessages, replyTargetBodyId]);
 	const externalBodyQueries = useQueries({
 		queries: mailboxId
 			? activeExternalBodyIds.map((messageId) =>
@@ -146,11 +182,33 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	);
 
 	const currentEmailId = email?.id;
+	const newestMessageId = allMessages.at(-1)?.id;
+	const seededSelectionRef = useRef<string | null>(null);
 	useEffect(() => {
 		if (!currentEmailId) return;
 		pendingMessageFocusRef.current = currentEmailId;
+		seededSelectionRef.current = null;
 		setExpandedMessages(new Set([currentEmailId]));
 	}, [currentEmailId]);
+	// The newest message joins the opened one exactly once per selection, so a
+	// reply arriving later never re-collapses what the reader has opened.
+	useEffect(() => {
+		if (!currentEmailId || !newestMessageId) return;
+		if (seededSelectionRef.current === currentEmailId) return;
+		seededSelectionRef.current = currentEmailId;
+		setExpandedMessages((current) => new Set(current).add(newestMessageId));
+	}, [currentEmailId, newestMessageId]);
+	// Closing the inline composer hands focus back to the message it answered, so
+	// the keyboard never lands on nothing. Queued before the focus effect below,
+	// which is what actually moves focus on this same commit.
+	const wasInlineComposingRef = useRef(false);
+	useEffect(() => {
+		if (wasInlineComposingRef.current && !isInlineComposing && newestMessageId) {
+			pendingMessageFocusRef.current = newestMessageId;
+		}
+		wasInlineComposingRef.current = isInlineComposing;
+	}, [isInlineComposing, newestMessageId]);
+
 	useEffect(() => {
 		const pendingId = pendingMessageFocusRef.current;
 		const container = conversationScrollRef.current;
@@ -163,7 +221,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		target.scrollIntoView({ block: "start" });
 		target.focus({ preventScroll: true });
 		pendingMessageFocusRef.current = null;
-	}, [currentEmailId, allMessages.length, expandedMessages, email?.thread_id, threadRepliesFetched]);
+	}, [currentEmailId, allMessages.length, expandedMessages, email?.thread_id, threadRepliesFetched, isInlineComposing]);
 
 	const focusMessage = (messageId: string) => {
 		pendingMessageFocusRef.current = messageId;
@@ -171,20 +229,6 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	};
 
 	const toggleExpand = (msgId: string) => { setExpandedMessages((prev) => { const next = new Set(prev); if (next.has(msgId)) next.delete(msgId); else next.add(msgId); return next; }); };
-
-	const draftMessageIds = useMemo(() => {
-		const ids = new Set<string>();
-		for (const msg of allMessages) { if (msg.folder_id === Folders.DRAFT) ids.add(msg.id); else if (isDraftFolder && msg.id === emailId) ids.add(msg.id); }
-		return ids;
-	}, [allMessages, isDraftFolder, emailId]);
-
-	const lastReceivedMessage = useMemo(() => {
-		const ce = currentMailbox?.email;
-		const received = allMessages.filter((msg) => !draftMessageIds.has(msg.id) && msg.sender !== ce);
-		if (received.length > 0) return received[0];
-		const nonDrafts = allMessages.filter((msg) => !draftMessageIds.has(msg.id));
-		return nonDrafts.length > 0 ? nonDrafts[0] : email;
-	}, [allMessages, draftMessageIds, currentMailbox?.email, email]);
 
 	const moveToFolders = useMemo(() => {
 		const cur = folder || email?.folder_id;
@@ -204,6 +248,22 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		? {
 				...email,
 				body: email.body_external ? selectedBodyQuery?.data : email.body,
+			}
+		: null;
+
+	// A reply carries the original quoted underneath, so it waits for the same
+	// authoritative body that Forward waits for.
+	const replyTargetBodyQuery = lastReceivedMessage
+		? externalBodyQueriesById.get(lastReceivedMessage.id)
+		: undefined;
+	const authoritativeReplyTarget = lastReceivedMessage &&
+		(!lastReceivedMessage.body_external ||
+			replyTargetBodyQuery?.data !== undefined)
+		? {
+				...lastReceivedMessage,
+				body: lastReceivedMessage.body_external
+					? replyTargetBodyQuery?.data
+					: lastReceivedMessage.body,
 			}
 		: null;
 
@@ -235,18 +295,18 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const handleMove = (folderId: string) => { if (mailboxId) { moveEmailMut.mutate({ mailboxId, id: email.id, folderId }); closePanel(); } };
 	const handleDelete = () => {
 		if (!mailboxId) return;
-		const confirmed = window.confirm("Move this email to Trash?");
+		const confirmed = window.confirm("Move this conversation to Trash?");
 		if (!confirmed) return;
 		deleteEmailMut.mutate(
 			{ mailboxId, id: email.id },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Email moved to Trash" });
+					toastManager.add({ title: "Conversation moved to Trash" });
 					closePanel();
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Failed to move email to Trash",
+						title: "Failed to move the conversation to Trash",
 						variant: "error",
 					}),
 			},
@@ -258,12 +318,12 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			{ mailboxId, id: email.id },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Email restored" });
+					toastManager.add({ title: "Conversation restored" });
 					closePanel();
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Failed to restore email",
+						title: "Failed to restore the conversation",
 						variant: "error",
 					}),
 			},
@@ -275,12 +335,12 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			{ mailboxId, scope: snoozeScope },
 			{
 				onSuccess: () => {
-					toastManager.add({ title: "Mail returned" });
+					toastManager.add({ title: "Conversation returned" });
 					closePanel();
 				},
 				onError: () =>
 					toastManager.add({
-						title: "Could not unsnooze mail",
+						title: "Could not return the conversation",
 						variant: "error",
 					}),
 			},
@@ -393,28 +453,15 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				toastManager.add({ title: message, variant: "error" });
 				return;
 			}
-			toastManager.add({
-				title: enqueuePlan.title ?? "Email queued. Draft kept until delivery is confirmed.",
-				timeout: 10_000,
-				actions: enqueuePlan.canUndo ? [
-					{
-						children: "Undo",
-						variant: "secondary",
-						size: "sm",
-						onClick: () =>
-							cancelOutboundMut.mutate(
-								{ mailboxId, deliveryId: result.deliveryId },
-								{
-									onSuccess: () => toastManager.add({ title: "Send cancelled" }),
-									onError: (error) =>
-										toastManager.add({
-											title: error instanceof Error ? error.message : "Could not cancel send",
-											variant: "error",
-										}),
-								},
-							),
-					},
-				] : [],
+			// Handed to the mailbox-level watcher: this panel closes on the next line
+			// when sending from Drafts, so it cannot see the delivery settle.
+			trackSend({
+				deliveryId: result.deliveryId,
+				emailId: result.id,
+				mailboxId,
+				scheduledFor: result.scheduledFor ?? undefined,
+				title: enqueuePlan.title,
+				canUndo: enqueuePlan.canUndo,
 			});
 			if (isDraftFolder) closePanel();
 		} catch (err) {
@@ -431,10 +478,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		try {
 			const draft = await aiDraftMut.mutateAsync({ mailboxId, emailId: target.id });
 			const subject =
-				draft.subject ||
-				(target.subject?.startsWith("Re:")
-					? target.subject
-					: `Re: ${target.subject || ""}`);
+				draft.subject || prefixedSubject(target.subject || "", "Re");
 			startCompose({
 				mode: "reply",
 				originalEmail: target,
@@ -454,7 +498,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		} catch (err) {
 			const message =
 				(err instanceof Error ? err.message : null) ||
-				"AI couldn't draft a reply. Try again.";
+				"AI couldn’t draft a reply. Try again.";
 			toastManager.add({ title: message, variant: "error" });
 		} finally {
 			setIsDrafting(false);
@@ -494,7 +538,6 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		<div className="flex flex-col h-full">
 			<EmailPanelToolbar
 				email={email}
-				mailboxId={mailboxId}
 				isDraftFolder={isDraftFolder}
 				isOutboxFolder={isOutboxFolder}
 				isSnoozedFolder={isSnoozedFolder}
@@ -506,15 +549,24 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				onBack={closePanel}
 				onSendDraft={() => handleSendDraft()}
 				onEditDraft={() => handleEditDraft()}
-					onReply={() =>
-						startCompose({ mode: "reply", originalEmail: lastReceivedMessage })
-					}
-					onReplyAll={() =>
+					onReply={() => {
+						if (!authoritativeReplyTarget) return;
+						startCompose({
+							mode: "reply",
+							originalEmail: authoritativeReplyTarget,
+						});
+					}}
+					onReplyAll={() => {
+						if (!authoritativeReplyTarget) return;
 						startCompose({
 							mode: "reply-all",
-							originalEmail: lastReceivedMessage,
-						})
-					}
+							originalEmail: authoritativeReplyTarget,
+						});
+					}}
+					canReply={Boolean(authoritativeReplyTarget)}
+					replyUnavailableReason={replyTargetBodyQuery?.isError
+						? "Complete message unavailable"
+						: "Loading complete message"}
 					onForward={() => {
 						if (!authoritativeSelectedEmail) return;
 						startCompose({
@@ -586,8 +638,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			</div>
 
 			<div ref={conversationScrollRef} className="flex-1 overflow-y-auto">
-				{hasThread ? (
-					allMessages.map((msg, idx) => {
+				{allMessages.map((msg, idx) => {
 						const isDraft = draftMessageIds.has(msg.id);
 						return (
 							<ThreadMessage
@@ -596,6 +647,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								mailboxId={mailboxId}
 								mailboxEmail={currentMailbox?.email}
 								isLast={idx === allMessages.length - 1}
+								isSoleMessage={!hasThread}
 								isDraft={isDraft}
 								isSending={isDraft ? isSending : false}
 								isExpanded={expandedMessages.has(msg.id)}
@@ -610,23 +662,10 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								bodyState={externalBodyQueriesById.get(msg.id)}
 							/>
 						);
-					})
-				) : (
-					<div
-						data-intelligence-message-id={email.id}
-						tabIndex={-1}
-						aria-label={`Message from ${email.sender}`}
-					>
-							<SingleMessageView
-								email={email}
-								mailboxId={mailboxId}
-								onPreviewImage={(url, filename) =>
-									setPreviewImage({ url, filename })
-								}
-								bodyState={selectedBodyQuery}
-							/>
-					</div>
-				)}
+					})}
+				{/* The one composer instance renders itself in here when it is answering
+				    this thread. Kept unconditional so it exists before compose opens. */}
+				<div id={INLINE_COMPOSE_HOST_ID} />
 				{!isIntelligenceUnsupported && mailboxId && (
 					<ConversationIntelligenceCard
 						mailboxId={mailboxId}

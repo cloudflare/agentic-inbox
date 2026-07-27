@@ -10,6 +10,7 @@ const sidebar = read("./Sidebar.tsx");
 const list = read("../routes/email-list.tsx");
 const panel = read("./EmailPanel.tsx");
 const toolbar = read("./email-panel/EmailPanelToolbar.tsx");
+const row = read("./EmailRow.tsx");
 
 test("Snoozed is a first-class mailbox folder with list and detail actions", () => {
 	assert.match(sidebar, /Folders\.SNOOZED/);
@@ -27,7 +28,18 @@ test("Snooze remains keyboard and touch accessible", () => {
 	assert.match(list, /case "snooze"/);
 	assert.match(list, /snoozeScopeAffectsRow\(scope, selectedRow\)/);
 	assert.match(list, /setKeyboardTargetId\(null\);\s*closePanel\(\)/);
-	assert.match(list, /Keep core actions discoverable and touch-accessible/);
-	assert.match(list, /className="flex items-center shrink-0"/);
-	assert.doesNotMatch(list, /Secondary actions remain hover-only/);
+	assert.match(list, /aria-label="Snooze mail"/);
+	// Row actions may hide until hover only where hovering exists. Every
+	// hover reveal stays gated on pointer type so a touch screen - which
+	// never hovers - keeps the actions permanently visible.
+	const hoverReveals = [...row.matchAll(/[\w:-]*group-hover:[\w-]+/g)];
+	assert.ok(hoverReveals.length > 0, "expected a hover reveal to gate");
+	for (const [reveal] of hoverReveals) {
+		assert.match(
+			reveal,
+			/^pointer-fine:group-hover:/,
+			`${reveal} must not strand touch users`,
+		);
+	}
+	assert.match(row, /pointer-fine:group-focus-within:flex/);
 });

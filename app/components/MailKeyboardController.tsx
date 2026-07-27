@@ -3,6 +3,7 @@ import { KeyboardIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
+	activatesFocusedControl,
 	isMailShortcutProtectedTarget,
 	resolveMailShortcut,
 	type MailCommand,
@@ -35,6 +36,7 @@ const SHORTCUT_GROUPS: ReadonlyArray<{
 			["S", "Star / unstar"],
 			["Z", "Snooze / return"],
 			["/", "Search"],
+			["⌘K / Ctrl K", "Open the command palette"],
 		],
 	},
 	{
@@ -116,6 +118,10 @@ export default function MailKeyboardController() {
 				return;
 			}
 			if (!resolution.command) return;
+			// Enter belongs to whatever control has focus. Buttons, links and menu
+			// items are unprotected above so shortcuts survive a focused mail row,
+			// but that must not cost them their own activation.
+			if (activatesFocusedControl(event.key, event.target)) return;
 			if (isComposing) return;
 			if (
 				showShortcuts &&

@@ -77,7 +77,7 @@ export default function OutboundDeliveryActions({
 			},
 			{
 				onSuccess: () =>
-					toastManager.add({ title: "Send queued for retry" }),
+					toastManager.add({ title: "Retrying send" }),
 				onError,
 			},
 		);
@@ -134,8 +134,8 @@ export default function OutboundDeliveryActions({
 					)}
 					{isPending
 						? action.kind === "cancel"
-							? "Cancelling..."
-							: "Retrying..."
+							? "Cancelling…"
+							: "Retrying…"
 						: compact
 							? compactActionLabel
 							: action.label}
@@ -148,7 +148,7 @@ export default function OutboundDeliveryActions({
 function deliveryStateLabel(delivery: OutboundDelivery): string {
 	if (delivery.status === "queued" && delivery.scheduledFor) return "Scheduled";
 	return {
-		queued: "Queued, cancellation available",
+		queued: "Sending, cancellation available",
 		sending: "Sending",
 		retrying: "Automatic retry in progress",
 		sent: "Sent",

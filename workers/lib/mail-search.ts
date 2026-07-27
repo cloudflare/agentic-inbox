@@ -1,4 +1,5 @@
 import { InternalFolders } from "../../shared/folders.ts";
+import { hasAttachmentsSql } from "./list-projection.ts";
 import {
 	MAIL_SEARCH_LIMITS,
 	SearchQueryError,
@@ -328,8 +329,9 @@ export function buildMailSearchPlan(options: MailSearchOptions): MailSearchPlan 
 	const limitParameter = dataParams.add(limit);
 	const offsetParameter = dataParams.add((page - 1) * limit);
 	const dataSql = `
-		SELECT e.id, e.subject, e.sender, e.recipient, e.cc, e.bcc, e.date,
+		SELECT e.id, e.subject, e.sender, e.sender_name, e.recipient, e.cc, e.bcc, e.date,
 			e.read, e.starred, e.in_reply_to, e.email_references,
+			${hasAttachmentsSql("e")} AS has_attachments,
 			e.thread_id, e.folder_id, e.snooze_source_folder_id, e.snoozed_until,
 			EXISTS(SELECT 1 FROM email_body_objects body_object
 			       WHERE body_object.email_id = e.id) AS body_external,

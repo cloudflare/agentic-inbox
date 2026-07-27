@@ -81,3 +81,17 @@ test("unsupported sort values fail closed to deterministic date ordering", () =>
     "/mailbox/support%40example.com/views/view%2Funsafe",
   );
 });
+
+test("saved views project the same row columns as folder lists", () => {
+	// Saved View results run through buildMailSearchPlan exactly as search does
+	// (app/queries/saved-views.ts posts to the same /search endpoint), so both
+	// surfaces render EmailRow with the sender name and the paperclip intact.
+	const sql = appliedSearchSql(
+		savedViewSearchParams({
+			filters: { folder: "inbox", labelId: "label_vip" },
+			sort: { column: "date", direction: "DESC" },
+		}),
+	);
+	assert.match(sql, /e\.sender_name/);
+	assert.match(sql, /AS has_attachments/);
+});

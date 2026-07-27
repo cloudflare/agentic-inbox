@@ -30,7 +30,8 @@ export function accountLifecycle(
 						 SET is_active = 0, password_hash = ?, password_salt = ?,
 						     mcp_token_hash = NULL, session_version = session_version + 1,
 						     updated_at = ?
-						 WHERE id = ?`,
+						 WHERE id = ?
+						 RETURNING id`,
           ).bind(
             input.passwordHash,
             input.passwordSalt,
@@ -76,7 +77,9 @@ export function accountLifecycle(
             input.userId,
           ),
         ]);
-        if ((results[0]?.meta.changes ?? 0) !== 1) {
+        // Row count, not meta.changes: the session_version bump fires a trigger
+        // that enqueues one revocation per mailbox, inflating the change count.
+        if ((results[0]?.results.length ?? 0) !== 1) {
           throw new Error("User was not found");
         }
         return { mailboxIds: mailboxRows.results.map((row) => row.address) };

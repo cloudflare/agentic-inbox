@@ -104,7 +104,13 @@ test("runtime recovery restores dirty lifecycle and pins the snapshot origin mai
 		form,
 		/restoredComposeLifecycle\(recoveryAtMountRef\.current\.lifecycle\)/,
 	);
-	assert.match(form, /lifecycle: lifecycleForRecovery/);
+	// The snapshot carries the edit-aware lifecycle, and is written from a commit
+	// rather than during render, so rendering the composer stays side-effect free.
+	assert.match(
+		form,
+		/useEffect\(\(\) => \{[\s\S]*?writeComposeRecovery\(\{[\s\S]*?lifecycle: composeRecoveryLifecycleForRender\([\s\S]*?baseline !== null && baseline !== renderFingerprint/,
+	);
+	assert.doesNotMatch(form, /^\tif \([\s\S]*?writeComposeRecovery/m);
 	assert.match(
 		form,
 		/lifecycle\.phase === "failed" && recoveryAutosaveNeededRef\.current/,
@@ -128,5 +134,10 @@ test("terminal delivery replay never closes as a fresh queue and safe resend ren
 		form,
 		/enqueuePlan\.action !== "finish"[\s\S]*?setError\(message\)[\s\S]*?return/,
 	);
-	assert.match(form, /Submitting email/);
+	assert.match(
+		form,
+		/trackSend\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id[\s\S]*?mailboxId: composeMailboxId/,
+		"an accepted send must outlive this composer, which finishClose unmounts on the next line",
+	);
+	assert.doesNotMatch(form, /Submitting email/);
 });

@@ -34,6 +34,7 @@ export interface Email {
 	snoozed_until?: string | null;
 	subject: string;
 	sender: string;
+	sender_name?: string | null;
 	recipient: string;
 	cc?: string;
 	bcc?: string;
@@ -49,10 +50,12 @@ export interface Email {
 	draft_version?: number;
 	attachments?: Attachment[];
 	snippet?: string | null;
+	has_attachments?: boolean;
 	// Thread aggregate fields (only present in threaded list view)
 	thread_count?: number;
 	thread_unread_count?: number;
 	participants?: string;
+	participant_names?: string;
 	needs_reply?: boolean;
 	has_draft?: boolean;
 	labels?: Label[];

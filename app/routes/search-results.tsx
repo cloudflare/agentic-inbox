@@ -12,10 +12,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import MailboxSplitView from "~/components/MailboxSplitView";
+import EmailRow from "~/components/EmailRow";
 import AiSearchWorkspace from "~/components/AiSearchWorkspace";
 import LabelChip from "~/components/labels/LabelChip";
 import SaveCurrentViewButton from "~/components/SaveCurrentViewButton";
-import { formatListDate, getSnippetText } from "~/lib/utils";
 import { definitionFromSearchView } from "~/lib/saved-view-navigation";
 import { useUpdateEmail } from "~/queries/emails";
 import { useSearchEmails, SEARCH_PAGE_SIZE } from "~/queries/search";
@@ -270,7 +270,7 @@ export default function SearchResultsRoute() {
 							<p className="mt-2 text-sm text-kumo-subtle">
 								{error instanceof Error
 									? error.message
-									: "We couldn't complete this search."}
+									: "We couldn’t complete this search."}
 							</p>
 							<Button
 								className="mt-4"
@@ -316,73 +316,48 @@ export default function SearchResultsRoute() {
 							)}
 						</div>
 					) : (
-						<div>
+						<div role="list" aria-label="Search results">
 							{results.map((email) => {
-								const isSelected = selectedEmailId === email.id;
-								const snippet = getSnippetText(email.snippet, 120);
 								const folderName = (email as Email & { folder_name?: string })
 									.folder_name;
 								const matchedAttachment = (
 									email as Email & { matched_attachment_filename?: string | null }
 								).matched_attachment_filename;
 								return (
-									<div
+									<EmailRow
 										key={email.id}
-										role="button"
-										tabIndex={0}
-										onClick={() => handleRowClick(email)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === " ") {
-												e.preventDefault();
-												handleRowClick(email);
-											}
-										}}
-										className={`group flex min-h-11 items-center gap-3 w-full text-left cursor-pointer transition-colors border-b border-kumo-line px-4 md:px-5 ${isCompact ? "py-1" : "py-2.5 md:py-3"} ${isPanelOpen && !isCompact ? "md:px-4 md:py-2.5" : ""} ${isSelected ? "bg-kumo-tint" : "hover:bg-kumo-tint"}`}
-									>
-										<div className="w-2.5 shrink-0 flex justify-center">
-											{!email.read && (
-												<div className="h-2 w-2 rounded-full bg-kumo-brand" />
-											)}
-										</div>
-										<div className="min-w-0 flex-1">
-											<div className="flex items-center gap-2">
-												<span
-													className={`truncate text-sm ${!email.read ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}
-												>
-													{highlightTerms(email.sender.split("@")[0], urlQuery)}
-												</span>
-												{folderName && (
+										email={email}
+										unread={!email.read}
+										selected={selectedEmailId === email.id}
+										compact={isCompact}
+										dense={isPanelOpen && !isCompact}
+										onOpen={() => handleRowClick(email)}
+										highlight={(text) => highlightTerms(text, urlQuery)}
+										meta={
+											folderName ? (
+												<span className="shrink-0">
 													<Badge variant="outline">
 														{folderDisplayName(folderName)}
 													</Badge>
-												)}
-												<span className="text-sm text-kumo-subtle shrink-0 ml-auto">
-													{formatListDate(email.date)}
 												</span>
-											</div>
-											<div
-												className={`flex min-w-0 items-center gap-2 text-sm mt-0.5 ${!email.read ? "font-medium text-kumo-default" : "text-kumo-subtle"}`}
-											>
-												<span className="truncate">
-													{highlightTerms(email.subject, urlQuery)}
-												</span>
-												{(email.labels ?? []).slice(0, 2).map((label) => (
-													<LabelChip key={label.id} label={label} />
-												))}
-											</div>
-											{!isCompact && snippet && (
-												<div className="truncate text-xs text-kumo-subtle mt-0.5">
-													{highlightTerms(snippet, urlQuery)}
-												</div>
-											)}
-											{matchedAttachment && (
-												<div className="mt-1 flex items-center gap-1 truncate text-xs text-kumo-subtle">
+											) : undefined
+										}
+										subjectMeta={(email.labels ?? [])
+											.slice(0, 2)
+											.map((label) => (
+												<LabelChip key={label.id} label={label} />
+											))}
+										footer={
+											matchedAttachment ? (
+												<span className="flex w-full min-w-0 items-center gap-1 text-xs text-kumo-subtle">
 													<PaperclipIcon size={13} className="shrink-0" />
-													<span className="truncate">{highlightTerms(matchedAttachment, urlQuery)}</span>
-												</div>
-											)}
-										</div>
-									</div>
+													<span className="truncate">
+														{highlightTerms(matchedAttachment, urlQuery)}
+													</span>
+												</span>
+											) : undefined
+										}
+									/>
 								);
 							})}
 						</div>

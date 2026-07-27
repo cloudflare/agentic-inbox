@@ -16,7 +16,7 @@ import { formatListDate } from "shared/dates";
 import { usePushSubscription } from "~/hooks/pwa/usePushSubscription";
 import {
 	useAppConfig,
-	useCurrentPushActor,
+	useCurrentActor,
 	useDeletePushDevice,
 	usePushHealth,
 } from "~/queries/push";
@@ -154,7 +154,7 @@ export function PushNotificationsSection({
 }) {
 	const toast = useKumoToastManager();
 	const configQuery = useAppConfig();
-	const actorQuery = useCurrentPushActor();
+	const actorQuery = useCurrentActor();
 	const actorScope = actorQuery.data?.email;
 	const healthQuery = usePushHealth(mailboxId, actorScope, onAccessRevoked);
 	const { enable, isSubscribing, pushSupported } = usePushSubscription(

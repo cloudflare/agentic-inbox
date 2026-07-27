@@ -44,7 +44,7 @@ function EmailPanelLoadingFallback({ onBack }: { onBack: () => void }) {
 					<div className="h-2.5 w-24 rounded bg-kumo-fill" />
 				</div>
 			</div>
-			<span className="sr-only">Opening conversation...</span>
+			<span className="sr-only">Opening conversation…</span>
 		</div>
 	);
 }

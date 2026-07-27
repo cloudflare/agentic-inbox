@@ -176,33 +176,35 @@ export function ReminderRow({
 							}
 						/>
 						<DropdownMenu.Content>
-							<DropdownMenu.Label>Reschedule reminder</DropdownMenu.Label>
-							<DropdownMenu.Item
-								icon={SunHorizonIcon}
-								className="min-h-11"
-								onSelect={() =>
-									onAction({
-										action: "snooze",
-										reminder,
-										remindAt: reminderRescheduleTime("tomorrow").toISOString(),
-									})
-								}
-							>
-								Tomorrow at 9:00 AM
-							</DropdownMenu.Item>
-							<DropdownMenu.Item
-								icon={CalendarBlankIcon}
-								className="min-h-11"
-								onSelect={() =>
-									onAction({
-										action: "snooze",
-										reminder,
-										remindAt: reminderRescheduleTime("next_week").toISOString(),
-									})
-								}
-							>
-								Next Monday at 9:00 AM
-							</DropdownMenu.Item>
+							<DropdownMenu.Group>
+								<DropdownMenu.Label>Reschedule reminder</DropdownMenu.Label>
+								<DropdownMenu.Item
+									icon={SunHorizonIcon}
+									className="min-h-11"
+									onSelect={() =>
+										onAction({
+											action: "snooze",
+											reminder,
+											remindAt: reminderRescheduleTime("tomorrow").toISOString(),
+										})
+									}
+								>
+									Tomorrow at 9:00 AM
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									icon={CalendarBlankIcon}
+									className="min-h-11"
+									onSelect={() =>
+										onAction({
+											action: "snooze",
+											reminder,
+											remindAt: reminderRescheduleTime("next_week").toISOString(),
+										})
+									}
+								>
+									Next Monday at 9:00 AM
+								</DropdownMenu.Item>
+							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu>
 					<Button

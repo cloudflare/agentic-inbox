@@ -57,7 +57,7 @@ function ComposeLoadingFallback({
 			aria-live="polite"
 		>
 			<div className="flex flex-col items-center gap-3 rounded-lg border border-kumo-line bg-kumo-base px-5 py-4 text-sm text-kumo-subtle shadow-lg">
-				<span>Opening composer...</span>
+				<span>Opening composer…</span>
 					<Button
 						variant="secondary"
 						onClick={() => {

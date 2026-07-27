@@ -13,8 +13,10 @@ import { useBrand } from "~/hooks/useBrand";
 /**
  * Foreground new-mail notifications. Web Push owns the background/closed-app path.
  *
- * - Polls the inbox and raises a toast the first time a newer inbound message
- *   appears (seeded silently on first load so existing mail never toasts).
+ * - Raises a toast the first time a newer inbound message appears (seeded
+ *   silently on first load so existing mail never toasts). The mailbox change
+ *   feed already polls and invalidates the emails cache, so this reads that
+ *   cache rather than running a second poll of its own.
  * - Mirrors the total unread count into the browser tab title.
  */
 export function useMailNotifications(mailboxId: string | undefined) {
@@ -25,7 +27,7 @@ export function useMailNotifications(mailboxId: string | undefined) {
 	const { data: inbox } = useEmails(
 		mailboxId,
 		{ folder: Folders.INBOX, page: "1", limit: "15" },
-		{ enabled: !!mailboxId, refetchInterval: 30_000 },
+		{ enabled: !!mailboxId },
 	);
 
 	const myEmail = (mailbox?.email || mailboxId || "").toLowerCase();

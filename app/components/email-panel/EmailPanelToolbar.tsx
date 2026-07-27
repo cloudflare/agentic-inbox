@@ -26,7 +26,6 @@ import type { Folder, Email } from "~/types";
 
 interface EmailPanelToolbarProps {
 	email: Email;
-	mailboxId?: string;
 	isDraftFolder: boolean;
 	isOutboxFolder: boolean;
 	isSnoozedFolder: boolean;
@@ -42,6 +41,8 @@ interface EmailPanelToolbarProps {
 	onReply: () => void;
 	onReplyAll: () => void;
 	onForward: () => void;
+	canReply: boolean;
+	replyUnavailableReason: string;
 	canForward: boolean;
 	forwardUnavailableReason: string;
 	onAiDraft: () => void;
@@ -58,7 +59,6 @@ interface EmailPanelToolbarProps {
 
 export default function EmailPanelToolbar({
 	email,
-	mailboxId,
 	isDraftFolder,
 	isOutboxFolder,
 	isSnoozedFolder,
@@ -73,6 +73,8 @@ export default function EmailPanelToolbar({
 	onReply,
 	onReplyAll,
 	onForward,
+	canReply,
+	replyUnavailableReason,
 	canForward,
 	forwardUnavailableReason,
 	onAiDraft,
@@ -116,7 +118,7 @@ export default function EmailPanelToolbar({
 						onClick={onSendDraft}
 						loading={isSending}
 					>
-						{isSending ? "Sending..." : "Send"}
+						{isSending ? "Sending…" : "Send"}
 					</Button>
 					<Button
 						variant="secondary"
@@ -129,24 +131,38 @@ export default function EmailPanelToolbar({
 				</>
 			) : (
 				<>
-					<Tooltip content="Reply" side="bottom" asChild>
+					<Tooltip
+						content={canReply ? "Reply" : replyUnavailableReason}
+						side="bottom"
+						asChild
+					>
 						<Button
 							variant="ghost"
 							shape="square"
 							size="sm"
 							icon={<ArrowBendUpLeftIcon size={18} />}
 							onClick={onReply}
-							aria-label="Reply"
+							disabled={!canReply}
+							aria-label={canReply
+								? "Reply"
+								: `Reply unavailable: ${replyUnavailableReason}`}
 						/>
 					</Tooltip>
-					<Tooltip content="Reply All" side="bottom" asChild>
+					<Tooltip
+						content={canReply ? "Reply All" : replyUnavailableReason}
+						side="bottom"
+						asChild
+					>
 						<Button
 							variant="ghost"
 							shape="square"
 							size="sm"
 							icon={<ChatCircleIcon size={18} />}
 							onClick={onReplyAll}
-							aria-label="Reply All"
+							disabled={!canReply}
+							aria-label={canReply
+								? "Reply All"
+								: `Reply All unavailable: ${replyUnavailableReason}`}
 						/>
 					</Tooltip>
 					<Tooltip
@@ -306,7 +322,7 @@ function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id:
 				/>
 			</Tooltip>
 			{open && (
-				<div className="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-lg border border-kumo-line bg-kumo-elevated shadow-lg py-1">
+				<div className="absolute top-full left-0 z-50 mt-1 max-h-[min(22rem,calc(100vh-6rem))] min-w-[160px] overflow-y-auto rounded-lg border border-kumo-line bg-kumo-elevated shadow-lg py-1">
 					<div className="px-3 py-1.5 text-xs font-medium text-kumo-subtle">Move to</div>
 					<div className="h-px bg-kumo-line my-1" />
 					{folders.map((f) => (

@@ -29,15 +29,18 @@ export function useAppConfig() {
 }
 
 /**
- * The actor email is already visible account identity. Including it in the
- * in-memory health key prevents a browser identity transition from reusing
- * another actor's device response. Push-health queries are never persisted.
+ * The signed-in account: header chrome, admin affordances, and the push-health
+ * key all read identity from here. Including the actor email in the in-memory
+ * health key prevents a browser identity transition from reusing another
+ * actor's device response, so identity is refreshed on refocus rather than
+ * cached for the session. Push-health queries are never persisted.
  */
-export function useCurrentPushActor() {
+export function useCurrentActor() {
 	return useQuery({
 		queryKey: queryKeys.currentActor,
 		queryFn: () => api.getCurrentActor(),
-		staleTime: Number.POSITIVE_INFINITY,
+		staleTime: 5 * 60_000,
+		refetchOnWindowFocus: true,
 	});
 }
 

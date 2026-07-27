@@ -6,6 +6,7 @@ import { Button, DropdownMenu, Input, Tooltip } from "@cloudflare/kumo";
 import { CommandIcon, DotsThreeIcon, ExamIcon, GearSixIcon, ListIcon, MagnifyingGlassIcon, PaperPlaneTiltIcon, RobotIcon, ShieldCheckIcon, SignOutIcon, SparkleIcon, XIcon } from "@phosphor-icons/react";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { useCurrentActor } from "~/queries/push";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useBrand } from "~/hooks/useBrand";
 import { MAIL_FOCUS_SEARCH_EVENT } from "~/components/MailKeyboardController";
@@ -21,7 +22,15 @@ export default function Header() {
 	const [searchParams] = useSearchParams();
 	const { toggleSidebar, toggleAgentPanel, isAgentPanelOpen } = useUIStore();
 	const { quizEnabled } = useBrand();
-	const [me, setMe] = useState<{ email: string; role: string } | null>(null);
+	// Identity drives the admin link and the account shown on sign-out
+	// (see /api/v1/me). Shared query, so a failure retries on refocus instead
+	// of silently pretending nobody is signed in.
+	const { data: me, isError: identityUnavailable } = useCurrentActor();
+	const signOutLabel = me
+		? `Sign out (${me.email})`
+		: identityUnavailable
+			? "Sign out (account details unavailable)"
+			: "Sign out";
 
 	useEffect(() => {
 		const focusSearch = () => {
@@ -36,14 +45,6 @@ export default function Header() {
 		window.addEventListener(MAIL_FOCUS_SEARCH_EVENT, focusSearch);
 		return () =>
 			window.removeEventListener(MAIL_FOCUS_SEARCH_EVENT, focusSearch);
-	}, []);
-
-	// Identify the signed-in user to show the admin link + sign-out (see /api/v1/me).
-	useEffect(() => {
-		fetch("/api/v1/me", { credentials: "same-origin" })
-			.then((r) => (r.ok ? (r.json() as Promise<{ email: string; role: string }>) : null))
-			.then((data) => setMe(data))
-			.catch(() => setMe(null));
 	}, []);
 
 	// /logout is a POST endpoint; submit a throwaway form to hit it.
@@ -128,7 +129,7 @@ export default function Header() {
 					<Input
 						className="w-full"
 						aria-label="Search emails"
-						placeholder="Search emails... (try from:name, is:unread, has:attachment)"
+						placeholder="Search emails… (try from:name, is:unread, has:attachment)"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						onKeyDown={handleKeyDown}
@@ -264,7 +265,7 @@ export default function Header() {
 						/>
 					</Tooltip>
 				)}
-				<Tooltip content={me ? `Sign out (${me.email})` : "Sign out"} side="bottom" asChild>
+				<Tooltip content={signOutLabel} side="bottom" asChild>
 					<Button
 						variant="ghost"
 						shape="square"
@@ -289,58 +290,70 @@ export default function Header() {
 						}
 					/>
 					<DropdownMenu.Content align="end">
-						<DropdownMenu.Label>Mail actions</DropdownMenu.Label>
-						<DropdownMenu.Item
-							icon={RobotIcon}
-							className="min-h-11"
-							onSelect={toggleAgentPanel}
-						>
-							{isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							icon={GearSixIcon}
-							className="min-h-11"
-							onSelect={() =>
-								navigate(
-									isSettingsActive
-										? `/mailbox/${mailboxId}/emails/inbox`
-										: `/mailbox/${mailboxId}/settings`,
-								)
-							}
-						>
-							{isSettingsActive ? "Back to inbox" : "Settings"}
-						</DropdownMenu.Item>
-						{quizEnabled && (
+						<DropdownMenu.Group>
+							<DropdownMenu.Label>Mail actions</DropdownMenu.Label>
+							{/* The ⌘K trigger is xl-only, so keep the palette reachable here. */}
 							<DropdownMenu.Item
-								icon={ExamIcon}
+								icon={CommandIcon}
+								className="min-h-11"
+								onSelect={() =>
+									window.dispatchEvent(new Event(MAIL_COMMAND_PALETTE_OPEN_EVENT))
+								}
+							>
+								Command palette
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								icon={RobotIcon}
+								className="min-h-11"
+								onSelect={toggleAgentPanel}
+							>
+								{isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								icon={GearSixIcon}
+								className="min-h-11"
+								onSelect={() =>
+									navigate(
+										isSettingsActive
+											? `/mailbox/${mailboxId}/emails/inbox`
+											: `/mailbox/${mailboxId}/settings`,
+									)
+								}
+							>
+								{isSettingsActive ? "Back to inbox" : "Settings"}
+							</DropdownMenu.Item>
+							{quizEnabled && (
+								<DropdownMenu.Item
+									icon={ExamIcon}
+									className="min-h-11"
+									onSelect={() => {
+										window.location.href = me?.role === "ADMIN" ? "/admin/quizzes" : "/quizzes";
+									}}
+								>
+									Quizzes
+								</DropdownMenu.Item>
+							)}
+							<DropdownMenu.Item
+								icon={PaperPlaneTiltIcon}
 								className="min-h-11"
 								onSelect={() => {
-									window.location.href = me?.role === "ADMIN" ? "/admin/quizzes" : "/quizzes";
+									window.location.href = "/bulk";
 								}}
 							>
-								Quizzes
+								Bulk send
 							</DropdownMenu.Item>
-						)}
-						<DropdownMenu.Item
-							icon={PaperPlaneTiltIcon}
-							className="min-h-11"
-							onSelect={() => {
-								window.location.href = "/bulk";
-							}}
-						>
-							Bulk send
-						</DropdownMenu.Item>
-						{me?.role === "ADMIN" && (
-							<DropdownMenu.Item
-								icon={ShieldCheckIcon}
-								className="min-h-11"
-								onSelect={() => {
-									window.location.href = "/admin/users";
-								}}
-							>
-								Admin
-							</DropdownMenu.Item>
-						)}
+							{me?.role === "ADMIN" && (
+								<DropdownMenu.Item
+									icon={ShieldCheckIcon}
+									className="min-h-11"
+									onSelect={() => {
+										window.location.href = "/admin/users";
+									}}
+								>
+									Admin
+								</DropdownMenu.Item>
+							)}
+						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Item
 							icon={SignOutIcon}

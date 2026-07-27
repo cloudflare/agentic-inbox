@@ -11,8 +11,10 @@
 //                           (fires beforeinstallprompt). Intentionally NO
 //                           caching — no offline experience in v1.
 //
-// Bump SW_VERSION when the handler shape changes; combined with the
-// `Cache-Control: no-cache` on this file, browsers refetch + swap on next load.
+// Bump SW_VERSION when the handler shape changes. Freshness comes from the
+// registration's `updateViaCache: "none"` (app/components/pwa/
+// ServiceWorkerRegistrar.tsx), which makes the browser bypass its HTTP cache
+// for this file, so browsers refetch + swap on next load.
 
 const SW_VERSION = "notif-v3";
 

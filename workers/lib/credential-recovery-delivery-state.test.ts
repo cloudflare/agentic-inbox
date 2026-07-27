@@ -29,8 +29,13 @@ class Statement {
     return this;
   }
   async run() {
-    const result = this.statement().run(...this.#values);
-    return { success: true, meta: { changes: Number(result.changes) } };
+    const before = totalChanges(this.database);
+    const results = this.statement().all(...this.#values);
+    return {
+      success: true,
+      results,
+      meta: { changes: totalChanges(this.database) - before },
+    };
   }
   async first<T>() {
     return (this.statement().get(...this.#values) as T | undefined) ?? null;
@@ -41,6 +46,15 @@ class Statement {
   private statement(): StatementSync {
     return this.database.prepare(this.sql);
   }
+}
+
+// D1 reports trigger-caused row changes in meta.changes, so the shim reports the
+// total_changes() delta rather than the trigger-excluding sqlite3_changes count.
+function totalChanges(database: DatabaseSync): number {
+  const row = database.prepare("SELECT total_changes() AS total").get() as {
+    total: number;
+  };
+  return Number(row.total);
 }
 
 function fixture() {

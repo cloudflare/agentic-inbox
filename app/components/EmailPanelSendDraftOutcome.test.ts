@@ -22,7 +22,17 @@ test("Send Draft keeps blocked terminal outcomes open and only exposes policy-ap
 		panel,
 		/enqueuePlan\.action !== "finish"[\s\S]*?variant: "error"[\s\S]*?return;[\s\S]*?enqueuePlan\.title/,
 	);
-	assert.match(panel, /actions: enqueuePlan\.canUndo \? \[/);
+	assert.match(panel, /canUndo: enqueuePlan\.canUndo/);
+	assert.match(
+		panel,
+		/trackSend\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id[\s\S]*?mailboxId,/,
+		"the draft-send path must hand the send to the mailbox-level watcher",
+	);
+	assert.doesNotMatch(
+		panel,
+		/useCancelOutboundDelivery/,
+		"this panel closes on send, so it must not own the undo callbacks",
+	);
 	assert.match(
 		panel,
 		/enqueuePlan\.action !== "finish"[\s\S]*?return;[\s\S]*?if \(isDraftFolder\) closePanel\(\)/,

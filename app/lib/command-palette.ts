@@ -1,6 +1,7 @@
 import { Folders } from "../../shared/folders.ts";
 import { isBatchTriageActionAllowed } from "../../shared/batch-triage.ts";
 import type { MailCommand } from "./mail-keyboard.ts";
+import { canSnoozeFromFolder } from "./snooze-selection.ts";
 
 export type MailPaletteCommand = {
 	id: string;
@@ -110,7 +111,7 @@ export function buildMailPaletteCommands(context: {
 		commands.push({
 			id: "toggle-read",
 			title: "Mark read / unread",
-			description: "Toggle the current conversation's read state",
+			description: "Toggle the current conversation’s read state",
 			group: "Current conversation",
 			keywords: ["read", "unread", "seen"],
 			shortcut: "U",
@@ -126,6 +127,40 @@ export function buildMailPaletteCommands(context: {
 			keywords: ["file", "remove from inbox"],
 			shortcut: "E",
 			action: { kind: "mail", command: "archive" },
+		});
+	}
+	// Star and snooze are not batch-triage actions; they mirror the folder rules
+	// the list-level handlers already enforce, so the palette never offers a no-op.
+	if (folderId !== Folders.OUTBOX) {
+		commands.push({
+			id: "toggle-star",
+			title: "Star / unstar conversation",
+			description: "Toggle the star on the current conversation",
+			group: "Current conversation",
+			keywords: ["flag", "favourite", "favorite", "important"],
+			shortcut: "S",
+			action: { kind: "mail", command: "toggle-star" },
+		});
+	}
+	if (folderId === Folders.SNOOZED) {
+		commands.push({
+			id: "unsnooze",
+			title: "Return conversation now",
+			description: "Bring the snoozed conversation back before its time",
+			group: "Current conversation",
+			keywords: ["unsnooze", "wake", "return", "undo snooze"],
+			shortcut: "Z",
+			action: { kind: "mail", command: "snooze" },
+		});
+	} else if (canSnoozeFromFolder(folderId)) {
+		commands.push({
+			id: "snooze",
+			title: "Snooze conversation",
+			description: "Hide it until a time you choose",
+			group: "Current conversation",
+			keywords: ["later", "remind", "defer"],
+			shortcut: "Z",
+			action: { kind: "mail", command: "snooze" },
 		});
 	}
 	if (isBatchTriageActionAllowed("trash", folderId)) {

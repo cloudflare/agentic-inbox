@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import DOMPurify from "dompurify";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	isExpectedInlineImageBlob,
 	normalizeInlineContentId,
@@ -60,7 +60,61 @@ function sourceSetContainsCid(value: string): boolean {
 }
 
 function sourceSetContainsRemoteImage(value: string): boolean {
-	return /(?:^|,)\s*https?:\/\//i.test(value);
+	return /(?:^|,)\s*(?:https?:)?\/\//i.test(value);
+}
+
+const DRAWABLE_IMAGE_TYPES: ReadonlySet<string> = new Set([
+	"image/apng",
+	"image/avif",
+	"image/gif",
+	"image/jpeg",
+	"image/png",
+	"image/svg+xml",
+	"image/webp",
+]);
+
+/**
+ * Whether a `<picture>` source the reader opted into could actually be the
+ * candidate the browser picks. One the picture can never select - a `media`
+ * query that does not match, or a format with no decoder - draws nothing, so
+ * treating it as proof the image renders would clear the `<img>`'s blocked mark
+ * and reveal an empty alt box instead of a picture. Fails closed.
+ *
+ * ponytail: matched against the parent window, not the srcdoc frame, so a
+ * width-based query is judged at the wrong viewport. `prefers-color-scheme`
+ * (the realistic case) is identical in both. Evaluate inside the frame if a
+ * width-conditional source ever matters.
+ */
+function sourceCanDraw(source: Element): boolean {
+	const media = source.getAttribute("media")?.trim();
+	if (media) {
+		try {
+			if (!window.matchMedia(media).matches) return false;
+		} catch {
+			return false;
+		}
+	}
+	const type = source.getAttribute("type")?.trim().toLowerCase();
+	return !type || DRAWABLE_IMAGE_TYPES.has(type);
+}
+
+/**
+ * How the srcdoc document can treat an `<img src>`:
+ * - `null` — nothing to do. `cid:` is served over the inline-image bridge,
+ *   `data:`/`blob:` are already allowed by the CSP in both states.
+ * - `"loadable"` — a remote source the opt-in CSP (`img-src data: blob: https:`)
+ *   can actually fetch. Blocked until the reader opts in, then restored.
+ * - `"unloadable"` — a source that can never render, whatever the reader picks.
+ *   `http:` fails on the https-only opt-in CSP and on mixed content; a relative
+ *   src resolves against the portal origin rather than the sender's site, so it
+ *   can only 404. Both are stripped and hidden in BOTH states, otherwise they
+ *   render as broken-image glyphs that opting in never fixes.
+ */
+function classifyImageSource(source: string): "loadable" | "unloadable" | null {
+	if (!source || /^(?:cid|data|blob):/i.test(source)) return null;
+	// Protocol-relative resolves against the https portal, so it is fetchable.
+	if (/^https:\/\//i.test(source) || source.startsWith("//")) return "loadable";
+	return "unloadable";
 }
 
 async function downloadInlineImages(
@@ -220,10 +274,22 @@ function iframeBridgeScript(
 	});
 	window.addEventListener("pagehide", revokeObjectUrls, { once: true });
 	window.addEventListener("beforeunload", revokeObjectUrls, { once: true });
+	// Remote images decode long after the document is parsed, and the parent
+	// pins this frame's height while the body clips its own overflow — so a
+	// height reported on a fixed schedule clips every image that arrives late.
+	// Watch the document instead and report whenever it actually reflows.
+	if (typeof ResizeObserver === "function") {
+		var heightObserver = new ResizeObserver(function () { reportHeight(); });
+		heightObserver.observe(document.documentElement);
+		heightObserver.observe(document.body);
+	}
+	for (var loadIndex = 0; loadIndex < document.images.length; loadIndex += 1) {
+		document.images[loadIndex].addEventListener("load", reportHeight);
+		document.images[loadIndex].addEventListener("error", reportHeight);
+	}
+	window.addEventListener("load", reportHeight);
 	parent.postMessage({ __emailIframeReady: true, nonce: nonce }, "*");
 	reportHeight();
-	setTimeout(reportHeight, 50);
-	setTimeout(reportHeight, 150);
 	setTimeout(reportHeight, 400);
 })();
 <\/script>`;
@@ -264,10 +330,7 @@ export default function EmailIframe({
 		string | null
 	>(null);
 	const loadRemoteImages = remoteImagesForMessageId === messageId;
-	const hasRemoteImages = useMemo(
-		() => /<(?:img|source)\b[^>]*\b(?:src|srcset)\s*=\s*(?:["'][^"']*https?:\/\/|https?:\/\/)/i.test(body),
-		[body],
-	);
+	const [hasRemoteImages, setHasRemoteImages] = useState(false);
 
 	useEffect(() => {
 		const iframe = iframeRef.current;
@@ -291,8 +354,21 @@ export default function EmailIframe({
 
 		const template = document.createElement("template");
 		template.innerHTML = cleanBody;
+		// DOMPurify allows data-* through by default, so a sender can ship these
+		// internal markers themselves and forge the rendering contract - claiming
+		// an image is already drawn, or blocking one to hide content. They mean
+		// nothing until the walks below stamp them from actual policy.
+		for (const forged of template.content.querySelectorAll(
+			"[data-remote-image-blocked], [data-remote-image-drawn]",
+		)) {
+			forged.removeAttribute("data-remote-image-blocked");
+			forged.removeAttribute("data-remote-image-drawn");
+		}
 		const referencedCids: string[] = [];
 		const cidPictures = new Set<Element>();
+		// Set by the same walk that strips, so the privacy banner offers "Load
+		// images" exactly when opting in would actually reveal something.
+		let togglesRemoteImages = false;
 		for (const image of template.content.querySelectorAll("img")) {
 			image.removeAttribute("data-email-inline-cid");
 			const source = image.getAttribute("src")?.trim() ?? "";
@@ -308,32 +384,56 @@ export default function EmailIframe({
 				const picture = image.closest("picture");
 				if (picture) cidPictures.add(picture);
 			}
-			if (isCidSource || sourceSetContainsCid(sourceSet)) {
-				image.removeAttribute("srcset");
+			const cidSourceSet = isCidSource || sourceSetContainsCid(sourceSet);
+			if (cidSourceSet) image.removeAttribute("srcset");
+			const remoteSourceSet =
+				!cidSourceSet && sourceSetContainsRemoteImage(sourceSet);
+			const sourceKind = classifyImageSource(source);
+			if (sourceKind === "loadable" || remoteSourceSet) {
+				togglesRemoteImages = true;
 			}
-			if (!loadRemoteImages && /^https?:\/\//i.test(source)) {
+			// An opted-in srcset still draws this image, so stripping an unloadable
+			// src must not also mark it blocked - the stylesheet would hide a
+			// picture the reader just asked for and "Load images" would do nothing.
+			const drawnBySourceSet = remoteSourceSet && loadRemoteImages;
+			if (
+				sourceKind === "unloadable" ||
+				(sourceKind === "loadable" && !loadRemoteImages)
+			) {
 				image.removeAttribute("src");
-				image.setAttribute("data-remote-image-blocked", "true");
-				image.setAttribute(
-					"alt",
-					image.getAttribute("alt") || "Remote image blocked for privacy",
-				);
+				if (!drawnBySourceSet) {
+					image.setAttribute("data-remote-image-blocked", "true");
+				}
 			}
-			if (!loadRemoteImages && sourceSetContainsRemoteImage(sourceSet)) {
+			if (remoteSourceSet && !loadRemoteImages) {
 				image.removeAttribute("srcset");
 			}
 		}
 		for (const source of template.content.querySelectorAll("source[srcset]")) {
 			const sourceSet = source.getAttribute("srcset") ?? "";
 			const picture = source.closest("picture");
-			if (
-				(picture && cidPictures.has(picture)) ||
-				sourceSetContainsCid(sourceSet) ||
-				(!loadRemoteImages && sourceSetContainsRemoteImage(sourceSet))
-			) {
+			const cidOwned =
+				(picture && cidPictures.has(picture)) || sourceSetContainsCid(sourceSet);
+			const remoteSourceSet =
+				!cidOwned && sourceSetContainsRemoteImage(sourceSet);
+			if (remoteSourceSet) togglesRemoteImages = true;
+			if (cidOwned || (remoteSourceSet && !loadRemoteImages)) {
 				source.removeAttribute("srcset");
+			} else if (remoteSourceSet && sourceCanDraw(source)) {
+				// This <source> survived the opt-in, so the picture still draws even
+				// though the <img>'s own unloadable src blocked it above: that walk
+				// runs first and cannot see a sibling. Reaching here at all means
+				// loadRemoteImages, so the blocked state is untouched.
+				const drawn = picture?.querySelector("img");
+				if (drawn) {
+					drawn.removeAttribute("data-remote-image-blocked");
+					// Its own src and srcset are gone, so the "nothing left to draw"
+					// rule would hide it on the sibling's behalf.
+					drawn.setAttribute("data-remote-image-drawn", "true");
+				}
 			}
 		}
+		setHasRemoteImages(togglesRemoteImages);
 		cleanBody = template.innerHTML;
 		const plannedImages = planReferencedInlineImages(
 			referencedCids,
@@ -388,6 +488,7 @@ export default function EmailIframe({
 <base target="_blank">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:${loadRemoteImages ? " https:" : ""}; script-src 'unsafe-inline';">
 <style>
 * { box-sizing: border-box; }
@@ -412,6 +513,14 @@ body {
 }
 a { color: #2563eb; }
 img { max-width: 100%; height: auto; }
+/* An image whose source was stripped has nothing left to render, so hide it
+   outright rather than leave a broken-image glyph or an alt-text box in the
+   message. The second selector catches images stripped down to no source at
+   all (a remote-only srcset, say); images still waiting on the inline-image
+   bridge keep data-email-inline-cid and stay visible. The privacy banner above
+   the frame is the only affordance the reader needs. */
+img[data-remote-image-blocked],
+img:not([src]):not([srcset]):not([data-email-inline-cid]):not([data-remote-image-drawn]) { display: none; }
 blockquote {
 	border-left: 3px solid #d1d5db;
 	padding-left: 1em;
@@ -468,28 +577,31 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
 		/>
 	);
 
-	if (!hasRemoteImages) return frame;
-
+	// The wrapper renders whether or not the banner does: swapping the root
+	// element would remount the iframe and blank the message the moment the
+	// sanitize walk reports that this body has remote images.
 	return (
 		<div className={autoSize ? "w-full" : "flex h-full w-full flex-col"}>
-			<div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-				<span>
-					{loadRemoteImages
-						? "Remote images are visible for this message."
-						: "Remote images are blocked to protect your privacy."}
-				</span>
-				<button
-					type="button"
-					className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 font-medium text-slate-700 shadow-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-					onClick={() =>
-						setRemoteImagesForMessageId((current) =>
-							current === messageId ? null : messageId,
-						)
-					}
-				>
-					{loadRemoteImages ? "Hide images" : "Load images"}
-				</button>
-			</div>
+			{hasRemoteImages && (
+				<div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+					<span>
+						{loadRemoteImages
+							? "Remote images are visible for this message."
+							: "Remote images are blocked to protect your privacy."}
+					</span>
+					<button
+						type="button"
+						className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 font-medium text-slate-700 shadow-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+						onClick={() =>
+							setRemoteImagesForMessageId((current) =>
+								current === messageId ? null : messageId,
+							)
+						}
+					>
+						{loadRemoteImages ? "Hide images" : "Load images"}
+					</button>
+				</div>
+			)}
 			{frame}
 		</div>
 	);

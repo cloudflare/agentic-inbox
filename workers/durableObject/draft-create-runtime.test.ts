@@ -470,7 +470,7 @@ test(
 						metadataJson: JSON.stringify({ attachmentCount: 2 }),
 					}]);
 					await request("/clear-alarm");
-					await request("/read-threaded-emails");
+					await request("/read-list-projections");
 					const discardAlarm =
 						(await request<{ alarm: number | null }>("/alarm-state")).alarm;
 					const discardObjectBeforeManualAlarm =
@@ -500,7 +500,7 @@ test(
 						keys: [legacyCleanupKey],
 					});
 					await request("/clear-alarm");
-					await request("/read-threaded-emails");
+					await request("/read-list-projections");
 					const legacyAlarm =
 						(await request<{ alarm: number | null }>("/alarm-state")).alarm;
 					const legacyObjectBeforeManualAlarm =
@@ -593,7 +593,7 @@ test(
 						saveKey: abandonedClaim.saveKey,
 					});
 					await request("/clear-alarm");
-					await request("/read-threaded-emails");
+					await request("/read-list-projections");
 					assert.equal(
 						typeof (await request<{ alarm: number | null }>("/alarm-state")).alarm,
 						"number",
@@ -677,7 +677,7 @@ test(
 					emailId: claimDraft.draftId,
 					nextAttemptAt: new Date(Date.now() + 60_000).toISOString(),
 				});
-				await request("/read-threaded-emails");
+				await request("/read-list-projections");
 				assert.equal(
 					typeof (await request<{ alarm: number | null }>("/alarm-state")).alarm,
 					"number",
@@ -818,7 +818,7 @@ test(
 					"number",
 				);
 				await request("/clear-alarm");
-				await request("/read-threaded-emails");
+				await request("/read-list-projections");
 				assert.equal(
 					typeof (await request<{ alarm: number | null }>("/alarm-state")).alarm,
 					"number",

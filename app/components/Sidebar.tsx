@@ -33,6 +33,7 @@ import { NavLink, useNavigate, useParams, useSearchParams } from "react-router";
 import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
 import ManageLabelsDialog from "~/components/labels/ManageLabelsDialog";
 import SavedViewsSidebarSection from "~/components/SavedViewsSidebarSection";
+import { useOutboundAttentionCount } from "~/queries/emails";
 import { useCreateFolder, useFolders } from "~/queries/folders";
 import { useLabels } from "~/queries/labels";
 import { useMailbox } from "~/queries/mailboxes";
@@ -68,6 +69,8 @@ interface FolderLinkProps {
 	icon: React.ReactNode;
 	label: string;
 	unreadCount?: number;
+	/** Deliveries that stalled or failed and need the user to act. */
+	attentionCount?: number;
 	onClick?: () => void;
 	active?: boolean;
 }
@@ -77,6 +80,7 @@ function FolderLink({
 	icon,
 	label,
 	unreadCount,
+	attentionCount,
 	onClick,
 	active,
 }: FolderLinkProps) {
@@ -94,8 +98,14 @@ function FolderLink({
 		>
 			<span className="shrink-0">{icon}</span>
 			<span className="truncate flex-1">{label}</span>
-			{unreadCount != null && unreadCount > 0 && (
-				<Badge variant="secondary">{unreadCount}</Badge>
+			{attentionCount != null && attentionCount > 0 ? (
+				<Badge variant="destructive">
+					{attentionCount}
+					<span className="sr-only"> deliveries need attention</span>
+				</Badge>
+			) : (
+				unreadCount != null &&
+				unreadCount > 0 && <Badge variant="secondary">{unreadCount}</Badge>
 			)}
 		</NavLink>
 	);
@@ -108,12 +118,21 @@ export default function Sidebar() {
 	}>();
 	const [searchParams] = useSearchParams();
 	const navigate = useNavigate();
-	const { data: folders = [] } = useFolders(mailboxId);
-	const { data: labels = [] } = useLabels(mailboxId);
+	const {
+		data: folders = [],
+		isError: foldersError,
+		refetch: refetchFolders,
+	} = useFolders(mailboxId);
+	const {
+		data: labels = [],
+		isError: labelsError,
+		refetch: refetchLabels,
+	} = useLabels(mailboxId);
 	const createFolderMutation = useCreateFolder();
 	const toastManager = useKumoToastManager();
 	const { startCompose, closeSidebar } = useUIStore();
 	const { data: currentMailbox } = useMailbox(mailboxId);
+	const outboundAttentionCount = useOutboundAttentionCount(mailboxId);
 	const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
 	const [isManageLabelsOpen, setIsManageLabelsOpen] = useState(false);
 	const [newFolderName, setNewFolderName] = useState("");
@@ -132,6 +151,15 @@ export default function Sidebar() {
 	const getUnreadCount = (folderId: string) => {
 		const found = folders.find((f) => f.id === folderId);
 		return found?.unreadCount || 0;
+	};
+
+	// Reopening the dialog starts a fresh attempt, so the last one's name and
+	// error never greet the next create. The operation identity is kept: a
+	// retype of the same name still recovers an uncertain create.
+	const openCreateFolder = () => {
+		setNewFolderName("");
+		setCreateFolderError("");
+		setIsCreateFolderOpen(true);
 	};
 
 	const handleCreateFolder = (e: React.FormEvent) => {
@@ -263,10 +291,28 @@ export default function Sidebar() {
 						icon={FOLDER_ICONS[folder.id]}
 						label={folder.label}
 						unreadCount={getUnreadCount(folder.id)}
+						attentionCount={
+							folder.id === Folders.OUTBOX ? outboundAttentionCount : 0
+						}
 						active={!selectedLabelId && folder.id === currentFolder}
 						onClick={handleNavClick}
 					/>
 				))}
+
+				{/* A failed folder fetch must not read as an empty, count-free mailbox. */}
+				{foldersError && (
+					<p role="alert" className="px-3 pt-3 text-xs leading-5 text-kumo-subtle">
+						Folders didn’t load, so unread counts and your own folders are
+						missing.{" "}
+						<button
+							type="button"
+							onClick={() => void refetchFolders()}
+							className="min-h-11 rounded px-1 font-medium text-kumo-brand underline underline-offset-2"
+						>
+							Try again
+						</button>
+					</p>
+				)}
 
 				{/* Custom folders */}
 				{customFolders.length > 0 && (
@@ -281,7 +327,7 @@ export default function Sidebar() {
 									shape="square"
 									size="sm"
 									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
+									onClick={openCreateFolder}
 									aria-label="Create new folder"
 								/>
 							</Tooltip>
@@ -313,7 +359,7 @@ export default function Sidebar() {
 									shape="square"
 									size="sm"
 									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
+									onClick={openCreateFolder}
 									aria-label="Create new folder"
 								/>
 							</Tooltip>
@@ -359,7 +405,18 @@ export default function Sidebar() {
 							onClick={handleNavClick}
 						/>
 					))}
-					{labels.length === 0 && (
+					{labelsError ? (
+						<p role="alert" className="px-3 py-1 text-xs leading-5 text-kumo-subtle">
+							Labels didn’t load.{" "}
+							<button
+								type="button"
+								onClick={() => void refetchLabels()}
+								className="min-h-11 rounded px-1 font-medium text-kumo-brand underline underline-offset-2"
+							>
+								Try again
+							</button>
+						</p>
+					) : labels.length === 0 ? (
 						<button
 							type="button"
 							className="w-full rounded-md px-3 py-2 text-left text-sm text-kumo-subtle hover:bg-kumo-tint"
@@ -367,7 +424,7 @@ export default function Sidebar() {
 						>
 							Create your first label
 						</button>
-					)}
+					) : null}
 				</div>
 			</nav>
 

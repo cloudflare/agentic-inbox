@@ -17,7 +17,6 @@ import {
   toEmailListValue,
 } from "~/lib/utils";
 import {
-  useCancelOutboundDelivery,
   useDiscardDraft,
   useForwardEmail,
   useReplyToEmail,
@@ -96,7 +95,7 @@ type PendingMissingAttachment = {
 
 export function useComposeForm(mailboxId?: string, _folder?: string) {
   const toastManager = useKumoToastManager();
-  const { composeOptions, closeCompose } = useUIStore();
+  const { composeOptions, closeCompose, trackSend } = useUIStore();
   const recoveryAtMountRef = useRef(peekComposeRecovery());
   const composeMailboxIdRef = useRef(
 		recoveryAtMountRef.current?.mailboxId ?? mailboxId,
@@ -123,7 +122,6 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
   const discardDraftMutation = useDiscardDraft();
   const replyMutation = useReplyToEmail();
   const forwardMutation = useForwardEmail();
-  const cancelOutboundMutation = useCancelOutboundDelivery();
   const {
     attachments,
     addFiles,
@@ -190,14 +188,18 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 	const renderFingerprint = composeDraftFingerprint(snapshot);
-	const recoveryBaselineFingerprint =
-		observedFingerprintRef.current ?? initializationFingerprintRef.current;
-	const lifecycleForRecovery = composeRecoveryLifecycleForRender(
-		lifecycleRef.current,
-		recoveryBaselineFingerprint !== null &&
-			recoveryBaselineFingerprint !== renderFingerprint,
-	);
-	if (lastInitializedOptionsRef.current === composeOptions && composeMailboxId) {
+	// Mirrors every committed render into the in-memory recovery snapshot, so a
+	// remount (lazy boundary, surface change, navigation) restores exactly what
+	// was on screen. Intentionally unkeyed: it must track every commit.
+	useEffect(() => {
+		if (
+			lastInitializedOptionsRef.current !== composeOptions ||
+			!composeMailboxId
+		) {
+			return;
+		}
+		const baseline =
+			observedFingerprintRef.current ?? initializationFingerprintRef.current;
 		writeComposeRecovery({
 			mailboxId: composeMailboxId,
 			to,
@@ -208,9 +210,12 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			identity: draftIdentity,
 			createKey: draftCreateKeyRef.current,
 			attachments,
-			lifecycle: lifecycleForRecovery,
+			lifecycle: composeRecoveryLifecycleForRender(
+				lifecycleRef.current,
+				baseline !== null && baseline !== renderFingerprint,
+			),
 		});
-	}
+	});
 
   const applyLifecycleEvent = useCallback(
     (event: ComposeDraftLifecycleEvent) => {
@@ -916,9 +921,6 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 					email: emailData,
 				});
 			};
-      toastManager.add({
-			title: scheduledFor ? "Submitting scheduled email..." : "Submitting email...",
-      });
 			let result = await enqueueConfirmedDraft(confirmedDraft);
 			let enqueuePlan = planComposeEnqueueResult(result);
 			if (enqueuePlan.action === "renew_revision_and_resend") {
@@ -934,35 +936,15 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 				toastManager.add({ title: message, variant: "error" });
 				return;
 			}
-      toastManager.add({
-			title:
-				enqueuePlan.title ??
-				(result.scheduledFor ? "Email scheduled" : "Email queued"),
-        description:
-          "It will move to Sent only after the provider confirms acceptance.",
-        timeout: result.scheduledFor ? 15_000 : 10_000,
-			actions: enqueuePlan.canUndo ? [
-          {
-            children: "Undo",
-            variant: "secondary",
-            size: "sm",
-            onClick: () =>
-              cancelOutboundMutation.mutate(
-                { mailboxId: composeMailboxId, deliveryId: result.deliveryId },
-                {
-                  onSuccess: () => toastManager.add({ title: "Send cancelled" }),
-                  onError: (cancelError) =>
-                    toastManager.add({
-                      title:
-                        cancelError instanceof Error
-                          ? cancelError.message
-                          : "Could not cancel send",
-                      variant: "error",
-                    }),
-                },
-              ),
-          },
-			] : [],
+      // Handed to the mailbox-level watcher: this composer unmounts on the very
+      // next line, so it can never see the delivery reach its outcome.
+      trackSend({
+        deliveryId: result.deliveryId,
+        emailId: result.id,
+        mailboxId: composeMailboxId,
+        scheduledFor: result.scheduledFor ?? undefined,
+        title: enqueuePlan.title,
+        canUndo: enqueuePlan.canUndo,
       });
       finishClose();
     } catch (sendError) {
