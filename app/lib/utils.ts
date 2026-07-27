@@ -9,7 +9,6 @@
  * Re-export for backwards compatibility with existing imports.
  */
 import DOMPurify from "dompurify";
-import { formatQuotedDate } from "shared/dates";
 import type { Attachment } from "~/types";
 import { escapeHtml } from "./html-text.ts";
 
@@ -20,9 +19,6 @@ export {
 	formatDetailDate,
 	formatShortDate,
 } from "shared/dates";
-
-/** @deprecated Use `formatQuotedDate` from `shared/dates` directly. */
-export const formatComposeDate = formatQuotedDate;
 
 /**
  * Format a byte count as a human-readable file size.
