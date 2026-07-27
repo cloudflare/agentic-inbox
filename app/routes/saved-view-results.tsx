@@ -3,7 +3,8 @@ import { BookmarkSimpleIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import MailboxSplitView from "~/components/MailboxSplitView";
-import { formatListDate, getSnippetText } from "~/lib/utils";
+import EmailRow from "~/components/EmailRow";
+import { useUpdateEmail } from "~/queries/emails";
 import { useSavedView, useSavedViewEmails } from "~/queries/saved-views";
 import { SavedViewApiError } from "~/services/saved-views";
 import { useUIStore } from "~/hooks/useUIStore";
@@ -19,6 +20,7 @@ export default function SavedViewResultsRoute() {
   const [page, setPage] = useState(1);
   const { selectedEmailId, selectEmail, closePanel, mailDensity } = useUIStore();
   const isCompact = mailDensity === "compact";
+  const updateEmail = useUpdateEmail();
   const applied = useSavedView(mailboxId, viewId);
   const results = useSavedViewEmails({
     mailboxId,
@@ -41,7 +43,11 @@ export default function SavedViewResultsRoute() {
   const failed = applied.isError || results.isError;
   const loading = applied.isLoading || (applied.isSuccess && results.isLoading);
 
-  const openEmail = (email: Email) => selectEmail(email.id);
+  const openEmail = (email: Email) => {
+    selectEmail(email.id);
+    if (!email.read && mailboxId)
+      updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } });
+  };
 
   return (
     <MailboxSplitView selectedEmailId={selectedEmailId}>
@@ -108,45 +114,17 @@ export default function SavedViewResultsRoute() {
               </p>
             </div>
           ) : (
-            <div>
-              {emails.map((email) => {
-                const selected = selectedEmailId === email.id;
-                const snippet = getSnippetText(email.snippet, 120);
-                return (
-                  <button
-                    key={email.id}
-                    type="button"
-                    onClick={() => openEmail(email)}
-                    className={`flex w-full items-center gap-3 border-b border-kumo-line px-4 text-left transition-colors md:px-5 ${isCompact ? "min-h-11 py-1" : "min-h-16 py-2.5"} ${selected ? "bg-kumo-tint" : "hover:bg-kumo-tint"}`}
-                  >
-                    <span className="flex w-2.5 shrink-0 justify-center">
-                      {!email.read && (
-                        <span className="h-2 w-2 rounded-full bg-kumo-brand" />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={`min-w-0 flex-1 truncate text-sm ${email.read ? "text-kumo-strong" : "font-semibold text-kumo-default"}`}
-                        >
-                          {email.sender}
-                        </span>
-                        <span className="shrink-0 text-xs text-kumo-subtle">
-                          {formatListDate(email.date)}
-                        </span>
-                      </span>
-                      <span className="mt-0.5 block truncate text-sm text-kumo-default">
-                        {email.subject || "(No subject)"}
-                      </span>
-                      {!isCompact && snippet && (
-                        <span className="mt-0.5 block truncate text-xs text-kumo-subtle">
-                          {snippet}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
+            <div role="list" aria-label={`${view?.name ?? "Saved view"} messages`}>
+              {emails.map((email) => (
+                <EmailRow
+                  key={email.id}
+                  email={email}
+                  unread={!email.read}
+                  selected={selectedEmailId === email.id}
+                  compact={isCompact}
+                  onOpen={() => openEmail(email)}
+                />
+              ))}
             </div>
           )}
         </div>

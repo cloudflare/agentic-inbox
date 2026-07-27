@@ -31,8 +31,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { Folders } from "shared/folders";
-import { formatListDate } from "shared/dates";
 import MailboxSplitView from "~/components/MailboxSplitView";
+import EmailRow from "~/components/EmailRow";
 import BatchTriageToolbar from "~/components/BatchTriageToolbar";
 import LazyLoadBoundary from "~/components/LazyLoadBoundary";
 import LabelChip from "~/components/labels/LabelChip";
@@ -62,7 +62,6 @@ import {
 	outboxFolderView,
 	shouldLoadOutboundState,
 } from "~/lib/outbound-folder-state";
-import { getSnippetText } from "~/lib/utils";
 import {
 	reconcileSnoozedSelection,
 	snoozeScopeAffectsRow,
@@ -1114,18 +1113,6 @@ export default function EmailListRoute() {
 		visibleEmailIds,
 	]);
 
-	const formatParticipants = (email: Email): string => {
-		if (email.participants) {
-			const names = email.participants
-				.split(",")
-				.map((p) => p.trim().split("@")[0])
-				.filter((name, idx, arr) => arr.indexOf(name) === idx);
-			if (names.length <= 3) return names.join(", ");
-			return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
-		}
-		return email.sender.split("@")[0];
-	};
-
 	return (
 		<MailboxSplitView selectedEmailId={selectedEmailId}>
 			{/* Folder header */}
@@ -1260,149 +1247,107 @@ export default function EmailListRoute() {
 							const isSelected = selectedEmailId === email.id;
 							const isBatchSelected = selectedVisibleIds.has(email.id);
 							const isKeyboardTarget = keyboardTargetId === email.id;
-							const snippet = getSnippetText(email.snippet);
 							const delivery = deliveryByEmailId.get(email.id);
 							const returnAt = snoozeReturnLabel(email.snoozed_until);
 							return (
-								<div
+								<EmailRow
 									key={email.id}
-									data-email-id={email.id}
-									role="listitem"
-									className={`group flex min-w-0 items-center gap-1.5 sm:gap-2 w-full text-left transition-colors border-b border-kumo-line border-s-2 px-2 sm:px-3 md:px-4 ${
-										isCompact ? "py-0" : "py-1.5 md:py-2"
-									} ${
-										isPanelOpen && !isCompact ? "md:px-4 md:py-2.5" : ""
-									} ${isSelected || isBatchSelected ? "bg-kumo-fill border-s-kumo-brand" : "border-s-transparent hover:bg-kumo-tint"} ${isKeyboardTarget ? "ring-2 ring-inset ring-kumo-brand/50" : ""}`}
-								>
-									{allowedBatchActions.size > 0 && (
-										<label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded focus-within:ring-2 focus-within:ring-kumo-brand">
-											<input
-												type="checkbox"
-												className="h-5 w-5 accent-kumo-brand"
-												checked={isBatchSelected}
-												onChange={() =>
-													setBatchSelection((current) =>
-														toggleVisibleSelection(
-															current,
-															email.id,
-															visibleEmailIds,
-														),
-													)
-												}
-												aria-label={`Select conversation ${email.subject || "without subject"}`}
-											/>
-										</label>
-									)}
-
-									<button
-										type="button"
-										className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-transparent text-kumo-subtle hover:text-kumo-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand"
-										onClick={(e) => toggleStar(e, email)}
-										aria-label={
-											email.starred
-												? `Unstar ${email.subject}`
-												: `Star ${email.subject}`
-										}
-									>
-										<StarIcon
-											size={18}
-											weight={email.starred ? "fill" : "regular"}
-											className={
-												email.starred ? "text-kumo-warning" : undefined
-											}
-										/>
-									</button>
-
-									<button
-										type="button"
-										className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand"
-										onClick={() => handleRowClick(email)}
-										aria-label={`Open conversation ${email.subject || "without subject"}`}
-									>
-										{/* Unread dot */}
-										<div className="w-2.5 shrink-0 flex justify-center">
-											{hasUnread(email) && (
-												<div className="h-2 w-2 rounded-full bg-kumo-brand" />
-											)}
-										</div>
-
-										{/* Content */}
-										<div className="min-w-0 flex-1">
-											<div className="flex items-center gap-2">
-												<span
-													className={`truncate text-sm ${hasUnread(email) ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}
-												>
-													{formatParticipants(email)}
-												</span>
-												{(email.thread_count ?? 1) > 1 && (
-													<span className="shrink-0 text-xs text-kumo-subtle bg-kumo-fill rounded-full px-1.5 py-0.5 font-medium">
-														{email.thread_count}
-													</span>
-												)}
-												{email.has_draft && (
-													<span className="shrink-0 text-xs text-kumo-danger font-medium">
-														Draft
-													</span>
-												)}
-												{delivery && (
-													<span
-														className={`max-w-24 shrink-0 truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${deliveryBadgeClass(delivery.status)}`}
-														title={delivery.lastErrorMessage}
-													>
-														{deliveryLabel(delivery)}
-													</span>
-												)}
-												{email.needs_reply && !email.has_draft && (
-													<Tooltip content="Needs reply" asChild>
-														<span className="shrink-0 text-kumo-warning">
-															<ArrowBendUpLeftIcon size={14} weight="bold" />
-														</span>
-													</Tooltip>
-												)}
-												<span className="text-sm text-kumo-subtle shrink-0 ml-auto">
-													{formatListDate(email.date)}
-												</span>
-											</div>
-											<div className="truncate text-sm mt-0.5">
-												<span
-													className={
-														hasUnread(email)
-															? "font-medium text-kumo-default"
-															: "text-kumo-subtle"
+									email={email}
+									unread={hasUnread(email)}
+									selected={isSelected}
+									batchSelected={isBatchSelected}
+									keyboardTarget={isKeyboardTarget}
+									compact={isCompact}
+									dense={isPanelOpen && !isCompact}
+									onOpen={() => handleRowClick(email)}
+									select={
+										allowedBatchActions.size > 0 ? (
+											<label className="flex h-7 w-7 cursor-pointer items-center justify-center rounded focus-within:ring-2 focus-within:ring-kumo-brand pointer-coarse:h-11 pointer-coarse:w-11">
+												<input
+													type="checkbox"
+													className="h-4 w-4 accent-kumo-brand pointer-coarse:h-5 pointer-coarse:w-5"
+													checked={isBatchSelected}
+													onChange={() =>
+														setBatchSelection((current) =>
+															toggleVisibleSelection(
+																current,
+																email.id,
+																visibleEmailIds,
+															),
+														)
 													}
+													aria-label={`Select conversation ${email.subject || "without subject"}`}
+												/>
+											</label>
+										) : undefined
+									}
+									star={
+										<button
+											type="button"
+											tabIndex={-1}
+											className="flex h-7 w-7 items-center justify-center rounded bg-transparent text-kumo-subtle hover:text-kumo-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand pointer-coarse:h-11 pointer-coarse:w-11"
+											onClick={(e) => toggleStar(e, email)}
+											aria-label={
+												email.starred
+													? `Unstar ${email.subject}`
+													: `Star ${email.subject}`
+											}
+										>
+											<StarIcon
+												size={16}
+												weight={email.starred ? "fill" : "regular"}
+												className={
+													email.starred ? "text-kumo-warning" : undefined
+												}
+											/>
+										</button>
+									}
+									meta={
+										<>
+											{email.has_draft && (
+												<span className="shrink-0 text-xs font-medium text-kumo-danger">
+													Draft
+												</span>
+											)}
+											{delivery && (
+												<span
+													className={`max-w-24 shrink-0 truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${deliveryBadgeClass(delivery.status)}`}
+													title={delivery.lastErrorMessage}
 												>
-													{email.subject}
-												</span>
-											{(email.labels ?? []).slice(0, 2).map((label) => (
-												<LabelChip key={label.id} label={label} />
-											))}
-											{!isCompact && snippet && (
-												<span className="text-kumo-subtle font-normal">
-													{" "}
-													&mdash; {snippet}
+													{deliveryLabel(delivery)}
 												</span>
 											)}
-											{folder === Folders.SNOOZED && returnAt && (
-												<span className="ms-2 inline-flex items-center gap-1 text-xs font-medium text-kumo-brand">
-													<ClockIcon size={12} aria-hidden="true" />
-													Returns {returnAt}
-												</span>
+											{email.needs_reply && !email.has_draft && (
+												<Tooltip content="Needs reply" asChild>
+													<span className="shrink-0 text-kumo-warning">
+														<ArrowBendUpLeftIcon size={14} weight="bold" />
+													</span>
+												</Tooltip>
 											)}
-											</div>
-										</div>
-									</button>
-
-									{isOutbox && mailboxId && delivery && (
-										<OutboundDeliveryActions
-											mailboxId={mailboxId}
-											delivery={delivery}
-											compact
-										/>
-									)}
-
-									{/* Keep core actions discoverable and touch-accessible on every viewport. */}
-									{!isOutbox && (
-										<div className="flex items-center shrink-0">
+										</>
+									}
+									subjectMeta={(email.labels ?? []).slice(0, 2).map((label) => (
+										<LabelChip key={label.id} label={label} />
+									))}
+									footer={
+										folder === Folders.SNOOZED && returnAt ? (
+											<span className="flex items-center gap-1 text-xs font-medium text-kumo-brand">
+												<ClockIcon size={12} aria-hidden="true" />
+												Returns {returnAt}
+											</span>
+										) : undefined
+									}
+									staticActions={
+										isOutbox && mailboxId && delivery ? (
+											<OutboundDeliveryActions
+												mailboxId={mailboxId}
+												delivery={delivery}
+												compact
+											/>
+										) : undefined
+									}
+									actions={
+										isOutbox ? undefined : (
 											<>
 												<Tooltip
 													content={email.read ? "Mark unread" : "Mark read"}
@@ -1412,7 +1357,8 @@ export default function EmailListRoute() {
 														variant="ghost"
 														shape="square"
 														size="sm"
-														className="min-h-11 min-w-11"
+														tabIndex={-1}
+														className="min-h-9 min-w-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
 														icon={
 															email.read ? (
 																<EnvelopeSimpleIcon size={14} />
@@ -1434,82 +1380,85 @@ export default function EmailListRoute() {
 														}
 													/>
 												</Tooltip>
-											{folder === Folders.SNOOZED ? (
-												<Tooltip content="Return now" asChild>
-													<Button
-														variant="ghost"
-														shape="square"
-														size="sm"
-														className="min-h-11 min-w-11"
-														icon={<ArrowCounterClockwiseIcon size={14} />}
-														onClick={(event) => {
-															event.stopPropagation();
-															clearSnooze(email);
-														}}
-														disabled={unsnooze.isPending}
-														aria-label="Return snoozed mail now"
-													/>
-												</Tooltip>
-											) : canSnoozeFromFolder(folder) ? (
-												<Tooltip content="Snooze" asChild>
-													<Button
-														variant="ghost"
-														shape="square"
-														size="sm"
-														className="min-h-11 min-w-11"
-														icon={<ClockIcon size={14} />}
-														onClick={(event) => {
-															event.stopPropagation();
-															openSnooze(email);
-														}}
-														aria-label="Snooze mail"
-													/>
-												</Tooltip>
-											) : null}
-											{folder !== Folders.SNOOZED && (
-												<Tooltip
-													content={
-														folder === Folders.TRASH
-															? "Restore"
-															: folder === Folders.DRAFT
-																? "Discard draft"
-																: "Move to Trash"
-													}
-													asChild
-												>
-													<Button
-														variant="ghost"
-														shape="square"
-														size="sm"
-														className="min-h-11 min-w-11"
-														icon={
-															folder === Folders.TRASH ? (
-																<ArrowCounterClockwiseIcon size={14} />
-															) : (
-																<TrashIcon size={14} />
-															)
-														}
-														onClick={(e) =>
-															folder === Folders.TRASH
-																? handleRestore(e, email.id)
-																: folder === Folders.DRAFT
-																			? handleDiscardDraft(e, email)
-																	: handleDelete(e, email.id)
-														}
-														aria-label={
+												{folder === Folders.SNOOZED ? (
+													<Tooltip content="Return now" asChild>
+														<Button
+															variant="ghost"
+															shape="square"
+															size="sm"
+															tabIndex={-1}
+															className="min-h-9 min-w-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+															icon={<ArrowCounterClockwiseIcon size={14} />}
+															onClick={(event) => {
+																event.stopPropagation();
+																clearSnooze(email);
+															}}
+															disabled={unsnooze.isPending}
+															aria-label="Return snoozed mail now"
+														/>
+													</Tooltip>
+												) : canSnoozeFromFolder(folder) ? (
+													<Tooltip content="Snooze" asChild>
+														<Button
+															variant="ghost"
+															shape="square"
+															size="sm"
+															tabIndex={-1}
+															className="min-h-9 min-w-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+															icon={<ClockIcon size={14} />}
+															onClick={(event) => {
+																event.stopPropagation();
+																openSnooze(email);
+															}}
+															aria-label="Snooze mail"
+														/>
+													</Tooltip>
+												) : null}
+												{folder !== Folders.SNOOZED && (
+													<Tooltip
+														content={
 															folder === Folders.TRASH
 																? "Restore"
 																: folder === Folders.DRAFT
 																	? "Discard draft"
 																	: "Move to Trash"
 														}
-													/>
-												</Tooltip>
-											)}
+														asChild
+													>
+														<Button
+															variant="ghost"
+															shape="square"
+															size="sm"
+															tabIndex={-1}
+															className="min-h-9 min-w-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+															icon={
+																folder === Folders.TRASH ? (
+																	<ArrowCounterClockwiseIcon size={14} />
+																) : (
+																	<TrashIcon size={14} />
+																)
+															}
+															onClick={(e) =>
+																folder === Folders.TRASH
+																	? handleRestore(e, email.id)
+																	: folder === Folders.DRAFT
+																		? handleDiscardDraft(e, email)
+																		: handleDelete(e, email.id)
+															}
+															aria-label={
+																folder === Folders.TRASH
+																	? "Restore"
+																	: folder === Folders.DRAFT
+																		? "Discard draft"
+																		: "Move to Trash"
+															}
+														/>
+													</Tooltip>
+												)}
 											</>
-										</div>
-									)}
-								</div>
+										)
+									}
+								/>
 							);
 						})}
 					</div>

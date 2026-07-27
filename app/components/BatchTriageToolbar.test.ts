@@ -4,6 +4,7 @@ import test from "node:test";
 
 const toolbar = readFileSync(new URL("./BatchTriageToolbar.tsx", import.meta.url), "utf8");
 const list = readFileSync(new URL("../routes/email-list.tsx", import.meta.url), "utf8");
+const row = readFileSync(new URL("./EmailRow.tsx", import.meta.url), "utf8");
 
 test("batch toolbar exposes touch-sized, labeled selection and action controls", () => {
 	assert.match(toolbar, /role="toolbar"/);
@@ -21,5 +22,5 @@ test("list row checkboxes are siblings of the dedicated open control and batch o
 	assert.match(list, /BatchTriageToolbar/);
 	assert.match(list, /useBatchTriage/);
 	assert.match(list, /aria-label=\{`Select conversation/);
-	assert.match(list, /aria-label=\{`Open conversation/);
+	assert.match(row, /aria-label=\{`Open conversation/);
 });

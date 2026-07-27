@@ -44,3 +44,8 @@ test("saved views UI is personal, accessible, responsive, and manageable", () =>
   assert.match(folderList, /<SaveCurrentViewButton/);
   assert.match(search, /<SaveCurrentViewButton/);
 });
+
+test("opening a saved-view message marks it read like every other surface", () => {
+  assert.match(results, /if \(!email\.read && mailboxId\)/);
+  assert.match(results, /updateEmail\.mutate\(\{[\s\S]*?data: \{ read: true \}/);
+});
