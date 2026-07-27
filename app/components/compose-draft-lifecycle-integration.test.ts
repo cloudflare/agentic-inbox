@@ -104,7 +104,13 @@ test("runtime recovery restores dirty lifecycle and pins the snapshot origin mai
 		form,
 		/restoredComposeLifecycle\(recoveryAtMountRef\.current\.lifecycle\)/,
 	);
-	assert.match(form, /lifecycle: lifecycleForRecovery/);
+	// The snapshot carries the edit-aware lifecycle, and is written from a commit
+	// rather than during render, so rendering the composer stays side-effect free.
+	assert.match(
+		form,
+		/useEffect\(\(\) => \{[\s\S]*?writeComposeRecovery\(\{[\s\S]*?lifecycle: composeRecoveryLifecycleForRender\([\s\S]*?baseline !== null && baseline !== renderFingerprint/,
+	);
+	assert.doesNotMatch(form, /^\tif \([\s\S]*?writeComposeRecovery/m);
 	assert.match(
 		form,
 		/lifecycle\.phase === "failed" && recoveryAutosaveNeededRef\.current/,

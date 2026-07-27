@@ -190,14 +190,18 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 	const renderFingerprint = composeDraftFingerprint(snapshot);
-	const recoveryBaselineFingerprint =
-		observedFingerprintRef.current ?? initializationFingerprintRef.current;
-	const lifecycleForRecovery = composeRecoveryLifecycleForRender(
-		lifecycleRef.current,
-		recoveryBaselineFingerprint !== null &&
-			recoveryBaselineFingerprint !== renderFingerprint,
-	);
-	if (lastInitializedOptionsRef.current === composeOptions && composeMailboxId) {
+	// Mirrors every committed render into the in-memory recovery snapshot, so a
+	// remount (lazy boundary, surface change, navigation) restores exactly what
+	// was on screen. Intentionally unkeyed: it must track every commit.
+	useEffect(() => {
+		if (
+			lastInitializedOptionsRef.current !== composeOptions ||
+			!composeMailboxId
+		) {
+			return;
+		}
+		const baseline =
+			observedFingerprintRef.current ?? initializationFingerprintRef.current;
 		writeComposeRecovery({
 			mailboxId: composeMailboxId,
 			to,
@@ -208,9 +212,12 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			identity: draftIdentity,
 			createKey: draftCreateKeyRef.current,
 			attachments,
-			lifecycle: lifecycleForRecovery,
+			lifecycle: composeRecoveryLifecycleForRender(
+				lifecycleRef.current,
+				baseline !== null && baseline !== renderFingerprint,
+			),
 		});
-	}
+	});
 
   const applyLifecycleEvent = useCallback(
     (event: ComposeDraftLifecycleEvent) => {
