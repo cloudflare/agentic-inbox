@@ -10,7 +10,6 @@ import { Folders } from "shared/folders";
 import EmailPanelDialogs from "~/components/email-panel/EmailPanelDialogs";
 import EmailPanelHeader from "~/components/email-panel/EmailPanelHeader";
 import EmailPanelToolbar from "~/components/email-panel/EmailPanelToolbar";
-import SingleMessageView from "~/components/email-panel/SingleMessageView";
 import ThreadMessage from "~/components/email-panel/ThreadMessage";
 import LabelChip from "~/components/labels/LabelChip";
 import LabelPicker from "~/components/labels/LabelPicker";
@@ -698,8 +697,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			</div>
 
 			<div ref={conversationScrollRef} className="flex-1 overflow-y-auto">
-				{hasThread ? (
-					allMessages.map((msg, idx) => {
+				{allMessages.map((msg, idx) => {
 						const isDraft = draftMessageIds.has(msg.id);
 						return (
 							<ThreadMessage
@@ -708,6 +706,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								mailboxId={mailboxId}
 								mailboxEmail={currentMailbox?.email}
 								isLast={idx === allMessages.length - 1}
+								isSoleMessage={!hasThread}
 								isDraft={isDraft}
 								isSending={isDraft ? isSending : false}
 								isExpanded={expandedMessages.has(msg.id)}
@@ -722,23 +721,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 								bodyState={externalBodyQueriesById.get(msg.id)}
 							/>
 						);
-					})
-				) : (
-					<div
-						data-intelligence-message-id={email.id}
-						tabIndex={-1}
-						aria-label={`Message from ${email.sender}`}
-					>
-							<SingleMessageView
-								email={email}
-								mailboxId={mailboxId}
-								onPreviewImage={(url, filename) =>
-									setPreviewImage({ url, filename })
-								}
-								bodyState={selectedBodyQuery}
-							/>
-					</div>
-				)}
+					})}
 				{isInlineComposing && (
 					<LazyLoadBoundary
 						fallback={

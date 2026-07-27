@@ -17,8 +17,21 @@ test("opening a cited message expands, scrolls, and focuses that exact source", 
 	assert.match(panel, /onFocusMessage=\{focusMessage\}/);
 });
 
-test("thread and single-message sources expose focusable labeled anchors", () => {
-	assert.match(threadMessage, /data-intelligence-message-id=\{email\.id\}/);
+test("every message exposes one focusable labeled anchor", () => {
+	assert.equal(
+		(threadMessage.match(/data-intelligence-message-id=\{email\.id\}/g) ?? [])
+			.length,
+		2,
+		"one anchor for the collapsed view, one for the expanded view",
+	);
 	assert.match(threadMessage, /aria-label=\{`Message from \$\{senderLabel\}/);
-	assert.match(panel, /data-intelligence-message-id=\{email\.id\}[\s\S]*?tabIndex=\{-1\}/);
+	assert.match(
+		threadMessage,
+		/data-intelligence-message-id=\{email\.id\}[\s\S]*?tabIndex=\{-1\}/,
+	);
+	// Every conversation, single-message or not, renders through that one anchor:
+	// the panel only ever queries for them, never emits a competing one.
+	assert.doesNotMatch(panel, /data-intelligence-message-id=/);
+	assert.match(panel, /querySelectorAll<HTMLElement>\("\[data-intelligence-message-id\]"\)/);
+	assert.match(panel, /isSoleMessage=\{!hasThread\}/);
 });

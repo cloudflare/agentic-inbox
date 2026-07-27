@@ -28,6 +28,11 @@ interface ThreadMessageProps {
 	mailboxId?: string;
 	mailboxEmail?: string;
 	isLast: boolean;
+	/**
+	 * The only message in this conversation. It never collapses (there would be
+	 * nothing left to read) and its attachments carry a heading.
+	 */
+	isSoleMessage?: boolean;
 	isDraft?: boolean;
 	isSending?: boolean;
 	isExpanded: boolean;
@@ -61,6 +66,7 @@ export default function ThreadMessage({
 	mailboxId,
 	mailboxEmail,
 	isLast,
+	isSoleMessage,
 	isDraft,
 	isSending,
 	isExpanded,
@@ -78,7 +84,7 @@ export default function ThreadMessage({
 	const containerClassName = `${!isLast ? "border-b border-kumo-line" : ""} ${isDraft ? "border-l-2 border-l-kumo-warning bg-kumo-warning/[0.02]" : ""}`;
 	const senderLabel = isDraft ? "Draft reply" : isSelf ? "You" : email.sender;
 
-	if (!isExpanded) {
+	if (!isExpanded && !isSoleMessage) {
 		return (
 			<div
 				className={containerClassName}
@@ -121,16 +127,20 @@ export default function ThreadMessage({
 			<div className="px-4 py-4 md:px-6">
 				<div className="flex items-center justify-between gap-3 mb-3">
 					<div className="flex items-center gap-2.5 min-w-0">
-						<button
-							type="button"
-							onClick={onToggleExpand}
-							className="shrink-0"
-							aria-label="Collapse message"
-						>
-							<div className="cursor-pointer hover:ring-2 hover:ring-kumo-brand/30 transition-shadow rounded-full">
-								<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
-							</div>
-						</button>
+						{isSoleMessage ? (
+							<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
+						) : (
+							<button
+								type="button"
+								onClick={onToggleExpand}
+								className="shrink-0"
+								aria-label="Collapse message"
+							>
+								<div className="cursor-pointer hover:ring-2 hover:ring-kumo-brand/30 transition-shadow rounded-full">
+									<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
+								</div>
+							</button>
+						)}
 						<div className="min-w-0">
 							<div className="flex items-center gap-2">
 								<span className="text-sm font-medium text-kumo-default truncate">
@@ -158,17 +168,19 @@ export default function ThreadMessage({
 								/>
 							</Tooltip>
 						)}
-						<button
-							type="button"
-							onClick={onToggleExpand}
-							className="ml-1"
-							aria-label="Collapse message"
-						>
-							<CaretUpIcon
-								size={14}
-								className="text-kumo-subtle hover:text-kumo-default transition-colors"
-							/>
-						</button>
+						{!isSoleMessage && (
+							<button
+								type="button"
+								onClick={onToggleExpand}
+								className="ml-1"
+								aria-label="Collapse message"
+							>
+								<CaretUpIcon
+									size={14}
+									className="text-kumo-subtle hover:text-kumo-default transition-colors"
+								/>
+							</button>
+						)}
 					</div>
 				</div>
 
@@ -227,6 +239,7 @@ export default function ThreadMessage({
 					attachments={email.attachments}
 					onPreviewImage={onPreviewImage}
 					className="mt-3 md:ml-[42px]"
+					showHeading={isSoleMessage}
 				/>
 			</div>
 		</div>
