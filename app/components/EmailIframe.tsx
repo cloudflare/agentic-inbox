@@ -374,6 +374,18 @@ export default function EmailIframe({
 			if (remoteSourceSet) togglesRemoteImages = true;
 			if (cidOwned || (remoteSourceSet && !loadRemoteImages)) {
 				source.removeAttribute("srcset");
+			} else if (remoteSourceSet) {
+				// This <source> survived the opt-in, so the picture still draws even
+				// though the <img>'s own unloadable src blocked it above: that walk
+				// runs first and cannot see a sibling. Reaching here at all means
+				// loadRemoteImages, so the blocked state is untouched.
+				const drawn = picture?.querySelector("img");
+				if (drawn) {
+					drawn.removeAttribute("data-remote-image-blocked");
+					// Its own src and srcset are gone, so the "nothing left to draw"
+					// rule would hide it on the sibling's behalf.
+					drawn.setAttribute("data-remote-image-drawn", "true");
+				}
 			}
 		}
 		setHasRemoteImages(togglesRemoteImages);
@@ -463,7 +475,7 @@ img { max-width: 100%; height: auto; }
    bridge keep data-email-inline-cid and stay visible. The privacy banner above
    the frame is the only affordance the reader needs. */
 img[data-remote-image-blocked],
-img:not([src]):not([srcset]):not([data-email-inline-cid]) { display: none; }
+img:not([src]):not([srcset]):not([data-email-inline-cid]):not([data-remote-image-drawn]) { display: none; }
 blockquote {
 	border-left: 3px solid #d1d5db;
 	padding-left: 1em;

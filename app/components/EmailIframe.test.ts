@@ -22,9 +22,10 @@ test("a blocked image leaves no glyph, box, or rewritten alt behind", () => {
 	assert.match(source, /img\[data-remote-image-blocked\],/);
 	// An image stripped down to no source at all must not show a glyph either,
 	// while one still awaiting its inline-image blob stays visible.
+	// ...unless a sibling <picture> source the reader opted into still draws it.
 	assert.match(
 		source,
-		/img:not\(\[src\]\):not\(\[srcset\]\):not\(\[data-email-inline-cid\]\) \{ display: none; \}/,
+		/img:not\(\[src\]\):not\(\[srcset\]\):not\(\[data-email-inline-cid\]\):not\(\[data-remote-image-drawn\]\) \{ display: none; \}/,
 	);
 	// Overwriting the author's alt was what put "Remote image blocked for
 	// privacy" text where the picture should be; the banner says it instead.
@@ -54,6 +55,19 @@ test("only images the reader can actually reveal offer the opt-in", () => {
 	// Blocked state is untouched: `drawnBySourceSet` can only be true under the
 	// opt-in, and the srcset is still stripped whenever the reader has not.
 	assert.match(source, /if \(remoteSourceSet && !loadRemoteImages\) \{\s*image\.removeAttribute\("srcset"\);/);
+	// `<picture><source srcset="https://…"><img src="/fallback.png"></picture>`
+	// is the same defect one level out: the surviving candidate is a sibling the
+	// <img> walk runs too early to see, so the <source> walk clears the mark.
+	assert.match(
+		source,
+		/\} else if \(remoteSourceSet\) \{[\s\S]*?const drawn = picture\?\.querySelector\("img"\);[\s\S]*?drawn\.removeAttribute\("data-remote-image-blocked"\);[\s\S]*?drawn\.setAttribute\("data-remote-image-drawn", "true"\);/,
+	);
+	// Only ever reached under the opt-in: the branch above claims every
+	// remote-srcset source while loadRemoteImages is false.
+	assert.match(
+		source,
+		/if \(cidOwned \|\| \(remoteSourceSet && !loadRemoteImages\)\) \{\s*source\.removeAttribute\("srcset"\);/,
+	);
 	assert.match(source, /if \(sourceKind === "loadable" \|\| remoteSourceSet\)/);
 	assert.match(source, /setHasRemoteImages\(togglesRemoteImages\)/);
 	// The banner must come from the sanitize walk, never a second regex over

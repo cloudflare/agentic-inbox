@@ -164,6 +164,10 @@ const MARKETING_BODY = [
 	// the reader opts in. Offering "Load images" and then still hiding it is the
 	// defect this fixture exists to catch.
 	'<img alt="Marketing mixed" src="/journey-relative-fallback.png" srcset="https://cdn.brightmail.example/mixed.svg 1x">',
+	// Same shape one level out: the surviving candidate is a sibling <source>,
+	// which the <img> walk runs too early to see.
+	'<picture><source srcset="https://cdn.brightmail.example/picture.svg 1x">',
+	'<img alt="Marketing picture" src="/journey-relative-fallback.png"></picture>',
 	`<p>${MARKETING_TAIL}</p>`,
 	"</div>",
 ].join("");
@@ -359,6 +363,15 @@ async function installFixture(page, counters) {
 
 	await page.route("https://cdn.brightmail.example/**", async (route) => {
 		const url = route.request().url();
+		if (url.endsWith("picture.svg")) {
+			counters.picture += 1;
+			await route.fulfill({
+				status: 200,
+				contentType: "image/svg+xml",
+				body: '<svg xmlns="http://www.w3.org/2000/svg" width="440" height="160"><rect width="440" height="160" fill="#b45309"/><text x="28" y="95" fill="#fff" font-size="24">PICTURE SOURCE LOADED</text></svg>',
+			});
+			return;
+		}
 		if (url.endsWith("mixed.svg")) {
 			counters.mixed += 1;
 			await route.fulfill({
@@ -1440,8 +1453,8 @@ async function verifyImages(page, baseUrl, name, counters) {
 			}
 			if (image.src) problems.push(`blocked image "${image.alt}" kept its remote src`);
 		}
-		if (counters.hero !== 0 || counters.tracker !== 0 || counters.mixed !== 0) {
-			problems.push(`remote images were fetched before opt-in (hero ${counters.hero}, tracker ${counters.tracker}, mixed ${counters.mixed})`);
+		if (counters.hero !== 0 || counters.tracker !== 0 || counters.mixed !== 0 || counters.picture !== 0) {
+			problems.push(`remote images were fetched before opt-in (hero ${counters.hero}, tracker ${counters.tracker}, mixed ${counters.mixed}, picture ${counters.picture})`);
 		}
 		const banner = page.getByRole("button", { name: "Load images" });
 		if (!(await banner.count())) {
@@ -1499,33 +1512,56 @@ async function verifyImages(page, baseUrl, name, counters) {
 				problems.push(`text below the images is clipped (tail bottom ${grown.tailBottom} > client ${grown.clientHeight})`);
 			}
 
-			// An image whose src can never load but whose srcset can must reveal
-			// itself on opt-in, not stay marked blocked with a live srcset.
-			await pollValue(() => counters.mixed, (v) => v === 1, "mixed srcset opt-in fetch", 15_000)
-				.catch(() => counters.mixed);
-			await delay(600);
-			const mixed = await optedContent.evaluate(() => {
-				const image = document.querySelector("img[alt='Marketing mixed']");
-				if (!image) return { present: false };
-				return {
-					present: true,
-					display: getComputedStyle(image).display,
-					blocked: image.hasAttribute("data-remote-image-blocked"),
-					src: image.getAttribute("src"),
-					srcset: image.getAttribute("srcset"),
-					height: image.getBoundingClientRect().height,
-					naturalWidth: image.naturalWidth,
-				};
-			});
-			detail(`${name} mixed src/srcset after opt-in ${JSON.stringify(mixed)} fetches ${counters.mixed}`);
-			if (!mixed.present) {
-				problems.push("the mixed src/srcset image is missing from the opted-in document");
-			} else {
-				if (mixed.blocked) problems.push("mixed src/srcset image is still marked blocked after opt-in");
-				if (mixed.display === "none") problems.push("mixed src/srcset image stayed hidden after Load images");
-				if (mixed.src) problems.push(`mixed image kept its unloadable src "${mixed.src}"`);
-				if (!mixed.srcset) problems.push("mixed image lost the srcset the reader opted in to");
-				if (mixed.naturalWidth === 0) problems.push("mixed image never decoded its srcset candidate");
+			// An image whose src can never load, but which some other candidate the
+			// reader just opted into can still draw, must reveal itself rather than
+			// stay marked blocked. Two carriers, same defect: the img's own srcset,
+			// and a sibling <source> the img walk runs too early to see.
+			for (const shape of [
+				{ alt: "Marketing mixed", counter: "mixed", carrier: "its own srcset" },
+				{ alt: "Marketing picture", counter: "picture", carrier: "a sibling <picture> source" },
+			]) {
+				await pollValue(
+					() => counters[shape.counter],
+					(v) => v === 1,
+					`${shape.alt} opt-in fetch`,
+					15_000,
+				).catch(() => counters[shape.counter]);
+				await delay(400);
+				const state = await optedContent.evaluate((alt) => {
+					const image = document.querySelector(`img[alt='${alt}']`);
+					if (!image) return { present: false };
+					const picture = image.closest("picture");
+					return {
+						present: true,
+						display: getComputedStyle(image).display,
+						blocked: image.hasAttribute("data-remote-image-blocked"),
+						src: image.getAttribute("src"),
+						srcset: image.getAttribute("srcset"),
+						sourceSrcset:
+							picture?.querySelector("source")?.getAttribute("srcset") ?? null,
+						height: image.getBoundingClientRect().height,
+						naturalWidth: image.naturalWidth,
+					};
+				}, shape.alt);
+				detail(`${name} ${shape.alt} after opt-in ${JSON.stringify(state)} fetches ${counters[shape.counter]}`);
+
+				if (!state.present) {
+					problems.push(`"${shape.alt}" is missing from the opted-in document`);
+					continue;
+				}
+				if (state.blocked) {
+					problems.push(`"${shape.alt}" is still marked blocked after opt-in though ${shape.carrier} survived`);
+				}
+				if (state.display === "none") {
+					problems.push(`"${shape.alt}" stayed hidden after Load images`);
+				}
+				if (state.src) problems.push(`"${shape.alt}" kept its unloadable src "${state.src}"`);
+				if (!state.srcset && !state.sourceSrcset) {
+					problems.push(`"${shape.alt}" lost the candidate the reader opted in to`);
+				}
+				if (state.naturalWidth === 0) {
+					problems.push(`"${shape.alt}" never decoded ${shape.carrier}`);
+				}
 			}
 		}
 
@@ -2196,7 +2232,7 @@ async function runViewport({ browser, baseUrl, storageState, name, viewport }) {
 	const page = await context.newPage();
 	page.setDefaultTimeout(20_000);
 	observe(page, name);
-	const counters = { hero: 0, tracker: 0, mixed: 0 };
+	const counters = { hero: 0, tracker: 0, mixed: 0, picture: 0 };
 	const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 	const only = onlyArg ? new Set(onlyArg.slice("--only=".length).split(",")) : null;
 	const run = (key, fn) => (!only || only.has(key) ? fn() : Promise.resolve());
