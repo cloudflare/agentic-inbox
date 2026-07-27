@@ -25,14 +25,50 @@ const MAX_TITLE_LENGTH = 120;
 const MAX_SUBJECT_LENGTH = 240;
 const UNSAFE_NOTIFICATION_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/gu;
 
-const ENTITIES: [RegExp, string][] = [
-	[/&nbsp;/g, " "],
-	[/&lt;/g, "<"],
-	[/&gt;/g, ">"],
-	[/&quot;/g, '"'],
-	[/&#0*39;|&apos;/g, "'"],
-	[/&amp;/g, "&"], // decode last so "&amp;lt;" → "&lt;", not "<"
-];
+// "amp" is deliberately absent: it decodes last so "&amp;lt;" → "&lt;", not "<".
+const NAMED_ENTITIES: Readonly<Record<string, string>> = {
+	nbsp: " ",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	apos: "'",
+	mdash: "—",
+	ndash: "–",
+	lsquo: "‘",
+	rsquo: "’",
+	ldquo: "“",
+	rdquo: "”",
+	hellip: "…",
+	bull: "•",
+	middot: "·",
+	copy: "©",
+	reg: "®",
+	trade: "™",
+};
+
+/** Reject anything String.fromCodePoint would throw on or render as a lone surrogate. */
+function decodedCodePoint(digits: string, radix: number): string | null {
+	const code = Number.parseInt(digits, radix);
+	if (!Number.isInteger(code) || code < 0 || code > 0x10ffff) return null;
+	if (code >= 0xd800 && code <= 0xdfff) return null;
+	return String.fromCodePoint(code);
+}
+
+/**
+ * Decode the entities that actually reach prose. Marketing senders emit named
+ * punctuation ("&mdash;") and numeric escapes ("&#8212;", "&#x2014;") freely,
+ * and an undecoded entity is read as literal text in a snippet.
+ */
+function decodeEntities(value: string): string {
+	return value
+		.replace(/&([a-zA-Z][a-zA-Z0-9]*);/g, (match, name: string) =>
+			NAMED_ENTITIES[name.toLowerCase()] ?? match,
+		)
+		.replace(/&#(?:([0-9]{1,7})|[xX]([0-9a-fA-F]{1,6}));/g, (match, dec, hex) =>
+			(dec ? decodedCodePoint(dec, 10) : decodedCodePoint(hex, 16)) ?? match,
+		)
+		.replace(/&amp;/g, "&");
+}
 
 // Elements whose *content* is markup, not prose. Stripping tags alone leaves
 // their text behind, which is how styled marketing mail rendered raw CSS as its
@@ -49,7 +85,7 @@ const NON_PROSE_ELEMENTS = /<(script|style|head)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/
 export function htmlToSnippet(raw: string | null | undefined, maxLength = 120): string {
 	if (!raw) return "";
 	let s = raw.replace(NON_PROSE_ELEMENTS, " ").replace(/<[^>]*>/g, " ");
-	for (const [re, ch] of ENTITIES) s = s.replace(re, ch);
+	s = decodeEntities(s);
 	s = s.replace(/\s+/g, " ").trim();
 	return truncateText(s, maxLength);
 }
