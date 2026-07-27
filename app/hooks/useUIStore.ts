@@ -28,7 +28,9 @@ export interface ComposeOptions {
 	draftEmail?: Email | null;
 }
 
-const AGENT_PANEL_STORAGE_KEY = "whispyr.agentPanelOpen";
+// Brand-neutral: both brands run this portal, so the key never names one.
+// Renamed from the old brand-prefixed key, which drops the stored choice once.
+const AGENT_PANEL_STORAGE_KEY = "mail-portal.agent-panel-open";
 
 /** Two compose requests aim at the same thing when mode and both anchors match. */
 function isSameComposeTarget(a: ComposeOptions, b: ComposeOptions): boolean {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { composeDraftLifecycle } from "../lib/compose-draft-lifecycle.ts";
 import {
@@ -149,4 +150,10 @@ test("a second freshly drafted reply is offered, never swallowed as a repeat", (
 
 	// It must reach the discard prompt rather than being dropped on the floor.
 	assert.equal(useUIStore.getState().queuedCompose, seeded);
+});
+
+test("persisted UI preferences are keyed to the portal, not to one brand", () => {
+	const source = readFileSync(new URL("./useUIStore.ts", import.meta.url), "utf8");
+	assert.match(source, /AGENT_PANEL_STORAGE_KEY = "mail-portal\.agent-panel-open"/);
+	assert.doesNotMatch(source, /whispyr|wiser/i);
 });
