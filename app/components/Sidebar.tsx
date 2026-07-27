@@ -33,6 +33,7 @@ import { NavLink, useNavigate, useParams, useSearchParams } from "react-router";
 import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
 import ManageLabelsDialog from "~/components/labels/ManageLabelsDialog";
 import SavedViewsSidebarSection from "~/components/SavedViewsSidebarSection";
+import { useOutboundAttentionCount } from "~/queries/emails";
 import { useCreateFolder, useFolders } from "~/queries/folders";
 import { useLabels } from "~/queries/labels";
 import { useMailbox } from "~/queries/mailboxes";
@@ -68,6 +69,8 @@ interface FolderLinkProps {
 	icon: React.ReactNode;
 	label: string;
 	unreadCount?: number;
+	/** Deliveries that stalled or failed and need the user to act. */
+	attentionCount?: number;
 	onClick?: () => void;
 	active?: boolean;
 }
@@ -77,6 +80,7 @@ function FolderLink({
 	icon,
 	label,
 	unreadCount,
+	attentionCount,
 	onClick,
 	active,
 }: FolderLinkProps) {
@@ -94,8 +98,14 @@ function FolderLink({
 		>
 			<span className="shrink-0">{icon}</span>
 			<span className="truncate flex-1">{label}</span>
-			{unreadCount != null && unreadCount > 0 && (
-				<Badge variant="secondary">{unreadCount}</Badge>
+			{attentionCount != null && attentionCount > 0 ? (
+				<Badge variant="destructive">
+					{attentionCount}
+					<span className="sr-only"> deliveries need attention</span>
+				</Badge>
+			) : (
+				unreadCount != null &&
+				unreadCount > 0 && <Badge variant="secondary">{unreadCount}</Badge>
 			)}
 		</NavLink>
 	);
@@ -114,6 +124,7 @@ export default function Sidebar() {
 	const toastManager = useKumoToastManager();
 	const { startCompose, closeSidebar } = useUIStore();
 	const { data: currentMailbox } = useMailbox(mailboxId);
+	const outboundAttentionCount = useOutboundAttentionCount(mailboxId);
 	const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
 	const [isManageLabelsOpen, setIsManageLabelsOpen] = useState(false);
 	const [newFolderName, setNewFolderName] = useState("");
@@ -263,6 +274,9 @@ export default function Sidebar() {
 						icon={FOLDER_ICONS[folder.id]}
 						label={folder.label}
 						unreadCount={getUnreadCount(folder.id)}
+						attentionCount={
+							folder.id === Folders.OUTBOX ? outboundAttentionCount : 0
+						}
 						active={!selectedLabelId && folder.id === currentFolder}
 						onClick={handleNavClick}
 					/>
