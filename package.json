@@ -46,6 +46,8 @@
 		"test:playwright:email-body": "node scripts/verify-email-body-playwright.mjs",
 		"pretest:playwright:email-list-errors": "npm run test:playwright:install",
 		"test:playwright:email-list-errors": "node scripts/verify-email-body-playwright.mjs --email-list-only",
+		"pretest:playwright:polish-journey": "npm run test:playwright:install",
+		"test:playwright:polish-journey": "node scripts/verify-polish-journey-playwright.mjs",
 		"test:playwright:install": "playwright install chromium",
 		"canary:email-authorization": "node scripts/run-email-authorization-canary.mjs",
 		"transition:wiser-shared-mailboxes": "node scripts/transition-wiser-shared-mailboxes.mjs",
