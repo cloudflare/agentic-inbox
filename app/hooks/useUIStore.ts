@@ -32,6 +32,9 @@ const AGENT_PANEL_STORAGE_KEY = "whispyr.agentPanelOpen";
 
 /** Two compose requests aim at the same thing when mode and both anchors match. */
 function isSameComposeTarget(a: ComposeOptions, b: ComposeOptions): boolean {
+	// A draft with no id is a freshly seeded body (an AI reply, an agent draft).
+	// Each one is new content, so it is never the request already open.
+	if (b.draftEmail && !b.draftEmail.id) return false;
 	return (
 		a.mode === b.mode &&
 		(a.originalEmail?.id ?? null) === (b.originalEmail?.id ?? null) &&

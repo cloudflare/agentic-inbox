@@ -136,3 +136,17 @@ test("a clean composer hands over to the next target without a prompt", () => {
 	assert.equal(state.composeOptions.mode, "reply");
 	assert.equal(state.queuedCompose, null);
 });
+
+test("a second freshly drafted reply is offered, never swallowed as a repeat", () => {
+	clearComposeRecovery();
+	openComposerWithUnsavedWork("<p>first AI draft, since edited</p>");
+	const seeded = {
+		mode: "reply" as const,
+		originalEmail: { id: "email-9" } as never,
+		draftEmail: { id: "", body: "<p>second AI draft</p>" } as never,
+	};
+	useUIStore.getState().startCompose(seeded);
+
+	// It must reach the discard prompt rather than being dropped on the floor.
+	assert.equal(useUIStore.getState().queuedCompose, seeded);
+});
