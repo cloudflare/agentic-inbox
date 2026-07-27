@@ -76,6 +76,12 @@ import {
 // Shared with push notifications: both surfaces reduce the same raw-HTML body
 // to one line of human text, so they must agree on what counts as prose.
 import { htmlToSnippet } from "../lib/push/payload";
+import {
+  hasAttachmentsSql,
+  SENDER_DISPLAY_SQL,
+  SNIPPET_LENGTH,
+  snippetSourceSql,
+} from "../lib/list-projection";
 import { vapidConfig } from "../lib/push/transport";
 import { sendWebPush } from "../lib/push/send";
 import type { PushPayload } from "../lib/push/types";
@@ -336,25 +342,6 @@ const NORMALIZED_SUBJECT_SQL = `LOWER(TRIM(
 		'aw: ', ''), 'wg: ', ''), 'réf: ', ''), 'sv: ', ''),
 		're: ', ''), 'fwd: ', ''), 'fw: ', '')
 ))`;
-
-/**
- * SQL expression for the prose-bearing slice of a stored body. Bodies are raw
- * HTML, so this anchors at `<body` when present — otherwise a large `<head>`
- * of `<style>` rules eats the whole budget and the list renders a blank
- * snippet. The slice stays generous because `htmlToSnippet` does the real
- * text extraction; SQL only keeps the row payload bounded.
- */
-const snippetSourceSql = (alias: string) =>
-  `SUBSTR(${alias}.body, CASE WHEN INSTR(LOWER(${alias}.body), '<body') > 0 THEN INSTR(LOWER(${alias}.body), '<body') ELSE 1 END, 4000)`;
-
-/** Attachment presence for one message, served by idx_attachments_email_id_id. */
-const hasAttachmentsSql = (alias: string) =>
-  `EXISTS(SELECT 1 FROM attachments a WHERE a.email_id = ${alias}.id)`;
-
-/** Display name when the ingest captured a usable one, else the raw address. */
-const SENDER_DISPLAY_SQL = `COALESCE(NULLIF(TRIM(sender_name), ''), sender)`;
-
-const SNIPPET_LENGTH = 160;
 
 const ALLOWED_SORT_COLUMNS = [
   "id",
