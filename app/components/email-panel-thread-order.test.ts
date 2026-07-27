@@ -49,3 +49,22 @@ test("self detection compares normalized addresses on both sides", () => {
 	);
 	assert.doesNotMatch(threadMessage, /email\.sender === mailboxEmail/);
 });
+
+test("closing the inline composer returns focus to the thread", () => {
+	// The hand-back must be queued before the effect that moves focus, and that
+	// effect must re-run when the composer closes, or focus is left on nothing.
+	assert.match(
+		panel,
+		/wasInlineComposingRef\.current && !isInlineComposing && newestMessageId\)[\s\S]*?pendingMessageFocusRef\.current = newestMessageId/,
+	);
+	const handBack = panel.indexOf("wasInlineComposingRef.current = isInlineComposing");
+	const focusMove = panel.indexOf("target.focus({ preventScroll: true })");
+	assert.ok(
+		handBack < focusMove,
+		"the focus hand-back effect must be declared before the focus effect",
+	);
+	assert.match(
+		panel,
+		/threadRepliesFetched, isInlineComposing\]/,
+	);
+});

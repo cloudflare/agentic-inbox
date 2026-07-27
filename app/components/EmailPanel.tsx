@@ -244,6 +244,17 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		seededSelectionRef.current = currentEmailId;
 		setExpandedMessages((current) => new Set(current).add(newestMessageId));
 	}, [currentEmailId, newestMessageId]);
+	// Closing the inline composer hands focus back to the message it answered, so
+	// the keyboard never lands on nothing. Queued before the focus effect below,
+	// which is what actually moves focus on this same commit.
+	const wasInlineComposingRef = useRef(false);
+	useEffect(() => {
+		if (wasInlineComposingRef.current && !isInlineComposing && newestMessageId) {
+			pendingMessageFocusRef.current = newestMessageId;
+		}
+		wasInlineComposingRef.current = isInlineComposing;
+	}, [isInlineComposing, newestMessageId]);
+
 	useEffect(() => {
 		const pendingId = pendingMessageFocusRef.current;
 		const container = conversationScrollRef.current;
@@ -256,17 +267,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		target.scrollIntoView({ block: "start" });
 		target.focus({ preventScroll: true });
 		pendingMessageFocusRef.current = null;
-	}, [currentEmailId, allMessages.length, expandedMessages, email?.thread_id, threadRepliesFetched]);
-
-	// Closing the inline composer hands focus back to the message it answered,
-	// so the keyboard never lands on nothing.
-	const wasInlineComposingRef = useRef(false);
-	useEffect(() => {
-		if (wasInlineComposingRef.current && !isInlineComposing && newestMessageId) {
-			pendingMessageFocusRef.current = newestMessageId;
-		}
-		wasInlineComposingRef.current = isInlineComposing;
-	}, [isInlineComposing, newestMessageId]);
+	}, [currentEmailId, allMessages.length, expandedMessages, email?.thread_id, threadRepliesFetched, isInlineComposing]);
 
 	const focusMessage = (messageId: string) => {
 		pendingMessageFocusRef.current = messageId;
