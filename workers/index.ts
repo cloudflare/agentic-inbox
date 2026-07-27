@@ -199,7 +199,10 @@ app.get("/api/v1/config", async (c) => {
 app.get("/manifest.webmanifest", (c: AppContext) => {
 	const manifest = pwaManifestFor(resolveBrand(c.env.BRAND));
 	return new Response(JSON.stringify(manifest), {
-		headers: { "Content-Type": "application/manifest+json" },
+		headers: {
+			"Content-Type": "application/manifest+json",
+			"Cache-Control": "public, max-age=3600",
+		},
 	});
 });
 
