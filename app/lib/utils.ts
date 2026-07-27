@@ -9,6 +9,7 @@
  * Re-export for backwards compatibility with existing imports.
  */
 import DOMPurify from "dompurify";
+import { decodeHtmlEntities } from "../../shared/html-entities.ts";
 import type { Attachment } from "~/types";
 import { escapeHtml } from "./html-text.ts";
 
@@ -69,23 +70,6 @@ export function htmlToPlainText(html: string): string {
 		.replace(/<div[^>]*>/gi, "")
 		.replace(/<\/div>/gi, "\n");
 	return (div.textContent || div.innerText || "").trim();
-}
-
-function decodeHtmlEntities(text: string): string {
-	return text
-		.replace(/&#(\d+);/g, (_match: string, code: string) =>
-			String.fromCharCode(Number(code)),
-		)
-		.replace(/&#x([0-9a-f]+);/gi, (_match: string, hex: string) =>
-			String.fromCharCode(Number.parseInt(hex, 16)),
-		)
-		.replace(/&amp;/g, "&")
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">")
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&apos;/g, "'")
-		.replace(/&nbsp;/g, " ");
 }
 
 export function getSnippetText(
