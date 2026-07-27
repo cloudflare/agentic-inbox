@@ -85,7 +85,9 @@ export default function EmailRow({
 			<button
 				type="button"
 				onClick={onOpen}
-				aria-label={`Open conversation ${email.subject || "without subject"}`}
+				aria-label={`Open conversation ${email.subject || "without subject"}${
+					email.has_attachments ? ", has attachments" : ""
+				}`}
 				className="flex min-h-11 min-w-0 flex-1 flex-col justify-center gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand"
 			>
 				<span className="flex w-full items-center gap-2">
@@ -111,7 +113,7 @@ export default function EmailRow({
 						<PaperclipIcon
 							size={13}
 							className="shrink-0 text-kumo-subtle"
-							aria-label="Has attachments"
+							aria-hidden="true"
 						/>
 					)}
 					<time
