@@ -134,5 +134,10 @@ test("terminal delivery replay never closes as a fresh queue and safe resend ren
 		form,
 		/enqueuePlan\.action !== "finish"[\s\S]*?setError\(message\)[\s\S]*?return/,
 	);
-	assert.match(form, /Submitting email/);
+	assert.match(
+		form,
+		/beginSendWatch\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id/,
+		"an accepted send must be watched to a truthful outcome, not announced and abandoned",
+	);
+	assert.doesNotMatch(form, /Submitting email/);
 });

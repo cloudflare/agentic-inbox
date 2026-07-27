@@ -33,6 +33,7 @@ import { useLabels, useMutateLabels } from "~/queries/labels";
 import { useUnsnooze } from "~/queries/snooze";
 import { useFollowUpReminders } from "~/queries/follow-up-reminders";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useSendOutcomeToast } from "~/hooks/useSendOutcomeToast";
 import type { Email, Folder, Label, Mailbox } from "~/types";
 import { LogicalSendIdentity } from "~/lib/compose-send-identity";
 
@@ -90,6 +91,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const isInlineComposing = isComposing &&
 		composeSurface(composeOptions, selectedEmailId) === "inline";
 	const toastManager = useKumoToastManager();
+	const { beginSendWatch } = useSendOutcomeToast(mailboxId);
 	const [isSending, setIsSending] = useState(false);
 	const [isDrafting, setIsDrafting] = useState(false);
 	const draftSendIdentityRef = useRef(new LogicalSendIdentity());
@@ -453,28 +455,24 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				toastManager.add({ title: message, variant: "error" });
 				return;
 			}
-			toastManager.add({
-				title: enqueuePlan.title ?? "Email queued. Draft kept until delivery is confirmed.",
-				timeout: 10_000,
-				actions: enqueuePlan.canUndo ? [
-					{
-						children: "Undo",
-						variant: "secondary",
-						size: "sm",
-						onClick: () =>
-							cancelOutboundMut.mutate(
-								{ mailboxId, deliveryId: result.deliveryId },
-								{
-									onSuccess: () => toastManager.add({ title: "Send cancelled" }),
-									onError: (error) =>
-										toastManager.add({
-											title: error instanceof Error ? error.message : "Could not cancel send",
-											variant: "error",
-										}),
-								},
-							),
-					},
-				] : [],
+			beginSendWatch({
+				deliveryId: result.deliveryId,
+				emailId: result.id,
+				scheduledFor: result.scheduledFor,
+				title: enqueuePlan.title,
+				canUndo: enqueuePlan.canUndo,
+				onUndo: () =>
+					cancelOutboundMut.mutate(
+						{ mailboxId, deliveryId: result.deliveryId },
+						{
+							onSuccess: () => toastManager.add({ title: "Send cancelled" }),
+							onError: (error) =>
+								toastManager.add({
+									title: error instanceof Error ? error.message : "Could not cancel send",
+									variant: "error",
+								}),
+						},
+					),
 			});
 			if (isDraftFolder) closePanel();
 		} catch (err) {

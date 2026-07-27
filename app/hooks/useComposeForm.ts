@@ -28,6 +28,7 @@ import { useMailbox } from "~/queries/mailboxes";
 import { useMailboxSignatureSettings } from "~/queries/mailbox-signature-settings";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useAttachments } from "~/hooks/useAttachments";
+import { useSendOutcomeToast } from "~/hooks/useSendOutcomeToast";
 import type { AttachmentRef, OutboundEnqueueResponse } from "~/types";
 import { LogicalSendIdentity } from "~/lib/compose-send-identity";
 import { planComposeEnqueueResult } from "~/lib/outbound-enqueue-outcome";
@@ -105,6 +106,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
     composeMailboxIdRef.current = mailboxId;
   }
   const composeMailboxId = composeMailboxIdRef.current ?? mailboxId;
+  const { beginSendWatch } = useSendOutcomeToast(composeMailboxId);
   const mailboxChanged = Boolean(
     composeMailboxId && mailboxId && composeMailboxId !== mailboxId,
   );
@@ -923,9 +925,6 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 					email: emailData,
 				});
 			};
-      toastManager.add({
-			title: scheduledFor ? "Submitting scheduled email..." : "Submitting email...",
-      });
 			let result = await enqueueConfirmedDraft(confirmedDraft);
 			let enqueuePlan = planComposeEnqueueResult(result);
 			if (enqueuePlan.action === "renew_revision_and_resend") {
@@ -941,35 +940,27 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 				toastManager.add({ title: message, variant: "error" });
 				return;
 			}
-      toastManager.add({
-			title:
-				enqueuePlan.title ??
-				(result.scheduledFor ? "Email scheduled" : "Email queued"),
-        description:
-          "It will move to Sent only after the provider confirms acceptance.",
-        timeout: result.scheduledFor ? 15_000 : 10_000,
-			actions: enqueuePlan.canUndo ? [
-          {
-            children: "Undo",
-            variant: "secondary",
-            size: "sm",
-            onClick: () =>
-              cancelOutboundMutation.mutate(
-                { mailboxId: composeMailboxId, deliveryId: result.deliveryId },
-                {
-                  onSuccess: () => toastManager.add({ title: "Send cancelled" }),
-                  onError: (cancelError) =>
-                    toastManager.add({
-                      title:
-                        cancelError instanceof Error
-                          ? cancelError.message
-                          : "Could not cancel send",
-                      variant: "error",
-                    }),
-                },
-              ),
-          },
-			] : [],
+      beginSendWatch({
+        deliveryId: result.deliveryId,
+        emailId: result.id,
+        scheduledFor: result.scheduledFor,
+        title: enqueuePlan.title,
+        canUndo: enqueuePlan.canUndo,
+        onUndo: () =>
+          cancelOutboundMutation.mutate(
+            { mailboxId: composeMailboxId, deliveryId: result.deliveryId },
+            {
+              onSuccess: () => toastManager.add({ title: "Send cancelled" }),
+              onError: (cancelError) =>
+                toastManager.add({
+                  title:
+                    cancelError instanceof Error
+                      ? cancelError.message
+                      : "Could not cancel send",
+                  variant: "error",
+                }),
+            },
+          ),
       });
       finishClose();
     } catch (sendError) {

@@ -22,7 +22,12 @@ test("Send Draft keeps blocked terminal outcomes open and only exposes policy-ap
 		panel,
 		/enqueuePlan\.action !== "finish"[\s\S]*?variant: "error"[\s\S]*?return;[\s\S]*?enqueuePlan\.title/,
 	);
-	assert.match(panel, /actions: enqueuePlan\.canUndo \? \[/);
+	assert.match(panel, /canUndo: enqueuePlan\.canUndo/);
+	assert.match(
+		panel,
+		/beginSendWatch\(\{[\s\S]*?deliveryId: result\.deliveryId[\s\S]*?emailId: result\.id/,
+		"the draft-send path must share the compose send toast lifecycle",
+	);
 	assert.match(
 		panel,
 		/enqueuePlan\.action !== "finish"[\s\S]*?return;[\s\S]*?if \(isDraftFolder\) closePanel\(\)/,
