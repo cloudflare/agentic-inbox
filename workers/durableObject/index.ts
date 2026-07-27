@@ -7022,6 +7022,7 @@ export class MailboxDO extends DurableObject<Env> {
       ...row,
       read: !!row.read,
       starred: !!row.starred,
+      has_attachments: !!row.has_attachments,
       labels: labelsByEmail.get(String(row.id)) ?? [],
     }));
   }

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
+import { mailboxMigrations } from "../durableObject/migrations.ts";
+import { applySqliteMigrations } from "../testing/sqlite-migrations.test.ts";
 import test from "node:test";
 import { buildMailSearchPlan } from "./mail-search.ts";
 import {
@@ -180,42 +182,26 @@ test("the frozen cross-Mailbox corpus satisfies locked system and fairness thres
 
 test("the frozen Search v2 baseline executes through its production SQLite plan", () => {
 	const database = new DatabaseSync(":memory:");
+	// The real migrated mailbox schema: a hand-rolled copy drifts, and the plan
+	// under test is the production one, columns and all.
+	applySqliteMigrations(database, mailboxMigrations);
 	database.exec(`
-		CREATE TABLE folders (id TEXT PRIMARY KEY, name TEXT NOT NULL);
-		CREATE TABLE emails (
-			id TEXT PRIMARY KEY, folder_id TEXT NOT NULL, subject TEXT, sender TEXT,
-			recipient TEXT, cc TEXT, bcc TEXT, date TEXT, read INTEGER, starred INTEGER,
-			body TEXT, in_reply_to TEXT, email_references TEXT, thread_id TEXT,
-			snooze_source_folder_id TEXT, snoozed_until TEXT
-		);
-		CREATE TABLE attachments (id TEXT PRIMARY KEY, email_id TEXT NOT NULL, filename TEXT NOT NULL);
-		CREATE TABLE email_body_objects (
-			id TEXT PRIMARY KEY,
-			email_id TEXT NOT NULL REFERENCES emails(id) ON DELETE CASCADE,
-			part_index INTEGER NOT NULL CHECK(part_index >= 0),
-			content_type TEXT NOT NULL CHECK(content_type IN ('text/html', 'text/plain')),
-			charset TEXT NOT NULL,
-			r2_key TEXT NOT NULL UNIQUE,
-			byte_length INTEGER NOT NULL CHECK(byte_length >= 0)
-		);
-		CREATE INDEX idx_email_body_objects_email_id
-			ON email_body_objects(email_id, part_index);
-		CREATE TABLE email_labels (email_id TEXT NOT NULL, label_id TEXT NOT NULL);
-		INSERT INTO folders VALUES ('inbox', 'Inbox');
-		INSERT INTO emails VALUES
-			('message-renewal', 'inbox', 'Renewal documents', 'vendor@example.test', 'legal@portal.test', NULL, NULL,
-			 '2026-07-01T10:00:00.000Z', 0, 0, 'Please review the attached agreement.', NULL, NULL, 't1', NULL, NULL),
-			('message-q3-forecast', 'inbox', 'Regional forecast', 'analyst@example.test', 'finance@portal.test', NULL, NULL,
-			 '2026-07-02T10:00:00.000Z', 0, 0, 'The detailed figures are in the attached workbook.', NULL, NULL, 't2', NULL, NULL),
-			('message-loading-window', 'inbox', 'Dock schedule', 'warehouse@example.test', 'ops@portal.test', NULL, NULL,
-			 '2026-07-03T10:00:00.000Z', 0, 0, 'The loading window closes at 14:30.', NULL, NULL, 't3', NULL, NULL),
-			('message-arabic-delivery', 'inbox', 'Delivery note', 'carrier@example.test', 'ops@portal.test', NULL, NULL,
-			 '2026-07-04T10:00:00.000Z', 0, 0, 'The translated delivery detail is attached.', NULL, NULL, 't4', NULL, NULL);
-		INSERT INTO attachments VALUES
-			('attachment-renewal-pdf', 'message-renewal', 'renewal.pdf'),
-			('attachment-q3-xlsx', 'message-q3-forecast', 'q3-cairo-east.xlsx'),
-			('attachment-q3-numbers', 'message-q3-forecast', 'q3-cairo-east.numbers'),
-			('attachment-delivery-odt', 'message-arabic-delivery', 'delivery-ar.odt');
+		INSERT OR REPLACE INTO folders (id, name) VALUES ('inbox', 'Inbox');
+		INSERT INTO emails (id, folder_id, subject, sender, recipient, date, read, starred, body, thread_id)
+		VALUES
+			('message-renewal', 'inbox', 'Renewal documents', 'vendor@example.test', 'legal@portal.test',
+			 '2026-07-01T10:00:00.000Z', 0, 0, 'Please review the attached agreement.', 't1'),
+			('message-q3-forecast', 'inbox', 'Regional forecast', 'analyst@example.test', 'finance@portal.test',
+			 '2026-07-02T10:00:00.000Z', 0, 0, 'The detailed figures are in the attached workbook.', 't2'),
+			('message-loading-window', 'inbox', 'Dock schedule', 'warehouse@example.test', 'ops@portal.test',
+			 '2026-07-03T10:00:00.000Z', 0, 0, 'The loading window closes at 14:30.', 't3'),
+			('message-arabic-delivery', 'inbox', 'Delivery note', 'carrier@example.test', 'ops@portal.test',
+			 '2026-07-04T10:00:00.000Z', 0, 0, 'The translated delivery detail is attached.', 't4');
+		INSERT INTO attachments (id, email_id, filename, mimetype, size) VALUES
+			('attachment-renewal-pdf', 'message-renewal', 'renewal.pdf', 'application/pdf', 1024),
+			('attachment-q3-xlsx', 'message-q3-forecast', 'q3-cairo-east.xlsx', 'application/vnd.ms-excel', 2048),
+			('attachment-q3-numbers', 'message-q3-forecast', 'q3-cairo-east.numbers', 'application/octet-stream', 512),
+			('attachment-delivery-odt', 'message-arabic-delivery', 'delivery-ar.odt', 'application/vnd.oasis.opendocument.text', 256);
 	`);
 	const mailboxByMessage = new Map([
 		["message-renewal", "legal@portal.test"],
