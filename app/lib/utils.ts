@@ -18,6 +18,7 @@ export {
 	formatListDate,
 	formatDetailDate,
 	formatShortDate,
+	toIsoDate,
 } from "shared/dates";
 
 /**
