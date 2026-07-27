@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+	activatesFocusedControl,
 	isMailShortcutProtectedTarget,
 	MODAL_SURFACE_SELECTOR,
 	resolveMailShortcut,
@@ -14,12 +15,15 @@ import {
 class StubElement {
 	tag: string;
 	ancestorRole?: string;
-	constructor(tag: string, ancestorRole?: string) {
+	insideRow: boolean;
+	constructor(tag: string, ancestorRole?: string, insideRow = false) {
 		this.tag = tag;
 		this.ancestorRole = ancestorRole;
+		this.insideRow = insideRow;
 	}
 	closest(selector: string) {
 		const parts = selector.split(", ").map((part) => part.trim());
+		if (parts.includes("[data-email-id]")) return this.insideRow ? this : null;
 		if (parts.some((part) => part.startsWith(this.tag))) return this;
 		if (this.ancestorRole && parts.includes(`[role="${this.ancestorRole}"]`)) {
 			return this;
@@ -30,6 +34,8 @@ class StubElement {
 (globalThis as { Element?: unknown }).Element = StubElement;
 const target = (tag: string, ancestorRole?: string) =>
 	new StubElement(tag, ancestorRole) as unknown as EventTarget;
+const rowTarget = (tag: string) =>
+	new StubElement(tag, undefined, true) as unknown as EventTarget;
 
 function shortcut(
 	key: string,
@@ -155,4 +161,45 @@ test("current-conversation commands never fall back to an unrelated first row", 
 	assert.equal(resolveVisibleMailTargetId(visibleIds, "stale", false), null);
 	assert.equal(resolveVisibleMailTargetId(visibleIds, null, true), "first");
 	assert.equal(resolveVisibleMailTargetId(visibleIds, "stale", true), "first");
+});
+
+test("Enter on a focused control runs that control, not the list shortcut", () => {
+	// Buttons, links and menu items are unprotected so shortcuts survive a
+	// focused mail row; cancelling their activation to open a message instead
+	// left every one of them visibly dead under the keyboard.
+	assert.equal(activatesFocusedControl("Enter", target("button")), true);
+	assert.equal(activatesFocusedControl("Enter", target("a")), true);
+	assert.equal(activatesFocusedControl("Enter", target("summary")), true);
+	assert.equal(activatesFocusedControl("Enter", target("div", "menuitem")), true);
+	assert.equal(activatesFocusedControl("Enter", target("div", "button")), true);
+	// Space activates the same controls, so it is claimed before it is mapped.
+	assert.equal(activatesFocusedControl(" ", target("button")), true);
+});
+
+test("letter shortcuts keep working with a control focused", () => {
+	for (const key of ["j", "k", "e", "r", "c", "u", "s", "z", "#", "/"]) {
+		assert.equal(
+			activatesFocusedControl(key, target("button")),
+			false,
+			`${key} is not an activation key and must still reach the list`,
+		);
+	}
+});
+
+test("Enter on a focused mail row still opens the ringed keyboard target", () => {
+	// j/k move the list's own keyboard target WITHOUT moving DOM focus, so a row
+	// focused three rows above the ring must not be what Enter opens.
+	assert.equal(activatesFocusedControl("Enter", rowTarget("button")), false);
+	assert.equal(activatesFocusedControl("Enter", rowTarget("a")), false);
+	assert.equal(
+		shortcut("Enter").command,
+		"open-message",
+		"the row path still resolves the list command",
+	);
+});
+
+test("nothing but a real element can claim an activation key", () => {
+	assert.equal(activatesFocusedControl("Enter", null), false);
+	assert.equal(activatesFocusedControl("Enter", target("div")), false);
+	assert.equal(activatesFocusedControl("Enter", target("input")), false);
 });

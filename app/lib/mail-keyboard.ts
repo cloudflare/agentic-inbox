@@ -110,6 +110,37 @@ export const TEXT_ENTRY_SELECTOR =
  */
 export const MODAL_SURFACE_SELECTOR = '[role="dialog"], [role="alertdialog"]';
 
+/**
+ * Controls whose native default for an activation key IS their own activation:
+ * cancelling it to run a list shortcut leaves the button visibly dead.
+ * Checkboxes and radios are absent on purpose - Enter does not activate them,
+ * and the row select control is a checkbox.
+ */
+export const ACTIVATION_TARGET_SELECTOR =
+	'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="tab"], [role="switch"]';
+
+/**
+ * Mail rows are buttons too, but they are deliberately NOT native-activated.
+ * The list keeps its own keyboard target that j/k moves without moving DOM
+ * focus, so Enter has to open the row the reader can see ringed rather than
+ * whichever row last took focus.
+ */
+const MAIL_ROW_SELECTOR = "[data-email-id]";
+
+/** Space is included ahead of any mapping: its default is activation too. */
+const ACTIVATION_KEYS: ReadonlySet<string> = new Set(["enter", " ", "spacebar"]);
+
+export function activatesFocusedControl(
+	key: string,
+	target: EventTarget | null,
+): boolean {
+	if (!ACTIVATION_KEYS.has(key.toLowerCase())) return false;
+	if (!(target instanceof Element)) return false;
+	const control = target.closest(ACTIVATION_TARGET_SELECTOR);
+	if (!control) return false;
+	return control.closest(MAIL_ROW_SELECTOR) === null;
+}
+
 export function isMailShortcutProtectedTarget(
 	target: EventTarget | null,
 ): boolean {
