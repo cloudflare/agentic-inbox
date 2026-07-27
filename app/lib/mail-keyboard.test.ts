@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+	isMailShortcutProtectedTarget,
 	resolveMailShortcut,
 	resolveVisibleMailTargetId,
+	TEXT_ENTRY_SELECTOR,
 } from "./mail-keyboard.ts";
 
 function shortcut(
@@ -60,6 +62,62 @@ test("never hijacks text entry, IME composition, or modified browser keys", () =
 	assert.deepEqual(shortcut("s", { metaKey: true }), {});
 	assert.deepEqual(shortcut("ArrowLeft", { altKey: true }), {});
 	assert.deepEqual(shortcut("Escape", { isTextEntry: true }), {});
+});
+
+test("only genuine text entry is shielded from shortcuts", () => {
+	for (const entry of [
+		"input:not([type='checkbox']):not([type='radio'])",
+		"textarea",
+		"select",
+		"[contenteditable]:not([contenteditable='false'])",
+		"[role='textbox']",
+	]) {
+		assert.ok(
+			TEXT_ENTRY_SELECTOR.includes(entry),
+			`text entry target ${entry} must stay protected`,
+		);
+	}
+});
+
+test("focusable mail chrome never blocks shortcuts or the command palette", () => {
+	// Conversation rows are buttons and the select control is a checkbox, so any
+	// of these tokens in the selector silently disables every shortcut and Cmd+K.
+	for (const chrome of [
+		"button",
+		"a[href]",
+		"summary",
+		"[role='button']",
+		"[role='menuitem']",
+	]) {
+		assert.ok(
+			!TEXT_ENTRY_SELECTOR.includes(chrome),
+			`${chrome} must not be treated as text entry`,
+		);
+	}
+});
+
+test("the protected-target check reads the element tree, not the event", () => {
+	// Node has no DOM: stand in a tag-name element so the real predicate runs
+	// against the real selector. Focus behaviour itself is covered by Playwright.
+	class StubElement {
+		tag: string;
+		constructor(tag: string) {
+			this.tag = tag;
+		}
+		closest(selector: string) {
+			return selector.split(", ").some((part) => part.startsWith(this.tag))
+				? this
+				: null;
+		}
+	}
+	(globalThis as { Element?: unknown }).Element = StubElement;
+	const target = (tag: string) => new StubElement(tag) as unknown as EventTarget;
+
+	assert.equal(isMailShortcutProtectedTarget(target("input")), true);
+	assert.equal(isMailShortcutProtectedTarget(target("textarea")), true);
+	assert.equal(isMailShortcutProtectedTarget(target("button")), false);
+	assert.equal(isMailShortcutProtectedTarget(target("a")), false);
+	assert.equal(isMailShortcutProtectedTarget(null), false);
 });
 
 test("current-conversation commands never fall back to an unrelated first row", () => {

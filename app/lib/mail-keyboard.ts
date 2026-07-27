@@ -90,16 +90,19 @@ export function resolveMailShortcut(
 	return command ? { command } : {};
 }
 
+/**
+ * Only genuine text entry may swallow a shortcut. Buttons, links and menu items
+ * are excluded on purpose: mail rows are buttons, so protecting them killed
+ * every shortcut and the command palette as soon as a row took focus. Checkbox
+ * and radio inputs are excluded for the same reason - the row select control is
+ * a checkbox and holds focus after a click.
+ */
+export const TEXT_ENTRY_SELECTOR =
+	"input:not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox']";
+
 export function isMailShortcutProtectedTarget(
 	target: EventTarget | null,
 ): boolean {
 	if (!(target instanceof Element)) return false;
-	if (
-		target.closest(
-			"input, textarea, select, button, a[href], summary, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='button'], [role='menuitem']",
-		)
-	) {
-		return true;
-	}
-	return false;
+	return target.closest(TEXT_ENTRY_SELECTOR) !== null;
 }
