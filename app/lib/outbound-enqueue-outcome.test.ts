@@ -36,13 +36,13 @@ test("a definitive failed replay renews safely but an unknown replay remains blo
 test("active replays are truthful success while sent or bounced terminal replays stay open", () => {
 	assert.deepEqual(
 		planComposeEnqueueResult({ outcome: "active_replay", status: "retrying" }),
-		{ action: "finish", title: "Email is already retrying", canUndo: true },
+		{ action: "finish", title: "This email is already retrying", canUndo: true },
 	);
 	assert.deepEqual(
 		planComposeEnqueueResult({ outcome: "terminal_replay", status: "sent" }),
 		{
 			action: "block",
-			message: "This draft revision was already sent. It was not queued again.",
+			message: "This draft revision was already sent. It was not sent again.",
 		},
 	);
 	assert.deepEqual(
@@ -62,6 +62,16 @@ test("only queued or retrying deliveries can offer Undo", () => {
 	);
 	assert.deepEqual(
 		planComposeEnqueueResult({ outcome: "active_replay", status: "sending" }),
-		{ action: "finish", title: "Email is already sending", canUndo: false },
+		{ action: "finish", title: "This email is already sending", canUndo: false },
 	);
+});
+
+test("replay copy never describes a queue the user cannot see", () => {
+	for (const status of ["queued", "sending", "retrying", "sent"] as const) {
+		const plan = planComposeEnqueueResult({
+			outcome: status === "sent" ? "terminal_replay" : "active_replay",
+			status,
+		});
+		assert.doesNotMatch(JSON.stringify(plan), /queue/i, status);
+	}
 });

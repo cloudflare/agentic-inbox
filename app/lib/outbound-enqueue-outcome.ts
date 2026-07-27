@@ -9,9 +9,9 @@ export type ComposeEnqueuePlan =
 	| { action: "block"; message: string };
 
 const activeReplayTitles: Partial<Record<OutboundDeliveryStatus, string>> = {
-	queued: "Email is already queued",
-	sending: "Email is already sending",
-	retrying: "Email is already retrying",
+	queued: "This email is already sending",
+	sending: "This email is already sending",
+	retrying: "This email is already retrying",
 };
 
 export function planComposeEnqueueResult(
@@ -39,7 +39,7 @@ export function planComposeEnqueueResult(
 	if (result.status === "sent") {
 		return {
 			action: "block",
-			message: "This draft revision was already sent. It was not queued again.",
+			message: "This draft revision was already sent. It was not sent again.",
 		};
 	}
 	if (result.status === "bounced") {
@@ -51,6 +51,6 @@ export function planComposeEnqueueResult(
 	}
 	return {
 		action: "block",
-		message: `This draft revision already has a ${result.status} delivery. It was not queued again.`,
+		message: `This draft revision already has a ${result.status} delivery. It was not sent again.`,
 	};
 }
