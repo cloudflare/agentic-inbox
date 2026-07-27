@@ -120,3 +120,56 @@ test("runtime retry can discover and pin the recovery origin before reading rout
 	assert.equal(peekComposeRecovery()?.identity?.id, "origin-draft");
 	clearComposeRecovery();
 });
+
+test("a cleared persisted draft is still work in progress, not an empty composer", () => {
+	// The reader deleted the last of a saved draft's content; the 1.2s autosave
+	// debounce has not fired yet. Judging emptiness by content alone let the next
+	// startCompose replace the composer and lose the deletion outright.
+	clearComposeRecovery();
+	writeComposeRecovery({
+		mailboxId: "team-a@example.com",
+		to: "",
+		cc: "",
+		bcc: "",
+		subject: "",
+		body: "",
+		identity: { id: "draft-1", version: 4 },
+		createKey: "draft-create-1",
+		attachments: [],
+		lifecycle: {
+			localRevision: 5,
+			savedRevision: 4,
+			phase: "pending",
+			activeSave: null,
+			error: null,
+		},
+	});
+	assert.equal(hasComposeRecovery(), true);
+	clearComposeRecovery();
+});
+
+test("an untouched composer never parks the next compose request", () => {
+	// A pristine composer starts saved with matching revisions, so opening one
+	// and immediately hitting Reply must not raise a discard prompt.
+	clearComposeRecovery();
+	writeComposeRecovery({
+		mailboxId: "team-a@example.com",
+		to: "",
+		cc: "",
+		bcc: "",
+		subject: "",
+		body: "",
+		identity: null,
+		createKey: "draft-create-2",
+		attachments: [],
+		lifecycle: {
+			localRevision: 0,
+			savedRevision: 0,
+			phase: "saved",
+			activeSave: null,
+			error: null,
+		},
+	});
+	assert.equal(hasComposeRecovery(), false);
+	clearComposeRecovery();
+});

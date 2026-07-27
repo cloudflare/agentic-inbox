@@ -1,5 +1,6 @@
 import type { ComposeAttachmentRecord } from "./compose-attachment-policy";
 import {
+	composeDraftIsDirty,
 	composeDraftTransition,
 	type ComposeDraftLifecycle,
 } from "./compose-draft-lifecycle.ts";
@@ -64,6 +65,13 @@ export function composeRecoveryLifecycleForRender(
 }
 
 export function hasComposeRecovery(): boolean {
+	if (!recovery) return false;
+	// Unsaved work is not the same as non-empty work. Clearing a persisted draft
+	// down to nothing IS an edit, and autosave is debounced, so judging by
+	// content alone replaced the composer and threw the deletion away. A pristine
+	// composer starts "saved" with matching revisions, so this stays quiet until
+	// the reader actually changes something.
+	if (composeDraftIsDirty(recovery.lifecycle)) return true;
 	return Boolean(
 		recovery &&
 			(recovery.to.trim() ||
