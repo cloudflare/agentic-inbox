@@ -186,16 +186,21 @@ test("letter shortcuts keep working with a control focused", () => {
 	}
 });
 
-test("Enter on a focused mail row still opens the ringed keyboard target", () => {
-	// j/k move the list's own keyboard target WITHOUT moving DOM focus, so a row
-	// focused three rows above the ring must not be what Enter opens.
-	assert.equal(activatesFocusedControl("Enter", rowTarget("button")), false);
-	assert.equal(activatesFocusedControl("Enter", rowTarget("a")), false);
-	assert.equal(
-		shortcut("Enter").command,
-		"open-message",
-		"the row path still resolves the list command",
-	);
+test("Enter on a focused mail row activates that exact row", () => {
+	// Rows are buttons and are NOT excluded: Search and Saved Views listen for no
+	// open-message command, so cancelling the native activation there left Enter
+	// doing nothing at all. In folders the ring follows DOM focus (roving focus in
+	// email-list.tsx), so the row Enter opens is the row the reader sees ringed.
+	assert.equal(activatesFocusedControl("Enter", rowTarget("button")), true);
+	assert.equal(activatesFocusedControl("Enter", rowTarget("a")), true);
+	// The list command still exists for the command palette and for j/k.
+	assert.equal(shortcut("Enter").command, "open-message");
+});
+
+test("row shortcuts other than activation keys still reach the list", () => {
+	for (const key of ["j", "k", "e", "r", "u", "s"]) {
+		assert.equal(activatesFocusedControl(key, rowTarget("button")), false);
+	}
 });
 
 test("nothing but a real element can claim an activation key", () => {

@@ -115,17 +115,15 @@ export const MODAL_SURFACE_SELECTOR = '[role="dialog"], [role="alertdialog"]';
  * cancelling it to run a list shortcut leaves the button visibly dead.
  * Checkboxes and radios are absent on purpose - Enter does not activate them,
  * and the row select control is a checkbox.
+ *
+ * Mail rows are included. They are buttons, and Enter must open the row that
+ * actually has focus: Search and Saved Views listen for no `open-message` at
+ * all, so publishing one there did nothing. The folder list keeps focus and its
+ * ring on the same row (see the roving focus in email-list.tsx), so native
+ * activation and the shortcut agree by construction.
  */
 export const ACTIVATION_TARGET_SELECTOR =
 	'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="tab"], [role="switch"]';
-
-/**
- * Mail rows are buttons too, but they are deliberately NOT native-activated.
- * The list keeps its own keyboard target that j/k moves without moving DOM
- * focus, so Enter has to open the row the reader can see ringed rather than
- * whichever row last took focus.
- */
-const MAIL_ROW_SELECTOR = "[data-email-id]";
 
 /** Space is included ahead of any mapping: its default is activation too. */
 const ACTIVATION_KEYS: ReadonlySet<string> = new Set(["enter", " ", "spacebar"]);
@@ -136,9 +134,7 @@ export function activatesFocusedControl(
 ): boolean {
 	if (!ACTIVATION_KEYS.has(key.toLowerCase())) return false;
 	if (!(target instanceof Element)) return false;
-	const control = target.closest(ACTIVATION_TARGET_SELECTOR);
-	if (!control) return false;
-	return control.closest(MAIL_ROW_SELECTOR) === null;
+	return target.closest(ACTIVATION_TARGET_SELECTOR) !== null;
 }
 
 export function isMailShortcutProtectedTarget(

@@ -979,11 +979,18 @@ export default function EmailListRoute() {
 				if (!next) return;
 				if (selectedEmailId) handleRowClick(next);
 				else setKeyboardTargetId(next.id);
-				document
-					.querySelector<HTMLElement>(
-						`[data-email-id="${CSS.escape(next.id)}"]`,
-					)
-					?.scrollIntoView({ block: "nearest" });
+				const row = document.querySelector<HTMLElement>(
+					`[data-email-id="${CSS.escape(next.id)}"]`,
+				);
+				// Roving focus: the ring and DOM focus have to name the same row, or
+				// Enter (which the browser applies to whatever has focus) opens a
+				// different conversation from the one the reader can see highlighted.
+				// The row's other controls are tabIndex={-1}, so this is the one
+				// focusable thing in it.
+				row
+					?.querySelector<HTMLElement>("button[aria-label^='Open conversation']")
+					?.focus({ preventScroll: true });
+				row?.scrollIntoView({ block: "nearest" });
 				return;
 			}
 
