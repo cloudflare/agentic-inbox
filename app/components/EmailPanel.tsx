@@ -23,6 +23,7 @@ import LazyLoadBoundary from "~/components/LazyLoadBoundary";
 import { splitEmailList, toEmailListValue } from "~/lib/utils";
 import { normalizedAddress } from "~/lib/recipient-input";
 import { composeSurface } from "~/lib/compose-surface";
+import { prefixedSubject } from "~/lib/compose-initialization";
 import { evaluateStoredDraftAttachments } from "~/lib/compose-attachment-policy";
 import { planComposeEnqueueResult } from "~/lib/outbound-enqueue-outcome";
 import api from "~/services/api";
@@ -174,10 +175,31 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		if (!email) return [];
 		return [email, ...threadReplies].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 	}, [email, threadReplies]);
+	const draftMessageIds = useMemo(() => {
+		const ids = new Set<string>();
+		for (const msg of allMessages) { if (msg.folder_id === Folders.DRAFT) ids.add(msg.id); else if (isDraftFolder && msg.id === emailId) ids.add(msg.id); }
+		return ids;
+	}, [allMessages, isDraftFolder, emailId]);
+
+	// Route-level mailboxId is often the address itself, so it is a truthful
+	// fallback while the mailbox record loads. Unresolved means nothing is self.
+	const selfAddress = normalizedAddress(currentMailbox?.email ?? mailboxId ?? "");
+	const lastReceivedMessage = useMemo(() => {
+		const received = allMessages.filter(
+			(msg) => !draftMessageIds.has(msg.id) &&
+				normalizedAddress(msg.sender) !== selfAddress,
+		);
+		if (received.length > 0) return received.at(-1);
+		const nonDrafts = allMessages.filter((msg) => !draftMessageIds.has(msg.id));
+		return nonDrafts.at(-1) ?? email;
+	}, [allMessages, draftMessageIds, selfAddress, email]);
+
 	const activeExternalBodyIds = useMemo(() => {
 		if (!email) return [];
 		const ids = new Set<string>();
 		if (email.body_external) ids.add(email.id);
+		// A reply quotes its target, so that body is fetched even while collapsed.
+		if (lastReceivedMessage?.body_external) ids.add(lastReceivedMessage.id);
 		for (const message of allMessages) {
 			if (
 				message.id !== email.id &&
@@ -188,7 +210,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			}
 		}
 		return [...ids];
-	}, [allMessages, email, expandedMessages]);
+	}, [allMessages, email, expandedMessages, lastReceivedMessage]);
 	const externalBodyQueries = useQueries({
 		queries: mailboxId
 			? activeExternalBodyIds.map((messageId) =>
@@ -254,25 +276,6 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
 	const toggleExpand = (msgId: string) => { setExpandedMessages((prev) => { const next = new Set(prev); if (next.has(msgId)) next.delete(msgId); else next.add(msgId); return next; }); };
 
-	const draftMessageIds = useMemo(() => {
-		const ids = new Set<string>();
-		for (const msg of allMessages) { if (msg.folder_id === Folders.DRAFT) ids.add(msg.id); else if (isDraftFolder && msg.id === emailId) ids.add(msg.id); }
-		return ids;
-	}, [allMessages, isDraftFolder, emailId]);
-
-	// Route-level mailboxId is often the address itself, so it is a truthful
-	// fallback while the mailbox record loads. Unresolved means nothing is self.
-	const selfAddress = normalizedAddress(currentMailbox?.email ?? mailboxId ?? "");
-	const lastReceivedMessage = useMemo(() => {
-		const received = allMessages.filter(
-			(msg) => !draftMessageIds.has(msg.id) &&
-				normalizedAddress(msg.sender) !== selfAddress,
-		);
-		if (received.length > 0) return received.at(-1);
-		const nonDrafts = allMessages.filter((msg) => !draftMessageIds.has(msg.id));
-		return nonDrafts.at(-1) ?? email;
-	}, [allMessages, draftMessageIds, selfAddress, email]);
-
 	const moveToFolders = useMemo(() => {
 		const cur = folder || email?.folder_id;
 		return folders.filter((candidate) =>
@@ -291,6 +294,22 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		? {
 				...email,
 				body: email.body_external ? selectedBodyQuery?.data : email.body,
+			}
+		: null;
+
+	// A reply carries the original quoted underneath, so it waits for the same
+	// authoritative body that Forward waits for.
+	const replyTargetBodyQuery = lastReceivedMessage
+		? externalBodyQueriesById.get(lastReceivedMessage.id)
+		: undefined;
+	const authoritativeReplyTarget = lastReceivedMessage &&
+		(!lastReceivedMessage.body_external ||
+			replyTargetBodyQuery?.data !== undefined)
+		? {
+				...lastReceivedMessage,
+				body: lastReceivedMessage.body_external
+					? replyTargetBodyQuery?.data
+					: lastReceivedMessage.body,
 			}
 		: null;
 
@@ -518,10 +537,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 		try {
 			const draft = await aiDraftMut.mutateAsync({ mailboxId, emailId: target.id });
 			const subject =
-				draft.subject ||
-				(target.subject?.startsWith("Re:")
-					? target.subject
-					: `Re: ${target.subject || ""}`);
+				draft.subject || prefixedSubject(target.subject || "", "Re");
 			startCompose({
 				mode: "reply",
 				originalEmail: target,
@@ -593,15 +609,24 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				onBack={closePanel}
 				onSendDraft={() => handleSendDraft()}
 				onEditDraft={() => handleEditDraft()}
-					onReply={() =>
-						startCompose({ mode: "reply", originalEmail: lastReceivedMessage })
-					}
-					onReplyAll={() =>
+					onReply={() => {
+						if (!authoritativeReplyTarget) return;
+						startCompose({
+							mode: "reply",
+							originalEmail: authoritativeReplyTarget,
+						});
+					}}
+					onReplyAll={() => {
+						if (!authoritativeReplyTarget) return;
 						startCompose({
 							mode: "reply-all",
-							originalEmail: lastReceivedMessage,
-						})
-					}
+							originalEmail: authoritativeReplyTarget,
+						});
+					}}
+					canReply={Boolean(authoritativeReplyTarget)}
+					replyUnavailableReason={replyTargetBodyQuery?.isError
+						? "Complete message unavailable"
+						: "Loading complete message"}
 					onForward={() => {
 						if (!authoritativeSelectedEmail) return;
 						startCompose({

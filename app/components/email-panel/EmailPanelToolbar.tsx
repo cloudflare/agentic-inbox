@@ -42,6 +42,8 @@ interface EmailPanelToolbarProps {
 	onReply: () => void;
 	onReplyAll: () => void;
 	onForward: () => void;
+	canReply: boolean;
+	replyUnavailableReason: string;
 	canForward: boolean;
 	forwardUnavailableReason: string;
 	onAiDraft: () => void;
@@ -73,6 +75,8 @@ export default function EmailPanelToolbar({
 	onReply,
 	onReplyAll,
 	onForward,
+	canReply,
+	replyUnavailableReason,
 	canForward,
 	forwardUnavailableReason,
 	onAiDraft,
@@ -129,24 +133,38 @@ export default function EmailPanelToolbar({
 				</>
 			) : (
 				<>
-					<Tooltip content="Reply" side="bottom" asChild>
+					<Tooltip
+						content={canReply ? "Reply" : replyUnavailableReason}
+						side="bottom"
+						asChild
+					>
 						<Button
 							variant="ghost"
 							shape="square"
 							size="sm"
 							icon={<ArrowBendUpLeftIcon size={18} />}
 							onClick={onReply}
-							aria-label="Reply"
+							disabled={!canReply}
+							aria-label={canReply
+								? "Reply"
+								: `Reply unavailable: ${replyUnavailableReason}`}
 						/>
 					</Tooltip>
-					<Tooltip content="Reply All" side="bottom" asChild>
+					<Tooltip
+						content={canReply ? "Reply All" : replyUnavailableReason}
+						side="bottom"
+						asChild
+					>
 						<Button
 							variant="ghost"
 							shape="square"
 							size="sm"
 							icon={<ChatCircleIcon size={18} />}
 							onClick={onReplyAll}
-							aria-label="Reply All"
+							disabled={!canReply}
+							aria-label={canReply
+								? "Reply All"
+								: `Reply All unavailable: ${replyUnavailableReason}`}
 						/>
 					</Tooltip>
 					<Tooltip

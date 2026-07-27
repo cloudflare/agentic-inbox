@@ -2,6 +2,7 @@ import type { ComposeOptions } from "../hooks/useUIStore.ts";
 import { replyAllRecipientFields } from "./recipient-input.ts";
 import {
 	FORWARDED_MESSAGE_MARKER,
+	QUOTED_REPLY_MARKER,
 	insertComposeSignature,
 } from "./compose-signature.ts";
 import {
@@ -29,11 +30,24 @@ const EMPTY_FIELDS: InitialComposeFields = {
 	body: "",
 };
 
-function prefixedSubject(subject: string, prefix: "Re" | "Fwd") {
-	const expectedPrefix = `${prefix}: `;
-	return subject.startsWith(expectedPrefix)
-		? subject
-		: `${expectedPrefix}${subject}`;
+const SUBJECT_PREFIX_PATTERNS = {
+	Re: /^re\s*:\s*/i,
+	Fwd: /^(?:fwd|fw)\s*:\s*/i,
+} as const;
+
+/**
+ * The one place a reply or forward prefix is applied. Existing prefixes are
+ * absorbed whatever their spacing or case, so subjects never stack up as
+ * "Re: Re: Fwd: ...".
+ */
+export function prefixedSubject(
+	subject: string,
+	prefix: "Re" | "Fwd",
+): string {
+	const pattern = SUBJECT_PREFIX_PATTERNS[prefix];
+	let base = subject.trim();
+	while (pattern.test(base)) base = base.replace(pattern, "").trim();
+	return `${prefix}: ${base}`;
 }
 
 function forwardBody(original: NonNullable<ComposeOptions["originalEmail"]>) {
@@ -45,6 +59,27 @@ function forwardBody(original: NonNullable<ComposeOptions["originalEmail"]>) {
 	);
 
 	return `<p><br></p><div ${FORWARDED_MESSAGE_MARKER} style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatQuotedDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
+}
+
+function quotedReplyBlock(
+	original: NonNullable<ComposeOptions["originalEmail"]>,
+) {
+	const body = original.body || "";
+	if (!body) return "";
+	// The original renders safely in the sandboxed iframe, but the quote is
+	// injected into the compose editor where raw HTML would execute. Escaped
+	// plain text is the only thing that crosses. The sender is escaped too, so
+	// `<john@example.com>` is not eaten as a tag.
+	const quoted = escapeHtml(stripHtml(body)).replace(/\n/g, "<br>");
+	return `<blockquote ${QUOTED_REPLY_MARKER} style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${formatQuotedDate(original.date)}, ${escapeHtml(original.sender)} wrote:<br><br>${quoted}</blockquote>`;
+}
+
+/**
+ * An empty paragraph to write in, then the original underneath. The signature is
+ * inserted into the gap between them, never below the quote.
+ */
+function replyBody(original: NonNullable<ComposeOptions["originalEmail"]>) {
+	return `<p><br></p>${quotedReplyBlock(original)}`;
 }
 
 function withSignature(
@@ -89,7 +124,7 @@ export function buildInitialComposeFields(input: {
 			...EMPTY_FIELDS,
 			to: original.sender,
 			subject: prefixedSubject(original.subject, "Re"),
-			body: withSignature(signature?.enabled ? "<p><br></p>" : "", "reply", signature),
+			body: withSignature(replyBody(original), "reply", signature),
 		};
 	}
 
@@ -103,7 +138,7 @@ export function buildInitialComposeFields(input: {
 				mailboxAddress: mailboxEmail ?? "",
 			}),
 			subject: prefixedSubject(original.subject, "Re"),
-			body: withSignature(signature?.enabled ? "<p><br></p>" : "", "reply-all", signature),
+			body: withSignature(replyBody(original), "reply-all", signature),
 		};
 	}
 

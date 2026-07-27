@@ -11,7 +11,7 @@
 import DOMPurify from "dompurify";
 import { formatQuotedDate } from "shared/dates";
 import type { Attachment } from "~/types";
-import { escapeHtml, stripHtml } from "./html-text.ts";
+import { escapeHtml } from "./html-text.ts";
 
 export { escapeHtml, stripHtml } from "./html-text.ts";
 
@@ -128,29 +128,6 @@ export function getSignatureBlock(settings?: {
 		return `<div style="border-top: 1px solid #ccc; margin-top: 16px; padding-top: 12px;">${content}</div>`;
 	}
 	return "";
-}
-
-/**
- * Build a quoted reply block HTML string from original email data.
- */
-export function buildQuotedReplyBlock(
-	dateStr: string | undefined,
-	sender: string,
-	body: string,
-): string {
-	if (!body) return "";
-	const formattedDate = formatComposeDate(dateStr);
-	
-	// HTML-escape sender to prevent <john@example.com> from disappearing as a tag
-	const escapedSender = escapeHtml(sender);
-
-	// Sanitize the body to plain text to prevent stored XSS.
-	// The original HTML renders safely in the sandboxed iframe, but quoted
-	// reply blocks are injected into the compose editor where raw HTML would
-	// execute. Convert to escaped plain text instead.
-	const bodyToQuote = escapeHtml(stripHtml(body)).replace(/\n/g, "<br>");
-
-	return `<br><blockquote style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${formattedDate}, ${escapedSender} wrote:<br><br>${bodyToQuote}</blockquote>`;
 }
 
 export function getNonInlineAttachments(attachments?: Attachment[]): Attachment[] {
