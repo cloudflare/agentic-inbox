@@ -148,11 +148,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 	conversationIntelligenceExpanded:
 		DEFAULT_WORKSPACE_PREFERENCES.conversationIntelligenceExpanded,
 
-	selectEmail: (id) =>
-		set((state) => ({
-			selectedEmailId: id,
-			isComposing: state.isComposing,
-		})),
+	selectEmail: (id) => set({ selectedEmailId: id }),
 
 	startCompose: (options) =>
 		set((state) => {
