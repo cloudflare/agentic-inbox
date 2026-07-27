@@ -299,7 +299,8 @@ export function credentialRecoveryD1(env: Env): CredentialRecoveryStore {
            WHERE id = ? AND is_active = 1 AND EXISTS (
              SELECT 1 FROM credential_recovery_tokens
              WHERE id = ? AND consumption_nonce = ?
-           )`,
+           )
+           RETURNING id`,
         ).bind(
           input.passwordHash,
           input.passwordSalt,
@@ -353,7 +354,9 @@ export function credentialRecoveryD1(env: Env): CredentialRecoveryStore {
       ]);
       if (
         (results[0]?.meta.changes ?? 0) !== 1 ||
-        (results[1]?.meta.changes ?? 0) !== 1 ||
+        // Row count, not meta.changes: the session_version bump fires a trigger
+        // that enqueues one revocation per mailbox, inflating the change count.
+        (results[1]?.results.length ?? 0) !== 1 ||
         (results[2]?.meta.changes ?? 0) !== 1
       ) {
         return null;
