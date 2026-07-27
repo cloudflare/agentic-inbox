@@ -24,6 +24,7 @@ import {
 } from "react-router";
 import { useBrand } from "~/hooks/useBrand";
 import { ServiceWorkerRegistrar } from "~/components/pwa/ServiceWorkerRegistrar";
+import SendOutcomeWatcher from "~/components/SendOutcomeWatcher";
 import { createMailQueryClient } from "~/lib/mail-query-client";
 import { resolveBrand } from "../workers/routes/brand";
 import {
@@ -147,6 +148,10 @@ export default function App() {
 				<TooltipProvider>
 					<Toasty>
 						<ServiceWorkerRegistrar />
+						{/* Above the Outlet so no in-app navigation can unmount a send
+						    watch: it needs only the toast manager, the query client and
+						    the store, all of which live here. */}
+						<SendOutcomeWatcher />
 						<Outlet />
 					</Toasty>
 				</TooltipProvider>

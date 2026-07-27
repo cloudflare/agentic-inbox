@@ -20,10 +20,12 @@ import {
 /**
  * Watches every accepted send through to a truthful outcome.
  *
- * This lives at the mailbox route rather than in the composer on purpose: an
- * accepted send closes the composer immediately, and a watcher hosted there
- * would take its poll, its 90s cap and its cancel callbacks down with it,
- * leaving "Sending…" on screen forever.
+ * Mounted once at the app root, inside the toast and query providers it needs.
+ * Nothing here is route-scoped - the in-flight sends live in the store and each
+ * watch reads only `send.*` - and anywhere lower unmounts mid-send: the
+ * composer closes on acceptance, and the mailbox route unmounts the moment the
+ * reader steps out to /mailboxes. Either one strands the permanent "Sending…"
+ * toast with no owner and raises a second one on the way back.
  */
 export default function SendOutcomeWatcher() {
 	const pendingSends = useUIStore((state) => state.pendingSends);

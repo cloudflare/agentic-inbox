@@ -7,21 +7,41 @@ const read = (path: string) =>
 
 const watcher = read("./SendOutcomeWatcher.tsx");
 const mailboxRoute = read("../routes/mailbox.tsx");
+const root = read("../root.tsx");
 const store = read("../hooks/useUIStore.ts");
 const composeForm = read("../hooks/useComposeForm.ts");
 const queries = read("../queries/emails.ts");
 const sidebar = read("./Sidebar.tsx");
 
-test("the watcher is hosted where it outlives the composer that started the send", () => {
-	assert.match(mailboxRoute, /<SendOutcomeWatcher \/>/);
+test("the watcher is hosted where no in-app navigation can unmount it", () => {
 	assert.match(
-		mailboxRoute,
+		root,
 		/import SendOutcomeWatcher from "~\/components\/SendOutcomeWatcher"/,
+	);
+	// Inside the toast and query providers it depends on, and above the Outlet
+	// so switching routes mid-send neither orphans nor duplicates the toast.
+	assert.match(
+		root,
+		/<Toasty>[\s\S]*<SendOutcomeWatcher \/>[\s\S]*<Outlet \/>[\s\S]*<\/Toasty>/,
+	);
+	assert.match(root, /<QueryClientProvider[\s\S]*<Toasty>/);
+	assert.doesNotMatch(
+		mailboxRoute,
+		/SendOutcomeWatcher/,
+		"a route-level mount dies the moment the reader steps out to /mailboxes",
 	);
 	assert.doesNotMatch(
 		composeForm,
 		/useOutboundDeliveries|SEND_OUTCOME_WATCH_MS/,
 		"the composer must not own the poll or the cap it cannot survive",
+	);
+});
+
+test("nothing in the watch is scoped to the route it used to live on", () => {
+	assert.doesNotMatch(
+		watcher,
+		/useParams|useLocation|useMatches/,
+		"reading route state would tie the watch back to a single route",
 	);
 });
 
