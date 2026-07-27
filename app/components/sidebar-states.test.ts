@@ -21,3 +21,13 @@ test("a failed label fetch is named and retryable, never an empty label list", (
 	// The empty state still belongs to a mailbox that genuinely has no labels.
 	assert.match(sidebar, /\) : labels\.length === 0 \? \([\s\S]*?Create your first label/);
 });
+
+test("reopening the create-folder dialog starts a clean attempt", () => {
+	assert.match(
+		sidebar,
+		/const openCreateFolder = \(\) => \{\s*setNewFolderName\(""\);\s*setCreateFolderError\(""\);\s*setIsCreateFolderOpen\(true\);/,
+	);
+	// Every entry point clears, so a stale error can never greet the next create.
+	assert.doesNotMatch(sidebar, /onClick=\{\(\) => setIsCreateFolderOpen\(true\)\}/);
+	assert.equal(sidebar.match(/onClick=\{openCreateFolder\}/g)?.length, 2);
+});

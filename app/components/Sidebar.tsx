@@ -153,6 +153,15 @@ export default function Sidebar() {
 		return found?.unreadCount || 0;
 	};
 
+	// Reopening the dialog starts a fresh attempt, so the last one's name and
+	// error never greet the next create. The operation identity is kept: a
+	// retype of the same name still recovers an uncertain create.
+	const openCreateFolder = () => {
+		setNewFolderName("");
+		setCreateFolderError("");
+		setIsCreateFolderOpen(true);
+	};
+
 	const handleCreateFolder = (e: React.FormEvent) => {
 		e.preventDefault();
     const folderName = canonicalCollapsedCreateName(newFolderName);
@@ -318,7 +327,7 @@ export default function Sidebar() {
 									shape="square"
 									size="sm"
 									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
+									onClick={openCreateFolder}
 									aria-label="Create new folder"
 								/>
 							</Tooltip>
@@ -350,7 +359,7 @@ export default function Sidebar() {
 									shape="square"
 									size="sm"
 									icon={<PlusIcon size={16} />}
-									onClick={() => setIsCreateFolderOpen(true)}
+									onClick={openCreateFolder}
 									aria-label="Create new folder"
 								/>
 							</Tooltip>
