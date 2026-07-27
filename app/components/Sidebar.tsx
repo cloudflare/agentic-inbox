@@ -118,8 +118,16 @@ export default function Sidebar() {
 	}>();
 	const [searchParams] = useSearchParams();
 	const navigate = useNavigate();
-	const { data: folders = [] } = useFolders(mailboxId);
-	const { data: labels = [] } = useLabels(mailboxId);
+	const {
+		data: folders = [],
+		isError: foldersError,
+		refetch: refetchFolders,
+	} = useFolders(mailboxId);
+	const {
+		data: labels = [],
+		isError: labelsError,
+		refetch: refetchLabels,
+	} = useLabels(mailboxId);
 	const createFolderMutation = useCreateFolder();
 	const toastManager = useKumoToastManager();
 	const { startCompose, closeSidebar } = useUIStore();
@@ -282,6 +290,21 @@ export default function Sidebar() {
 					/>
 				))}
 
+				{/* A failed folder fetch must not read as an empty, count-free mailbox. */}
+				{foldersError && (
+					<p role="alert" className="px-3 pt-3 text-xs leading-5 text-kumo-subtle">
+						Folders didn’t load, so unread counts and your own folders are
+						missing.{" "}
+						<button
+							type="button"
+							onClick={() => void refetchFolders()}
+							className="min-h-11 rounded px-1 font-medium text-kumo-brand underline underline-offset-2"
+						>
+							Try again
+						</button>
+					</p>
+				)}
+
 				{/* Custom folders */}
 				{customFolders.length > 0 && (
 					<div className="pt-5">
@@ -373,7 +396,18 @@ export default function Sidebar() {
 							onClick={handleNavClick}
 						/>
 					))}
-					{labels.length === 0 && (
+					{labelsError ? (
+						<p role="alert" className="px-3 py-1 text-xs leading-5 text-kumo-subtle">
+							Labels didn’t load.{" "}
+							<button
+								type="button"
+								onClick={() => void refetchLabels()}
+								className="min-h-11 rounded px-1 font-medium text-kumo-brand underline underline-offset-2"
+							>
+								Try again
+							</button>
+						</p>
+					) : labels.length === 0 ? (
 						<button
 							type="button"
 							className="w-full rounded-md px-3 py-2 text-left text-sm text-kumo-subtle hover:bg-kumo-tint"
@@ -381,7 +415,7 @@ export default function Sidebar() {
 						>
 							Create your first label
 						</button>
-					)}
+					) : null}
 				</div>
 			</nav>
 
