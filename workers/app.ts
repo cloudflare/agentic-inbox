@@ -62,7 +62,10 @@ import {
   handleCredentialRecovery,
   handleCredentialRecoveryRequest,
 } from "./routes/credential-recovery";
-import { mutationOriginDecision } from "./lib/request-security";
+import {
+  mutationOriginDecision,
+  workersDevRequestDecision,
+} from "./lib/request-security";
 import {
   isSensitiveAuthenticationPath,
   replaceWithPrivateResponse,
@@ -390,6 +393,13 @@ async function fetchWithBranding(
   env: Env,
   ctx: ExecutionContext,
 ): Promise<Response> {
+  // Ahead of OAuthProvider, not inside the Hono app: the provider answers /mcp,
+  // /token, /register and the discovery documents before `app` ever sees them,
+  // so a guard any lower would leave that surface exposed on workers.dev.
+  // An empty body keeps the 404 from saying anything about what is deployed.
+  if (workersDevRequestDecision(request) === "not-found") {
+    return new Response(null, { status: 404 });
+  }
   const res = await oauthProvider.fetch(request, env, ctx);
   const path = new URL(request.url).pathname;
   if (isSensitiveAuthenticationPath(path)) return withPrivateNoStore(res);
