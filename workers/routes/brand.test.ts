@@ -94,6 +94,38 @@ assert.equal(resolveBrand("WISER").id, "wiser", "case-insensitive → wiser");
 		/href="\/favicon\.ico" type="image\/x-icon"/,
 		"whispyr legacy favicon",
 	);
+	// Add to Home Screen reads install metadata off whatever page is open, and
+	// a logged-out visitor only ever sees these Worker-rendered pages.
+	for (const [name, shell] of [
+		["wiser", wiser],
+		["whispyr", whispyr],
+	] as const) {
+		assert.match(
+			shell,
+			/<link rel="manifest" href="\/manifest\.webmanifest">/,
+			`${name} pageShell links the manifest`,
+		);
+		assert.match(
+			shell,
+			/<meta name="mobile-web-app-capable" content="yes">/,
+			`${name} pageShell is installable`,
+		);
+		assert.match(
+			shell,
+			/<meta name="apple-mobile-web-app-capable" content="yes">/,
+			`${name} pageShell opens standalone on iOS`,
+		);
+	}
+	assert.match(
+		wiser,
+		/<meta name="apple-mobile-web-app-title" content="Wiser Mail">/,
+		"wiser home-screen title",
+	);
+	assert.match(
+		whispyr,
+		/<meta name="apple-mobile-web-app-title" content="Whispyr Mail">/,
+		"whispyr home-screen title",
+	);
 }
 
 // ── PWA manifest: install metadata owns brand-specific raster assets ──
