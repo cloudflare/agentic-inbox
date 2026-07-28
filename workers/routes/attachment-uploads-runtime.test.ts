@@ -115,9 +115,23 @@ test(
 				"nonmember@example.com",
 				"hash",
 				"salt",
-				"ADMIN",
+				"AGENT",
 				1,
 				"nonmember@example.com",
+				1,
+				now,
+				now,
+			).run();
+			await database.prepare(
+				"INSERT INTO users (id,email,password_hash,password_salt,role,is_active,mailbox_address,session_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+			).bind(
+				"admin",
+				"admin@example.com",
+				"hash",
+				"salt",
+				"ADMIN",
+				1,
+				"admin@example.com",
 				1,
 				now,
 				now,
@@ -139,7 +153,7 @@ test(
 				mailbox: string,
 				uploadId: string,
 				bytes: Uint8Array,
-				user?: "member" | "nonmember",
+				user?: "member" | "nonmember" | "admin",
 			) => miniflare.dispatchFetch(
 				`http://attachment.test/api/v1/mailboxes/${encodeURIComponent(mailbox)}/attachment-uploads/${uploadId}?filename=brief.txt&type=text%2Fplain`,
 				{
@@ -161,6 +175,13 @@ test(
 			);
 			assert.equal((await bucket.head(`uploads/${MAILBOX_ID}/${deniedId}`)), null);
 			assert.equal((await bucket.head(`uploads/other@example.com/${deniedId}`)), null);
+
+			const adminId = crypto.randomUUID();
+			assert.equal(
+				(await upload("other@example.com", adminId, new Uint8Array([9]), "admin")).status,
+				201,
+			);
+			assert.notEqual(await bucket.head(`uploads/other@example.com/${adminId}`), null);
 
 			const canonicalMailboxId = crypto.randomUUID();
 			const canonicalMailbox = await miniflare.dispatchFetch(

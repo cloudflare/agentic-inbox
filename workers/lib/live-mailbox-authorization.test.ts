@@ -113,6 +113,81 @@ test("live mailbox authorization reads the current generation only for active gr
 	db.close();
 });
 
+test("an active administrator is member-equivalent on every active mailbox", async () => {
+	const { db, env } = fixture();
+	db.prepare(
+		`INSERT INTO users
+		   (id, email, password_hash, password_salt, session_version, role, is_active,
+		    mailbox_address, created_at, updated_at)
+		 VALUES ('admin-1', 'admin@example.com', 'hash', 'salt', 3, 'ADMIN', 1,
+		         'admin@example.com', 1, 1)`,
+	).run();
+	db.prepare(
+		`INSERT INTO mailboxes
+		   (id, address, type, owner_user_id, is_active, created_at, updated_at)
+		 VALUES ('admin@example.com', 'admin@example.com', 'PERSONAL', 'admin-1', 1, 1, 1)`,
+	).run();
+
+	// Another agent's Personal Mailbox and a Shared Mailbox it never joined.
+	assert.equal(await hasExactLiveMailboxAccess(env, "ONE@EXAMPLE.COM", "admin-1", 3), true);
+	assert.equal(await hasExactLiveMailboxAccess(env, "team@example.com", "admin-1", 3), true);
+	assert.deepEqual(
+		(await listExactLiveMailboxes(env, "admin-1", 3)).map((mailbox) => mailbox.id),
+		["admin@example.com", "one@example.com", "team@example.com"],
+	);
+	assert.deepEqual(
+		(await loadExactLiveMailboxRoster(env, "admin-1", 3))?.mailboxIds,
+		["admin@example.com", "one@example.com", "team@example.com"],
+	);
+	assert.equal(
+		await currentAgentActorSessionVersion(env, "one@example.com", "admin-1"),
+		3,
+	);
+
+	// The allowance is still bound to the exact live credential generation.
+	assert.equal(await hasExactLiveMailboxAccess(env, "one@example.com", "admin-1", 2), false);
+
+	// An agent gains nothing from the administrator's mailbox existing.
+	assert.equal(await hasExactLiveMailboxAccess(env, "admin@example.com", "user-1", 7), false);
+	assert.deepEqual(
+		(await listExactLiveMailboxes(env, "user-1", 7)).map((mailbox) => mailbox.id),
+		["one@example.com", "team@example.com"],
+	);
+
+	// Deactivation revokes the allowance everywhere at once.
+	db.prepare("UPDATE users SET is_active = 0 WHERE id = 'admin-1'").run();
+	assert.equal(await hasExactLiveMailboxAccess(env, "one@example.com", "admin-1", 3), false);
+	assert.deepEqual(await listExactLiveMailboxes(env, "admin-1", 3), []);
+	assert.equal(
+		await currentAgentActorSessionVersion(env, "one@example.com", "admin-1"),
+		null,
+	);
+	db.close();
+});
+
+test("an administrator never reaches a deactivated mailbox", async () => {
+	const { db, env } = fixture();
+	db.prepare(
+		`INSERT INTO users
+		   (id, email, password_hash, password_salt, session_version, role, is_active,
+		    mailbox_address, created_at, updated_at)
+		 VALUES ('admin-1', 'admin@example.com', 'hash', 'salt', 3, 'ADMIN', 1,
+		         'admin@example.com', 1, 1)`,
+	).run();
+	db.prepare("UPDATE mailboxes SET is_active = 0 WHERE id = 'team@example.com'").run();
+
+	assert.equal(await hasExactLiveMailboxAccess(env, "team@example.com", "admin-1", 3), false);
+	assert.deepEqual(
+		(await listExactLiveMailboxes(env, "admin-1", 3)).map((mailbox) => mailbox.id),
+		["one@example.com"],
+	);
+	assert.equal(
+		await currentAgentActorSessionVersion(env, "team@example.com", "admin-1"),
+		null,
+	);
+	db.close();
+});
+
 test("stable mailbox rosters suppress access removed during the read", async () => {
 	const mailbox = {
 		id: "team@example.com",

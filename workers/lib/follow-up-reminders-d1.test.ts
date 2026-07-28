@@ -445,6 +445,32 @@ test("D1 inbound completion rechecks conversation identity and baseline time in 
 	db.close();
 });
 
+test("D1 inbound completion keeps an administrator's reminder after membership revocation", async () => {
+	const { db, store, service } = fixture();
+	await service.create("user-2", MAILBOX, {
+		...createInput,
+		emailId: "message-2",
+		idempotencyKey: "create-reminder-user-2",
+	});
+	db.prepare(
+		"DELETE FROM mailbox_memberships WHERE mailbox_id = ? AND user_id = 'user-2'",
+	).run(MAILBOX);
+	db.prepare("UPDATE users SET role = 'ADMIN' WHERE id = 'user-2'").run();
+	const completed = await store.completeForInboundReply({
+		mailboxAddress: MAILBOX,
+		conversationKey: "thread-1",
+		inboundMessageId: "message-3",
+		inboundMessageDate: "2026-07-11T13:00:00.000Z",
+		occurredAt: NOW + 1,
+	});
+	assert.equal(completed, 1);
+	assert.equal(
+		db.prepare("SELECT state FROM follow_up_reminders WHERE owner_user_id = 'user-2'").get()!.state,
+		"completed",
+	);
+	db.close();
+});
+
 test("D1 inbound completion atomically excludes revoked and inactive owners", async () => {
 	const { db, store, service } = fixture();
 	await service.create("user-1", MAILBOX, createInput);

@@ -41,7 +41,9 @@ test("mailbox administration page distinguishes Personal and Shared mailboxes", 
 	assert.match(html, /hesham@wiserchat\.ai/);
 	assert.match(html, /support@wiserchat\.ai/);
 	assert.match(html, /3 members/);
-	assert.match(html, /Personal mail stays private to its owner/);
+	assert.match(html, /same access as a member on every mailbox/);
+	assert.doesNotMatch(html, /stays private to its owner/);
+	assert.doesNotMatch(html, /does not grant access to its messages/);
 });
 
 test("mailbox administration page exposes only the intentionally simple shared access model", () => {

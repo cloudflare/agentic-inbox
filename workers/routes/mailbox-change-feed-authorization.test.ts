@@ -160,15 +160,22 @@ test("mounted feed authorizes Personal owners and Shared members before query pa
 	state.database.close();
 });
 
-test("mounted feed denies administrator-only and nonmember access before invalid query parsing or storage", async () => {
+test("mounted feed denies nonmember access before invalid query parsing or storage", async () => {
 	const state = fixture();
-	for (const userId of ["admin", "nonmember"] as const) {
-		state.setSession(userId);
-		const response = await state.request("team%40example.com", "?unexpected=mail-content");
-		assert.equal(response.status, 403);
-		assert.deepEqual(await response.json(), { error: "Forbidden" });
-	}
+	state.setSession("nonmember");
+	const response = await state.request("team%40example.com", "?unexpected=mail-content");
+	assert.equal(response.status, 403);
+	assert.deepEqual(await response.json(), { error: "Forbidden" });
 	assert.equal(state.reads, 0);
+	state.database.close();
+});
+
+test("mounted feed authorizes an administrator on mailboxes they neither own nor belong to", async () => {
+	const state = fixture();
+	state.setSession("admin");
+	assert.equal((await state.request("team%40example.com")).status, 200);
+	assert.equal((await state.request("owner%40example.com")).status, 200);
+	assert.equal(state.reads, 2);
 	state.database.close();
 });
 
