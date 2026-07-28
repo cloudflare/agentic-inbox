@@ -45,7 +45,8 @@ export async function hasExactLiveMailboxAccess(
 			   AND u.session_version = ?
 			   AND m.is_active = 1
 			   AND (
-			     (m.type = 'PERSONAL' AND m.owner_user_id = u.id)
+			     u.role = 'ADMIN'
+			     OR (m.type = 'PERSONAL' AND m.owner_user_id = u.id)
 			     OR (m.type = 'SHARED' AND EXISTS (
 			       SELECT 1 FROM mailbox_memberships mm
 			       WHERE mm.mailbox_id = m.id AND mm.user_id = u.id
@@ -95,7 +96,8 @@ export async function loadExactLiveMailboxRoster(
 		 LEFT JOIN mailboxes m
 		   ON m.is_active = 1
 		  AND (
-		    (m.type = 'PERSONAL' AND m.owner_user_id = u.id)
+		    u.role = 'ADMIN'
+		    OR (m.type = 'PERSONAL' AND m.owner_user_id = u.id)
 		    OR (m.type = 'SHARED' AND EXISTS (
 		      SELECT 1 FROM mailbox_memberships mm
 		      WHERE mm.mailbox_id = m.id AND mm.user_id = u.id
@@ -156,7 +158,8 @@ export async function listExactLiveMailboxes(
 		   AND u.is_active = 1
 		   AND u.session_version = ?
 		   AND (
-		     (m.type = 'PERSONAL' AND m.owner_user_id = u.id)
+		     u.role = 'ADMIN'
+		     OR (m.type = 'PERSONAL' AND m.owner_user_id = u.id)
 		     OR (m.type = 'SHARED' AND EXISTS (
 		       SELECT 1 FROM mailbox_memberships mm
 		       WHERE mm.mailbox_id = m.id AND mm.user_id = u.id
@@ -191,6 +194,7 @@ export async function currentAgentActorSessionVersion(
 		`SELECT u.is_active AS user_active, u.session_version,
 		        m.is_active AS mailbox_active,
 		        CASE
+		          WHEN u.role = 'ADMIN' THEN 1
 		          WHEN m.type = 'PERSONAL' AND m.owner_user_id = u.id THEN 1
 		          WHEN m.type = 'SHARED' AND EXISTS (
 		            SELECT 1 FROM mailbox_memberships mm
