@@ -16,13 +16,20 @@ export function accountLifecycle(
       hashPassword(generateMcpToken(), env.JWT_SECRET),
     store: {
       async deactivate(input) {
+        // An administrator is member-equivalent on every active mailbox, so
+        // deactivation cleanup fans out over all of them, not only what the
+        // user owns or joined. The role still reads ADMIN here: the batch
+        // below revokes the session, it never rewrites the role.
         const mailboxRows = await env.DB.prepare(
           `SELECT DISTINCT m.address
 					 FROM mailboxes m
 					 LEFT JOIN mailbox_memberships mm ON mm.mailbox_id = m.id
-					 WHERE m.owner_user_id = ? OR mm.user_id = ?`,
+					 WHERE m.owner_user_id = ? OR mm.user_id = ?
+					    OR (m.is_active = 1 AND EXISTS (
+					          SELECT 1 FROM users WHERE id = ? AND role = 'ADMIN'
+					        ))`,
         )
-          .bind(input.userId, input.userId)
+          .bind(input.userId, input.userId, input.userId)
           .all<{ address: string }>();
         const results = await env.DB.batch([
           env.DB.prepare(
