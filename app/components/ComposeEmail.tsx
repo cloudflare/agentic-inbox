@@ -831,7 +831,7 @@ export default function ComposeEmail() {
                             key={preset.id}
                             icon={ClockIcon}
                             className="min-h-11"
-                            onSelect={() => choosePreset(preset.date)}
+                            onClick={() => choosePreset(preset.date)}
                           >
                             <span className="flex min-w-0 flex-col">
                               <span className="font-medium">{preset.title}</span>
@@ -846,7 +846,7 @@ export default function ComposeEmail() {
                       <DropdownMenu.Item
                         className="min-h-11"
                         icon={CalendarBlankIcon}
-                        onSelect={openCustomSchedule}
+                        onClick={openCustomSchedule}
                       >
                         Custom date and time…
                       </DropdownMenu.Item>
@@ -854,7 +854,7 @@ export default function ComposeEmail() {
                         <DropdownMenu.Item
                           className="min-h-11"
                           icon={PaperPlaneTiltIcon}
-                          onSelect={() => setScheduledFor(null)}
+                          onClick={() => setScheduledFor(null)}
                         >
                           Send now
                         </DropdownMenu.Item>

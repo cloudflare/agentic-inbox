@@ -181,7 +181,7 @@ export function ReminderRow({
 								<DropdownMenu.Item
 									icon={SunHorizonIcon}
 									className="min-h-11"
-									onSelect={() =>
+									onClick={() =>
 										onAction({
 											action: "snooze",
 											reminder,
@@ -194,7 +194,7 @@ export function ReminderRow({
 								<DropdownMenu.Item
 									icon={CalendarBlankIcon}
 									className="min-h-11"
-									onSelect={() =>
+									onClick={() =>
 										onAction({
 											action: "snooze",
 											reminder,

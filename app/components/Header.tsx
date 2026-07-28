@@ -296,7 +296,7 @@ export default function Header() {
 							<DropdownMenu.Item
 								icon={CommandIcon}
 								className="min-h-11"
-								onSelect={() =>
+								onClick={() =>
 									window.dispatchEvent(new Event(MAIL_COMMAND_PALETTE_OPEN_EVENT))
 								}
 							>
@@ -305,14 +305,14 @@ export default function Header() {
 							<DropdownMenu.Item
 								icon={RobotIcon}
 								className="min-h-11"
-								onSelect={toggleAgentPanel}
+								onClick={toggleAgentPanel}
 							>
 								{isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
 								icon={GearSixIcon}
 								className="min-h-11"
-								onSelect={() =>
+								onClick={() =>
 									navigate(
 										isSettingsActive
 											? `/mailbox/${mailboxId}/emails/inbox`
@@ -326,7 +326,7 @@ export default function Header() {
 								<DropdownMenu.Item
 									icon={ExamIcon}
 									className="min-h-11"
-									onSelect={() => {
+									onClick={() => {
 										window.location.href = me?.role === "ADMIN" ? "/admin/quizzes" : "/quizzes";
 									}}
 								>
@@ -336,7 +336,7 @@ export default function Header() {
 							<DropdownMenu.Item
 								icon={PaperPlaneTiltIcon}
 								className="min-h-11"
-								onSelect={() => {
+								onClick={() => {
 									window.location.href = "/bulk";
 								}}
 							>
@@ -346,7 +346,7 @@ export default function Header() {
 								<DropdownMenu.Item
 									icon={ShieldCheckIcon}
 									className="min-h-11"
-									onSelect={() => {
+									onClick={() => {
 										window.location.href = "/admin/users";
 									}}
 								>
@@ -358,7 +358,7 @@ export default function Header() {
 						<DropdownMenu.Item
 							icon={SignOutIcon}
 							className="min-h-11"
-							onSelect={signOut}
+							onClick={signOut}
 						>
 							Sign out
 						</DropdownMenu.Item>

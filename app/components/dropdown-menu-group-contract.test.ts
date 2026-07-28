@@ -43,3 +43,41 @@ test("every DropdownMenu.Label is enclosed by a DropdownMenu.Group", () => {
 	assert.deepEqual(offenders, []);
 	assert.ok(labelsChecked > 0, "the contract check must actually find labels");
 });
+
+const ITEM_TAG = /<DropdownMenu\.(?:Item|LinkItem|CheckboxItem|RadioItem)\b/g;
+
+/** An opening tag ends at the first `>` outside any `{…}` expression. */
+function openingTag(source: string, start: number): string {
+	let depth = 0;
+	for (let index = start; index < source.length; index += 1) {
+		const character = source[index];
+		if (character === "{") depth += 1;
+		else if (character === "}") depth -= 1;
+		else if (character === ">" && depth === 0) return source.slice(start, index + 1);
+	}
+	return source.slice(start);
+}
+
+/**
+ * Base UI activates menu items through `onClick`; it has no `onSelect` prop.
+ * React's DOM `onSelect` still type-checks on the underlying `<div>`, so an
+ * item wired that way compiles, opens, and closes on tap while its handler
+ * never runs. Source-pinned because only a real click exposes it.
+ */
+test("no DropdownMenu item is wired through onSelect", () => {
+	const offenders: string[] = [];
+	let itemsChecked = 0;
+
+	for (const file of sourceFiles(appDir)) {
+		const source = readFileSync(file, "utf8");
+		for (const match of source.matchAll(ITEM_TAG)) {
+			itemsChecked += 1;
+			if (!/\bonSelect\s*=/.test(openingTag(source, match.index))) continue;
+			const line = source.slice(0, match.index).split("\n").length;
+			offenders.push(`${path.relative(appDir, file)}:${line}`);
+		}
+	}
+
+	assert.deepEqual(offenders, []);
+	assert.ok(itemsChecked > 0, "the contract check must actually find items");
+});

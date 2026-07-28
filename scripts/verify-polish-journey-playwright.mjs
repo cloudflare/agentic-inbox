@@ -2422,6 +2422,82 @@ async function verifyMenuCrashes(page, baseUrl, name) {
 }
 
 // ---------------------------------------------------------------------------
+// 7c. HEADER MENU ACTIVATION
+// ---------------------------------------------------------------------------
+
+/**
+ * Below xl the header's Settings control lives inside the three-dots
+ * DropdownMenu, which closes on any tap whether or not the item's handler ran.
+ * A menu that swallows activation therefore looks exactly like one that works,
+ * so assert the destination rather than the tap.
+ */
+async function verifyHeaderMenu(page, baseUrl, name) {
+	const item = "07c-header-menu";
+	const shots = [];
+	const problems = [];
+	const observations = [];
+
+	try {
+		await openInbox(page, baseUrl);
+		const overflow = page.getByRole("button", { name: "More mail actions" });
+		const usesMenu = await overflow.isVisible().catch(() => false);
+		observations.push(`three-dots menu visible=${usesMenu}`);
+
+		if (usesMenu) {
+			// Every item in this menu shares one activation path, so the palette
+			// item proves the handler ran without navigating away from the check.
+			await overflow.click();
+			await delay(600);
+			const paletteItem = page.getByRole("menuitem", { name: "Command palette" });
+			if (!(await paletteItem.isVisible().catch(() => false))) {
+				problems.push("the three-dots menu never opened");
+			} else {
+				await paletteItem.click();
+				await delay(800);
+				const paletteOpen = await page
+					.getByRole("combobox", { name: "Search commands" })
+					.isVisible()
+					.catch(() => false);
+				observations.push(`command palette opened=${paletteOpen}`);
+				if (!paletteOpen) {
+					problems.push('"Command palette" closed the menu without running its handler');
+				}
+				await page.keyboard.press("Escape");
+				await delay(400);
+			}
+			await overflow.click();
+			await delay(600);
+			await page.getByRole("menuitem", { name: "Settings" }).click();
+		} else {
+			await page.getByRole("button", { name: "Settings" }).click();
+		}
+		await delay(1_500);
+
+		const shotPath = shot(name, item, usesMenu ? "menu-settings" : "gear-settings");
+		await page.screenshot({ path: shotPath });
+		shots.push(shotPath);
+		observations.push(`url after Settings=${page.url()}`);
+		if (!page.url().includes("/settings")) {
+			problems.push('"Settings" left the page on the inbox instead of navigating');
+		}
+		const menuStillOpen = await page
+			.getByRole("menuitem", { name: "Settings" })
+			.isVisible()
+			.catch(() => false);
+		observations.push(`menu still open after activation=${menuStillOpen}`);
+
+		record(item, name, problems.length === 0 ? "PASS" : "FAIL",
+			(problems.length === 0
+				? `the header Settings control (${usesMenu ? "three-dots menu" : "gear button"}) navigated to settings`
+				: problems.join(" | "))
+			+ ` || ${observations.join("; ")}`,
+			shots);
+	} catch (error) {
+		record(item, name, "FAIL", `threw: ${formatFailure(error)}`, shots);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // 8. PWA HEAD
 // ---------------------------------------------------------------------------
 
@@ -2485,6 +2561,7 @@ async function runViewport({ browser, baseUrl, storageState, name, viewport }) {
 		await run("send", () => verifySendFeedback(page, baseUrl, name));
 		await run("dialogguard", () => verifyDialogShortcutGuard(page, baseUrl, name));
 		await run("menus", () => verifyMenuCrashes(page, baseUrl, name));
+		await run("headermenu", () => verifyHeaderMenu(page, baseUrl, name));
 		await run("sweeps", () => verifySweeps(page, baseUrl, name));
 	} finally {
 		await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {});
