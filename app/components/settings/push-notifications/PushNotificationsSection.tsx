@@ -168,6 +168,7 @@ export function PushNotificationsSection({
 	const [mounted, setMounted] = useState(false);
 	const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 	const [statusAnnouncement, setStatusAnnouncement] = useState("");
+	const [permissionRefused, setPermissionRefused] = useState(false);
 
 	useEffect(() => setMounted(true), []);
 	useEffect(() => {
@@ -181,7 +182,6 @@ export function PushNotificationsSection({
 	}, []);
 
 	const hasVapidKey = !!configQuery.data?.vapidPublicKey;
-	const permission = typeof Notification === "undefined" ? "default" : Notification.permission;
 	const setupState = derivePushSetupState({
 		mounted,
 		configLoading:
@@ -193,15 +193,25 @@ export function PushNotificationsSection({
 		hasVapidKey,
 		installed: mounted && isStandalone(),
 		pushSupported,
-		permission,
+		attemptDenied: permissionRefused,
 	});
 
 	async function handleEnable() {
 		const result = await enable();
 		if (result === "revoked") return;
+		setPermissionRefused(result === "denied");
+		if (result === "enabled") {
+			toast.add({ title: "Notifications enabled on this device" });
+			return;
+		}
 		toast.add(
-			result === "enabled"
-				? { title: "Notifications enabled on this device" }
+			result === "denied"
+				? {
+						title: "Your device refused the notification request",
+						description:
+							"Remove this app from your Home Screen, add it again from Safari, then try again.",
+						variant: "error",
+					}
 				: {
 						title: "Couldn’t enable notifications",
 						description: "Check that notifications are allowed, then try again.",
@@ -341,33 +351,38 @@ export function PushNotificationsSection({
 					<Guidance title="Notifications temporarily unavailable">
 						Notification handoff is not configured for this portal. Mail remains available in your Inbox.
 					</Guidance>
-				) : setupState === "blocked" ? (
-					<p className="text-xs text-kumo-danger" role="alert">
-						Notifications are blocked for this app. Enable them in your device settings,
-						then reopen the app.
-					</p>
 				) : setupState === "unsupported" ? (
 					<Guidance title="Notifications unavailable">
 						This installed app does not support push notifications on this device.
 					</Guidance>
-				) : setupState === "enable" ? (
-					<div className="flex flex-wrap gap-2">
-						<Button
-							variant="primary"
-							size="sm"
-							className="min-h-11"
-							onClick={handleEnable}
-							loading={isSubscribing}
-						>
-							{health?.devices.length ? "Enable on this device" : "Enable notifications"}
-						</Button>
-					</div>
-				) : (
+				) : setupState === "install" ? (
 					<InstallGuidance
 						environment={environment}
 						installPromptAvailable={!!installPrompt}
 						onInstall={handleInstall}
 					/>
+				) : (
+					// "blocked" keeps the button: a refusal is recoverable by re-adding
+					// the app, and hiding the only retry is what stranded this before.
+					<div className="space-y-2">
+						{setupState === "blocked" ? (
+							<p className="text-xs text-kumo-danger" role="alert">
+								Your device refused the notification request. Remove this app from your
+								Home Screen, add it again from Safari, then try again.
+							</p>
+						) : null}
+						<div className="flex flex-wrap gap-2">
+							<Button
+								variant="primary"
+								size="sm"
+								className="min-h-11"
+								onClick={handleEnable}
+								loading={isSubscribing}
+							>
+								{health?.devices.length ? "Enable on this device" : "Enable notifications"}
+							</Button>
+						</div>
+					</div>
 				)}
 
 				{health ? (

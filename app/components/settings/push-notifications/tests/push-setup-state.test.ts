@@ -13,7 +13,7 @@ const ready = {
 	hasVapidKey: true,
 	installed: true,
 	pushSupported: true,
-	permission: "default",
+	attemptDenied: false,
 } satisfies Parameters<typeof derivePushSetupState>[0];
 
 test("push setup waits for hydration and deploy configuration", () => {
@@ -32,6 +32,20 @@ test("push setup requires installation before it offers notification permission"
 });
 
 test("push setup explains blocked and unsupported installed states", () => {
-	assert.equal(derivePushSetupState({ ...ready, permission: "denied" }), "blocked");
+	assert.equal(derivePushSetupState({ ...ready, attemptDenied: true }), "blocked");
 	assert.equal(derivePushSetupState({ ...ready, pushSupported: false }), "unsupported");
+	// An unsupported install can never have been refused; say so honestly.
+	assert.equal(
+		derivePushSetupState({ ...ready, pushSupported: false, attemptDenied: true }),
+		"unsupported",
+	);
+});
+
+test("push setup offers enable until the device actually refuses", () => {
+	// iOS reports Notification.permission === "denied" for a Home Screen web app
+	// it has never prompted for. Deriving "blocked" from that read hid the Enable
+	// button, so requestPermission() never ran and the app stayed blocked for
+	// good. Only a refused attempt may block.
+	assert.equal(derivePushSetupState(ready), "enable");
+	assert.equal(derivePushSetupState({ ...ready, attemptDenied: false }), "enable");
 });

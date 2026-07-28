@@ -28,7 +28,18 @@ async function waitForServiceWorkerReady(): Promise<ServiceWorkerRegistration | 
  * requests permission (must be called from a user gesture), waits for the SW,
  * subscribes with the env's VAPID key, and stores the subscription.
  */
-export type PushSubscriptionActionResult = "enabled" | "failed" | "revoked";
+export type PushSubscriptionActionResult =
+	| "enabled"
+	| "failed"
+	| "denied"
+	| "revoked";
+
+// pushManager.subscribe() rejects with NotAllowedError when the device really
+// refused. That rejection — not Notification.permission — is the only signal
+// iOS reports reliably.
+function isPermissionDenied(error: unknown): boolean {
+	return error instanceof Error && error.name === "NotAllowedError";
+}
 
 export function usePushSubscription(
 	mailboxId: string | undefined,
@@ -54,8 +65,10 @@ export function usePushSubscription(
 		if (!applicationServerKey) return "failed";
 		setIsSubscribing(true);
 		try {
-			const permission = await Notification.requestPermission();
-			if (permission !== "granted") return "failed";
+			// Ask, but do not branch on the answer: iOS returns "denied" for web
+			// apps it has never prompted for, so an early return here means the
+			// prompt never gets a second chance. subscribe() below is the oracle.
+			await Notification.requestPermission();
 
 			const registration = await waitForServiceWorkerReady();
 			if (!registration) return "failed";
@@ -75,6 +88,7 @@ export function usePushSubscription(
 				onAccessRevoked?.(mailboxId);
 				return "revoked";
 			}
+			if (isPermissionDenied(err)) return "denied";
 			console.error("[pwa] push subscribe failed", err);
 			return "failed";
 		} finally {
