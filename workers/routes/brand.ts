@@ -303,7 +303,6 @@ export function pageShell(b: BrandConfig, title: string, body: string): string {
 <meta name="theme-color" content="${b.themeColor}">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="${b.appName}">
 <link rel="icon" href="${b.favicon}" type="image/svg+xml">
 <link rel="icon" href="${b.legacyFavicon}" type="${b.legacyFaviconType}" sizes="${b.legacyFaviconSizes}">
