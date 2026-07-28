@@ -95,7 +95,7 @@ function mcpResult(result: Record<string, unknown>) {
 }
 
 const MAILBOX_ARG_DESCRIPTION =
-	"The mailbox email address. Omit to use your Personal Mailbox, or provide a Shared Mailbox you belong to.";
+	"The mailbox email address. Omit to use your Personal Mailbox, or provide any mailbox you can access — call list_mailboxes to see them.";
 
 /** MCP server identity for a brand — name, title, marketing URL, connector icons. */
 function mcpServerInfo(b: BrandConfig) {

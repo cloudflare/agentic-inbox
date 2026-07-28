@@ -8,7 +8,7 @@ Deliver a state-of-the-art, standalone, AI-powered mail client that preserves th
 
 ## Locked boundaries
 
-- Personal Mailboxes are private by default.
+- Personal Mailboxes are private from other agents; administrators reach every mailbox.
 - Shared Mailboxes use a simple administrator-managed member list.
 - Every Shared Mailbox member may read and reply as that address.
 - Read/unread is mailbox-wide.
