@@ -2518,15 +2518,22 @@ async function verifyPwaHead(baseUrl) {
 		};
 		detail(`login head checks ${JSON.stringify(checks, null, 1)}`);
 		const missing = Object.entries(checks)
-			.filter(([key, value]) => value === null && ["manifestLink", "appleCapable"].includes(key))
+			.filter(([key, value]) => value === null && ["manifestLink", "mobileWebAppCapable"].includes(key))
 			.map(([key]) => key);
 		const optionalMissing = Object.entries(checks)
 			.filter(([, value]) => value === null)
 			.map(([key]) => key);
-		record(item, "server", missing.length === 0 ? "PASS" : "FAIL",
-			missing.length === 0
-				? `server-rendered /login carries ${checks.manifestLink} and ${checks.appleCapable}; absent: ${optionalMissing.length ? optionalMissing.join(", ") : "none"}`
-				: `missing required head tags: ${missing.join(", ")}`,
+		// The legacy apple-mobile-web-app-capable tag routes iOS installs down the
+		// pre-manifest web-clip path whose push identity is empty (webpushd answers
+		// "denied" without prompting), so its PRESENCE is the failure.
+		const problems = [...missing.map((key) => `missing required head tag: ${key}`)];
+		if (checks.appleCapable !== null) {
+			problems.push(`legacy web-clip tag present: ${checks.appleCapable}`);
+		}
+		record(item, "server", problems.length === 0 ? "PASS" : "FAIL",
+			problems.length === 0
+				? `server-rendered /login carries ${checks.manifestLink} and ${checks.mobileWebAppCapable} with no legacy apple-mobile-web-app-capable tag; absent: ${optionalMissing.length ? optionalMissing.join(", ") : "none"}`
+				: problems.join(" | "),
 			[]);
 		return checks;
 	} catch (error) {

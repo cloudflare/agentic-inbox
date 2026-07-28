@@ -100,8 +100,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				{/* PWA: installable + home-screen behaviour (WISER-240). */}
 				<link rel="manifest" href="/manifest.webmanifest" />
 				<meta name="theme-color" content={themeColor} />
+				{/* No legacy apple-mobile-web-app-capable tag: it routes the install
+				    down iOS's pre-manifest web-clip path, whose push identity is
+				    empty — webpushd then reports permission "denied" without ever
+				    prompting. The manifest's display:standalone covers iOS 16.4+. */}
 				<meta name="mobile-web-app-capable" content="yes" />
-				<meta name="apple-mobile-web-app-capable" content="yes" />
 				<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 				<meta name="apple-mobile-web-app-title" content={appName} />
 				<link rel="apple-touch-icon" href={appleTouchIcon} />
