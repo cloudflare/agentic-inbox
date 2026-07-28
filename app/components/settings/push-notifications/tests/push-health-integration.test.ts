@@ -58,6 +58,20 @@ test("background push rebind immediately suppresses a revoked Mailbox", () => {
 	assert.match(mailboxRoute, /exitRevokedMailbox\(/);
 });
 
+test("the Enable action is never gated on a permission read", () => {
+	// iOS reports Notification.permission as "denied" for a Home Screen web app it
+	// has never prompted for. Reading it here hid the Enable button, which made the
+	// repo's only requestPermission() call site unreachable, so iOS was never asked
+	// and the card stayed blocked for good. Nothing may gate the action on that read.
+	assert.doesNotMatch(section, /Notification\.permission/);
+	assert.match(section, /attemptDenied: permissionRefused/);
+	// Blocked renders the warning beside the button, never instead of it.
+	assert.match(section, /setupState === "blocked" \? \(/);
+	// The refusal signal comes from subscribe() rejecting, not from a permission read.
+	assert.match(pushHook, /isPermissionDenied\(err\)\) return "denied"/);
+	assert.doesNotMatch(pushHook, /permission !== "granted"/);
+});
+
 test("notification controls refresh or rebind current state but never replay old mail", () => {
 	assert.match(section, /Refresh status/);
 	assert.match(section, /Enable on this device/);

@@ -22,7 +22,10 @@ import {
 } from "~/queries/push";
 import { ApiError } from "~/services/api";
 import type { PushDeviceHealth } from "~/services/push-health.ts";
-import { detectPwaInstallEnvironment } from "~/utils/pwa/detectPlatform";
+import {
+	detectPwaInstallEnvironment,
+	type PwaInstallEnvironment,
+} from "~/utils/pwa/detectPlatform";
 import { Guidance } from "./Guidance";
 import { InstallGuidance } from "./InstallGuidance";
 import { NotificationCard } from "./NotificationCard";
@@ -43,6 +46,17 @@ function isBeforeInstallPromptEvent(event: Event): event is BeforeInstallPromptE
 
 function isStandaloneNavigator(value: Navigator): value is Navigator & { standalone: boolean } {
 	return "standalone" in value;
+}
+
+/**
+ * How to re-ask after a refusal. iOS exposes no per-site notification setting
+ * for a Home Screen web app, so reinstalling is the only way back; every other
+ * platform has a site permission the user can flip in place.
+ */
+function deniedRecoveryHint(platform: PwaInstallEnvironment["platform"]): string {
+	return platform === "ios"
+		? "Remove this app from your Home Screen, add it again from Safari, then try again."
+		: "Allow notifications for this site in your browser settings, then try again.";
 }
 
 function isStandalone(): boolean {
@@ -182,6 +196,7 @@ export function PushNotificationsSection({
 	}, []);
 
 	const hasVapidKey = !!configQuery.data?.vapidPublicKey;
+	const environment = detectPwaInstallEnvironment();
 	const setupState = derivePushSetupState({
 		mounted,
 		configLoading:
@@ -208,8 +223,7 @@ export function PushNotificationsSection({
 			result === "denied"
 				? {
 						title: "Your device refused the notification request",
-						description:
-							"Remove this app from your Home Screen, add it again from Safari, then try again.",
+						description: deniedRecoveryHint(environment.platform),
 						variant: "error",
 					}
 				: {
@@ -303,7 +317,6 @@ export function PushNotificationsSection({
 	}
 
 	const health = healthQuery.data;
-	const environment = detectPwaInstallEnvironment();
 	const overall = health ? pushHealthPresentation(health) : null;
 	const effectiveNotConfigured =
 		setupState === "not_configured" || health?.state === "not_configured";
@@ -367,8 +380,8 @@ export function PushNotificationsSection({
 					<div className="space-y-2">
 						{setupState === "blocked" ? (
 							<p className="text-xs text-kumo-danger" role="alert">
-								Your device refused the notification request. Remove this app from your
-								Home Screen, add it again from Safari, then try again.
+								Your device refused the notification request.{" "}
+								{deniedRecoveryHint(environment.platform)}
 							</p>
 						) : null}
 						<div className="flex flex-wrap gap-2">

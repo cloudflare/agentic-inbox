@@ -73,10 +73,19 @@ export function usePushSubscription(
 			const registration = await waitForServiceWorkerReady();
 			if (!registration) return "failed";
 
-			const subscription = await registration.pushManager.subscribe({
-				userVisibleOnly: true,
-				applicationServerKey,
-			});
+			let subscription: PushSubscription;
+			try {
+				subscription = await registration.pushManager.subscribe({
+					userVisibleOnly: true,
+					applicationServerKey,
+				});
+			} catch (err) {
+				// Scoped to subscribe(): it is the only step that can legitimately
+				// report a refusal, and classifying the whole block would mislabel a
+				// later network failure as one, sending the user off to reinstall.
+				if (isPermissionDenied(err)) return "denied";
+				throw err;
+			}
 			const json = subscription.toJSON();
 			await register.mutateAsync({
 				endpoint: json.endpoint ?? "",
@@ -88,7 +97,6 @@ export function usePushSubscription(
 				onAccessRevoked?.(mailboxId);
 				return "revoked";
 			}
-			if (isPermissionDenied(err)) return "denied";
 			console.error("[pwa] push subscribe failed", err);
 			return "failed";
 		} finally {
