@@ -121,14 +121,16 @@ export function useRebindExistingPushSubscription(
 	const vapidKey = config?.vapidPublicKey ?? null;
 
 	useEffect(() => {
+		// Deliberately not gated on Notification.permission: iOS misreports it as
+		// "denied", and getSubscription() below already answers the only question
+		// this path cares about — whether a subscription exists to rebind.
 		if (
 			!mailboxId ||
 			!actorQuery.data?.email ||
 			!vapidKey ||
 			typeof window === "undefined" ||
 			!("serviceWorker" in navigator) ||
-			typeof Notification === "undefined" ||
-			Notification.permission !== "granted"
+			!("PushManager" in window)
 		) {
 			return;
 		}
