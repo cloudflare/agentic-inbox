@@ -136,6 +136,14 @@ assert.equal(resolveBrand("WISER").id, "wiser", "case-insensitive → wiser");
 {
 	const wiser = pwaManifestFor(resolveBrand("wiser"));
 	assert.equal(wiser.name, "Wiser Mail");
+	// With the legacy web-clip tag gone, display:standalone is the ONLY thing
+	// keeping iOS installs standalone (and push-capable) — pin it per brand.
+	assert.equal(wiser.display, "standalone", "wiser manifest display mode");
+	assert.equal(
+		pwaManifestFor(resolveBrand("whispyr")).display,
+		"standalone",
+		"whispyr manifest display mode",
+	);
 	assert.deepEqual(
 		wiser.icons.map((icon) => icon.src),
 		[
