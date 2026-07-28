@@ -18,7 +18,8 @@ type PushSetupInput = {
 	hasVapidKey: boolean;
 	installed: boolean;
 	pushSupported: boolean;
-	permission: NotificationPermission;
+	/** An enable attempt that the device actually refused (NotAllowedError). */
+	attemptDenied: boolean;
 };
 
 export function derivePushSetupState(input: PushSetupInput): PushSetupState {
@@ -26,7 +27,12 @@ export function derivePushSetupState(input: PushSetupInput): PushSetupState {
 	if (input.hasQueryError) return "error";
 	if (!input.hasVapidKey) return "not_configured";
 	if (!input.installed) return "install";
-	if (input.permission === "denied") return "blocked";
 	if (!input.pushSupported) return "unsupported";
+	// "blocked" is never derived from Notification.permission. iOS reports a
+	// stale "denied" for a Home Screen web app it has never prompted for, and
+	// gating the Enable button on that read hides the only path that can ever
+	// change it — the app then looks blocked forever while iOS was never asked.
+	// Only an attempt the device refused sets this.
+	if (input.attemptDenied) return "blocked";
 	return "enable";
 }

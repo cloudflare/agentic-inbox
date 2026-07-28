@@ -22,7 +22,10 @@ import {
 } from "~/queries/push";
 import { ApiError } from "~/services/api";
 import type { PushDeviceHealth } from "~/services/push-health.ts";
-import { detectPwaInstallEnvironment } from "~/utils/pwa/detectPlatform";
+import {
+	detectPwaInstallEnvironment,
+	type PwaInstallEnvironment,
+} from "~/utils/pwa/detectPlatform";
 import { Guidance } from "./Guidance";
 import { InstallGuidance } from "./InstallGuidance";
 import { NotificationCard } from "./NotificationCard";
@@ -43,6 +46,17 @@ function isBeforeInstallPromptEvent(event: Event): event is BeforeInstallPromptE
 
 function isStandaloneNavigator(value: Navigator): value is Navigator & { standalone: boolean } {
 	return "standalone" in value;
+}
+
+/**
+ * How to re-ask after a refusal. iOS exposes no per-site notification setting
+ * for a Home Screen web app, so reinstalling is the only way back; every other
+ * platform has a site permission the user can flip in place.
+ */
+function deniedRecoveryHint(platform: PwaInstallEnvironment["platform"]): string {
+	return platform === "ios"
+		? "Remove this app from your Home Screen, add it again from Safari, then try again."
+		: "Allow notifications for this site in your browser settings, then try again.";
 }
 
 function isStandalone(): boolean {
@@ -168,6 +182,7 @@ export function PushNotificationsSection({
 	const [mounted, setMounted] = useState(false);
 	const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 	const [statusAnnouncement, setStatusAnnouncement] = useState("");
+	const [permissionRefused, setPermissionRefused] = useState(false);
 
 	useEffect(() => setMounted(true), []);
 	useEffect(() => {
@@ -181,7 +196,7 @@ export function PushNotificationsSection({
 	}, []);
 
 	const hasVapidKey = !!configQuery.data?.vapidPublicKey;
-	const permission = typeof Notification === "undefined" ? "default" : Notification.permission;
+	const environment = detectPwaInstallEnvironment();
 	const setupState = derivePushSetupState({
 		mounted,
 		configLoading:
@@ -193,15 +208,24 @@ export function PushNotificationsSection({
 		hasVapidKey,
 		installed: mounted && isStandalone(),
 		pushSupported,
-		permission,
+		attemptDenied: permissionRefused,
 	});
 
 	async function handleEnable() {
 		const result = await enable();
 		if (result === "revoked") return;
+		setPermissionRefused(result === "denied");
+		if (result === "enabled") {
+			toast.add({ title: "Notifications enabled on this device" });
+			return;
+		}
 		toast.add(
-			result === "enabled"
-				? { title: "Notifications enabled on this device" }
+			result === "denied"
+				? {
+						title: "Your device refused the notification request",
+						description: deniedRecoveryHint(environment.platform),
+						variant: "error",
+					}
 				: {
 						title: "Couldn’t enable notifications",
 						description: "Check that notifications are allowed, then try again.",
@@ -293,7 +317,6 @@ export function PushNotificationsSection({
 	}
 
 	const health = healthQuery.data;
-	const environment = detectPwaInstallEnvironment();
 	const overall = health ? pushHealthPresentation(health) : null;
 	const effectiveNotConfigured =
 		setupState === "not_configured" || health?.state === "not_configured";
@@ -341,33 +364,38 @@ export function PushNotificationsSection({
 					<Guidance title="Notifications temporarily unavailable">
 						Notification handoff is not configured for this portal. Mail remains available in your Inbox.
 					</Guidance>
-				) : setupState === "blocked" ? (
-					<p className="text-xs text-kumo-danger" role="alert">
-						Notifications are blocked for this app. Enable them in your device settings,
-						then reopen the app.
-					</p>
 				) : setupState === "unsupported" ? (
 					<Guidance title="Notifications unavailable">
 						This installed app does not support push notifications on this device.
 					</Guidance>
-				) : setupState === "enable" ? (
-					<div className="flex flex-wrap gap-2">
-						<Button
-							variant="primary"
-							size="sm"
-							className="min-h-11"
-							onClick={handleEnable}
-							loading={isSubscribing}
-						>
-							{health?.devices.length ? "Enable on this device" : "Enable notifications"}
-						</Button>
-					</div>
-				) : (
+				) : setupState === "install" ? (
 					<InstallGuidance
 						environment={environment}
 						installPromptAvailable={!!installPrompt}
 						onInstall={handleInstall}
 					/>
+				) : (
+					// "blocked" keeps the button: a refusal is recoverable by re-adding
+					// the app, and hiding the only retry is what stranded this before.
+					<div className="space-y-2">
+						{setupState === "blocked" ? (
+							<p className="text-xs text-kumo-danger" role="alert">
+								Your device refused the notification request.{" "}
+								{deniedRecoveryHint(environment.platform)}
+							</p>
+						) : null}
+						<div className="flex flex-wrap gap-2">
+							<Button
+								variant="primary"
+								size="sm"
+								className="min-h-11"
+								onClick={handleEnable}
+								loading={isSubscribing}
+							>
+								{health?.devices.length ? "Enable on this device" : "Enable notifications"}
+							</Button>
+						</div>
+					</div>
 				)}
 
 				{health ? (

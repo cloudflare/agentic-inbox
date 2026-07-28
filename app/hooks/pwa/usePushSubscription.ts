@@ -28,7 +28,18 @@ async function waitForServiceWorkerReady(): Promise<ServiceWorkerRegistration | 
  * requests permission (must be called from a user gesture), waits for the SW,
  * subscribes with the env's VAPID key, and stores the subscription.
  */
-export type PushSubscriptionActionResult = "enabled" | "failed" | "revoked";
+export type PushSubscriptionActionResult =
+	| "enabled"
+	| "failed"
+	| "denied"
+	| "revoked";
+
+// pushManager.subscribe() rejects with NotAllowedError when the device really
+// refused. That rejection — not Notification.permission — is the only signal
+// iOS reports reliably.
+function isPermissionDenied(error: unknown): boolean {
+	return error instanceof Error && error.name === "NotAllowedError";
+}
 
 export function usePushSubscription(
 	mailboxId: string | undefined,
@@ -54,16 +65,27 @@ export function usePushSubscription(
 		if (!applicationServerKey) return "failed";
 		setIsSubscribing(true);
 		try {
-			const permission = await Notification.requestPermission();
-			if (permission !== "granted") return "failed";
+			// Ask, but do not branch on the answer: iOS returns "denied" for web
+			// apps it has never prompted for, so an early return here means the
+			// prompt never gets a second chance. subscribe() below is the oracle.
+			await Notification.requestPermission();
 
 			const registration = await waitForServiceWorkerReady();
 			if (!registration) return "failed";
 
-			const subscription = await registration.pushManager.subscribe({
-				userVisibleOnly: true,
-				applicationServerKey,
-			});
+			let subscription: PushSubscription;
+			try {
+				subscription = await registration.pushManager.subscribe({
+					userVisibleOnly: true,
+					applicationServerKey,
+				});
+			} catch (err) {
+				// Scoped to subscribe(): it is the only step that can legitimately
+				// report a refusal, and classifying the whole block would mislabel a
+				// later network failure as one, sending the user off to reinstall.
+				if (isPermissionDenied(err)) return "denied";
+				throw err;
+			}
 			const json = subscription.toJSON();
 			await register.mutateAsync({
 				endpoint: json.endpoint ?? "",
@@ -107,14 +129,16 @@ export function useRebindExistingPushSubscription(
 	const vapidKey = config?.vapidPublicKey ?? null;
 
 	useEffect(() => {
+		// Deliberately not gated on Notification.permission: iOS misreports it as
+		// "denied", and getSubscription() below already answers the only question
+		// this path cares about — whether a subscription exists to rebind.
 		if (
 			!mailboxId ||
 			!actorQuery.data?.email ||
 			!vapidKey ||
 			typeof window === "undefined" ||
 			!("serviceWorker" in navigator) ||
-			typeof Notification === "undefined" ||
-			Notification.permission !== "granted"
+			!("PushManager" in window)
 		) {
 			return;
 		}
