@@ -83,6 +83,7 @@ test("D1 deactivation stays revoked after reactivation and purges every mailbox 
     "0006_credential_recovery.sql",
     "0010_create_agent_connection_revocations.sql",
     "0012_create_credential_recovery_jobs.sql",
+    "0013_revoke_admin_agent_connections.sql",
   ]) {
     db.exec(
       readFileSync(
@@ -215,6 +216,95 @@ test("D1 deactivation stays revoked after reactivation and purges every mailbox 
   db.close();
 });
 
+test("deactivating an administrator cleans up every active mailbox they could reach", async () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("PRAGMA foreign_keys = ON");
+  for (const migration of [
+    "0001_create_users.sql",
+    "0003_create_mailbox_access.sql",
+    "0005_auth_security.sql",
+    "0006_credential_recovery.sql",
+    "0010_create_agent_connection_revocations.sql",
+    "0012_create_credential_recovery_jobs.sql",
+    "0013_revoke_admin_agent_connections.sql",
+  ]) {
+    db.exec(
+      readFileSync(
+        new URL(`../../migrations/${migration}`, import.meta.url),
+        "utf8",
+      ),
+    );
+  }
+  db.prepare(
+    `INSERT INTO users
+     (id, email, password_hash, password_salt, session_version, role, is_active,
+      mailbox_address, created_at, updated_at)
+     VALUES ('usr_admin', 'admin@wiserchat.ai', 'hash', 'salt', 1, 'ADMIN', 1,
+             'admin@wiserchat.ai', 100, 100),
+            ('usr_member', 'member@wiserchat.ai', 'hash', 'salt', 1, 'AGENT', 1,
+             'member@wiserchat.ai', 100, 100)`,
+  ).run();
+  // The administrator owns only their own mailbox: the other Personal Mailbox
+  // and the Shared Mailbox are reachable by role alone, and the retired one is
+  // reachable by nobody.
+  db.prepare(
+    `INSERT INTO mailboxes
+     (id, address, type, owner_user_id, is_active, created_at, updated_at)
+     VALUES ('admin@wiserchat.ai', 'admin@wiserchat.ai', 'PERSONAL', 'usr_admin', 1, 100, 100),
+            ('member@wiserchat.ai', 'member@wiserchat.ai', 'PERSONAL', 'usr_member', 1, 100, 100),
+            ('team@wiserchat.ai', 'team@wiserchat.ai', 'SHARED', NULL, 1, 100, 100),
+            ('retired@wiserchat.ai', 'retired@wiserchat.ai', 'SHARED', NULL, 0, 100, 100)`,
+  ).run();
+
+  const purged: string[] = [];
+  const disconnected: string[] = [];
+  const env = {
+    DB: d1(db),
+    JWT_SECRET: "test-secret",
+    MAILBOX: {
+      idFromName(name: string) {
+        return name;
+      },
+      get(id: string) {
+        return {
+          async removePushSubscriptionsForUser(userId: string) {
+            purged.push(`${id}:${userId}`);
+          },
+        };
+      },
+    },
+  } as unknown as Env;
+  const lifecycle = accountLifecycle(env, async (mailboxId, userId) => {
+    disconnected.push(`${mailboxId}:${userId}`);
+  });
+  await lifecycle.deactivate("usr_admin");
+
+  assert.deepEqual(disconnected.sort(), [
+    "admin@wiserchat.ai:usr_admin",
+    "member@wiserchat.ai:usr_admin",
+    "team@wiserchat.ai:usr_admin",
+  ]);
+  assert.deepEqual(purged.sort(), [
+    "admin@wiserchat.ai:usr_admin",
+    "member@wiserchat.ai:usr_admin",
+    "team@wiserchat.ai:usr_admin",
+  ]);
+  // The durable outbox saw the same reach, without duplicating the mailbox the
+  // administrator also owns.
+  assert.deepEqual(
+    db
+      .prepare(
+        `SELECT mailbox_id FROM agent_connection_revocations
+         WHERE scope = 'ACTOR' AND user_id = 'usr_admin'
+         ORDER BY mailbox_id`,
+      )
+      .all()
+      .map((row) => row.mailbox_id),
+    ["admin@wiserchat.ai", "member@wiserchat.ai", "team@wiserchat.ai"],
+  );
+  db.close();
+});
+
 test("a Shared Mailbox tombstone cannot be reactivated as a login account", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON");
@@ -225,6 +315,7 @@ test("a Shared Mailbox tombstone cannot be reactivated as a login account", asyn
     "0006_credential_recovery.sql",
     "0010_create_agent_connection_revocations.sql",
     "0012_create_credential_recovery_jobs.sql",
+    "0013_revoke_admin_agent_connections.sql",
   ]) {
     db.exec(
       readFileSync(

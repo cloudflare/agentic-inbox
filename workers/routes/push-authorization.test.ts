@@ -136,18 +136,28 @@ test("mounted push surfaces allow Personal owners and current Shared members", a
 	state.database.close();
 });
 
-test("administrator role alone and nonmembers cannot read or mutate push state", async () => {
+test("nonmembers cannot read or mutate push state", async () => {
 	const state = fixture();
-	for (const userId of ["admin", "nonmember"] as const) {
-		state.setSession(userId);
-		const healthResponse = await state.requestHealth("team%40example.com");
-		assert.equal(healthResponse.status, 403);
-		assert.deepEqual(await healthResponse.json(), { error: "Forbidden" });
-		const mutationResponse = await state.register("team%40example.com");
-		assert.equal(mutationResponse.status, 403);
-		assert.deepEqual(await mutationResponse.json(), { error: "Forbidden" });
-	}
+	state.setSession("nonmember");
+	const healthResponse = await state.requestHealth("team%40example.com");
+	assert.equal(healthResponse.status, 403);
+	assert.deepEqual(await healthResponse.json(), { error: "Forbidden" });
+	const mutationResponse = await state.register("team%40example.com");
+	assert.equal(mutationResponse.status, 403);
+	assert.deepEqual(await mutationResponse.json(), { error: "Forbidden" });
 	assert.equal(state.reads, 0);
 	assert.equal(state.mutations, 0);
+	state.database.close();
+});
+
+test("an administrator reads and mutates push state on mailboxes they neither own nor belong to", async () => {
+	const state = fixture();
+	state.setSession("admin");
+	assert.equal((await state.requestHealth("team%40example.com")).status, 200);
+	assert.equal((await state.register("team%40example.com")).status, 201);
+	assert.equal((await state.requestHealth("owner%40example.com")).status, 200);
+	assert.equal((await state.register("owner%40example.com")).status, 201);
+	assert.equal(state.reads, 2);
+	assert.equal(state.mutations, 2);
 	state.database.close();
 });

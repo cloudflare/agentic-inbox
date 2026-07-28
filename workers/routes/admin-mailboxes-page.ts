@@ -37,7 +37,7 @@ function personalMailboxRows(
 	if (mailboxes.length === 0) {
 		return `<div class="empty-state">
 			<strong>No Personal Mailboxes yet</strong>
-			<span>Creating a user also creates their private Personal Mailbox.</span>
+			<span>Creating a user also creates their own Personal Mailbox.</span>
 		</div>`;
 	}
 
@@ -204,11 +204,11 @@ export function renderAdminMailboxesPage(
 		</div>
 		${flashHtml}<div id="mailbox-status" role="status" aria-live="polite"></div>
 		<div class="access-principles">
-			<div class="principle"><strong>Personal stays private</strong><span>Personal mail stays private to its owner. Being an administrator does not grant access to its messages.</span></div>
+			<div class="principle"><strong>Administrators see every mailbox</strong><span>An administrator has the same access as a member on every mailbox, Personal ones included: read, compose, and reply. Actions are attributed to the person who performed them.</span></div>
 			<div class="principle"><strong>Shared means shared handling</strong><span>Members can read, compose, and reply. Read state is shared across the mailbox. Actions are attributed to the person who performed them.</span></div>
 		</div>
 		<section aria-labelledby="personal-heading">
-			<div class="section-heading"><div><h2 id="personal-heading">Personal Mailboxes</h2><p>One private mailbox per user.</p></div><span class="section-count">${personal.length} total</span></div>
+			<div class="section-heading"><div><h2 id="personal-heading">Personal Mailboxes</h2><p>One mailbox per user. Administrators can open any of them.</p></div><span class="section-count">${personal.length} total</span></div>
 			${personalMailboxRows(personal, users)}
 		</section>
 		<section aria-labelledby="shared-heading">

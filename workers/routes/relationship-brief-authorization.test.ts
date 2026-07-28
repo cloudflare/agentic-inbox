@@ -108,15 +108,22 @@ test("mounted relationship brief allows Personal owners and current Shared membe
 	state.database.close();
 });
 
-test("administrator-only and nonmember access fail before malformed body consumption or runtime", async () => {
+test("nonmember access fails before malformed body consumption or runtime", async () => {
 	const state = fixture();
-	for (const userId of ["admin", "nonmember"] as const) {
-		state.setSession(userId);
-		const response = await state.request("team%40example.com", "not-json-private-body");
-		assert.equal(response.status, 403);
-		assert.deepEqual(await response.json(), { error: "Forbidden" });
-	}
+	state.setSession("nonmember");
+	const response = await state.request("team%40example.com", "not-json-private-body");
+	assert.equal(response.status, 403);
+	assert.deepEqual(await response.json(), { error: "Forbidden" });
 	assert.equal(state.runs, 0);
+	state.database.close();
+});
+
+test("an administrator runs the brief on mailboxes they neither own nor belong to", async () => {
+	const state = fixture();
+	state.setSession("admin");
+	assert.equal((await state.request("team%40example.com")).status, 200);
+	assert.equal((await state.request("owner%40example.com")).status, 200);
+	assert.equal(state.runs, 2);
 	state.database.close();
 });
 

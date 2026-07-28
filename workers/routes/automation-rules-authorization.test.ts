@@ -151,22 +151,37 @@ test("mounted Automation reads allow Personal owners and every current Shared me
 	state.database.close();
 });
 
-test("administrator role alone and nonmembers fail before Automation parsing or storage", async () => {
+test("nonmembers fail before Automation parsing or storage", async () => {
 	const state = fixture();
-	for (const userId of ["admin", "nonmember"] as const) {
-		state.setSession(userId);
-		const response = await state.request("team@example.com", {
-			method: "POST",
-			body: "not-json",
-		});
-		assert.equal(response.status, 403);
-	}
+	state.setSession("nonmember");
+	const response = await state.request("team@example.com", {
+		method: "POST",
+		body: "not-json",
+	});
+	assert.equal(response.status, 403);
 	assert.equal(state.reads, 0);
 	assert.equal(state.writes, 0);
 	state.database.close();
 });
 
-test("Shared mutation requires an administrator who is also a current member", async () => {
+test("an administrator manages Automation Rules on a Shared Mailbox they do not belong to", async () => {
+	const state = fixture();
+	state.setSession("admin");
+	assert.equal((await state.request("team@example.com")).status, 200);
+	assert.equal(
+		(await state.request("team@example.com", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ definition, expectedOrderRevision: 0 }),
+		})).status,
+		201,
+	);
+	assert.equal(state.reads, 1);
+	assert.equal(state.writes, 1);
+	state.database.close();
+});
+
+test("Shared mutation requires an administrator, never a plain member", async () => {
 	const state = fixture();
 	const init = {
 		method: "POST",

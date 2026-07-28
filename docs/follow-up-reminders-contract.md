@@ -52,7 +52,7 @@ An inbound reply completes an active reminder only when:
 - its message date is newer than the baseline message date;
 - the reminder owner still has live access to the mailbox.
 
-The persisted inbound signal is inserted into the mailbox Durable Object queue in the same transaction as the email. A mailbox alarm retries transient D1 failures with bounded backoff. Queue identity is the internal inbound message ID, so a repeated alarm or duplicate signal is harmless. The persistence adapter rechecks active state, the baseline date, active user state, active mailbox state, and Personal ownership or Shared membership inside one bounded SQL completion write. This makes access revocation atomic with completion and avoids per-owner query fan-out.
+The persisted inbound signal is inserted into the mailbox Durable Object queue in the same transaction as the email. A mailbox alarm retries transient D1 failures with bounded backoff. Queue identity is the internal inbound message ID, so a repeated alarm or duplicate signal is harmless. The persistence adapter rechecks active state, the baseline date, active user state, active mailbox state, and live mailbox access (Personal ownership, Shared membership, or an active administrator's role) inside one bounded SQL completion write. This makes access revocation atomic with completion and avoids per-owner query fan-out.
 
 ## Idempotency and privacy threats
 

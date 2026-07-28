@@ -10,7 +10,10 @@ import {
 	type FollowUpReminderStore,
 	type ReminderStoreOperation,
 } from "./follow-up-reminders.ts";
-import { LIVE_MAILBOX_ACCESS_SQL } from "./live-mailbox-access-sql.ts";
+import {
+	LIVE_MAILBOX_ACCESS_SQL,
+	liveMailboxAccessSql,
+} from "./live-mailbox-access-sql.ts";
 
 interface ReminderRow {
 	id: string;
@@ -341,25 +344,10 @@ export function followUpReminderD1Store(
 				 WHERE mailbox_address = ? AND conversation_key = ?
 				   AND state = 'active' AND baseline_message_id <> ?
 				   AND baseline_message_date < ?
-				   AND EXISTS (
-				     SELECT 1
-				     FROM users AS owner
-				     JOIN mailboxes AS mailbox ON mailbox.id = reminder.mailbox_address
-				     WHERE owner.id = reminder.owner_user_id
-				       AND owner.is_active = 1
-				       AND mailbox.is_active = 1
-				       AND (
-				         (mailbox.type = 'PERSONAL' AND mailbox.owner_user_id = owner.id)
-				         OR (
-				           mailbox.type = 'SHARED'
-				           AND EXISTS (
-				             SELECT 1 FROM mailbox_memberships AS membership
-				             WHERE membership.mailbox_id = mailbox.id
-				               AND membership.user_id = owner.id
-				           )
-				         )
-				       )
-				   )`,
+				   AND ${liveMailboxAccessSql(
+					"reminder.mailbox_address",
+					"reminder.owner_user_id",
+				)}`,
 			)
 				.bind(
 					input.occurredAt,

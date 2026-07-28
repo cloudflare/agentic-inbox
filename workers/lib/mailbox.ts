@@ -7,8 +7,8 @@
  *
  * `requireMailbox` resolves the MailboxDO stub for a `:mailboxId` route param,
  * and enforces live Personal ownership or Shared membership before resolving
- * the mailbox Durable Object. Administrator role alone never grants content
- * access.
+ * the mailbox Durable Object. An active administrator is member-equivalent on
+ * every active mailbox; actions still record the acting user.
  */
 import { createMiddleware } from "hono/factory";
 import type { Context } from "hono";

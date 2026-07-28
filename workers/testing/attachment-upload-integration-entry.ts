@@ -14,11 +14,11 @@ export class AttachmentUploadTestMailboxDO {
 const app = new Hono<MailboxContext>();
 app.use("*", async (c, next) => {
 	const user = c.req.header("x-test-user");
-	if (user === "member" || user === "nonmember") {
+	if (user === "member" || user === "nonmember" || user === "admin") {
 		const session: SessionClaims = {
 			sub: user,
 			email: `${user}@example.com`,
-			role: user === "nonmember" ? "ADMIN" : "AGENT",
+			role: user === "admin" ? "ADMIN" : "AGENT",
 			mailbox: `${user}@example.com`,
 			sessionVersion: 1,
 		};

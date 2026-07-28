@@ -126,15 +126,17 @@ export function createMailboxAccess(store: MailboxAccessStore) {
 			userId: string,
 			mailboxId: string,
 		): Promise<boolean> {
-			const [user, row] = await Promise.all([
+			const [user, mailbox] = await Promise.all([
 				store.getUser(userId),
-				store.getMailboxAccessRow(userId, mailboxId.toLowerCase()),
+				store.getMailbox(mailboxId.toLowerCase()),
 			]);
-			if (!user || user.is_active !== 1 || !row || row.is_active !== 1) {
+			if (!user || user.is_active !== 1 || !mailbox || mailbox.is_active !== 1) {
 				return false;
 			}
-			if (row.type === "PERSONAL") return row.owner_user_id === userId;
-			return user.role === "ADMIN" && row.membership_user_id === userId;
+			// Shared automation rules were always administrator-only, so a non-admin
+			// only ever qualifies through Personal ownership.
+			return user.role === "ADMIN" ||
+				(mailbox.type === "PERSONAL" && mailbox.owner_user_id === userId);
 		},
 
 		async canManageMailboxSettings(
@@ -148,9 +150,8 @@ export function createMailboxAccess(store: MailboxAccessStore) {
 			if (!user || user.is_active !== 1 || !mailbox || mailbox.is_active !== 1) {
 				return false;
 			}
-			return mailbox.type === "PERSONAL"
-				? mailbox.owner_user_id === userId
-				: user.role === "ADMIN";
+			return user.role === "ADMIN" ||
+				(mailbox.type === "PERSONAL" && mailbox.owner_user_id === userId);
 		},
 
 		async requireMailboxAdministrator(adminUserId: string): Promise<void> {
@@ -160,6 +161,11 @@ export function createMailboxAccess(store: MailboxAccessStore) {
 		async listAccessibleMailboxes(userId: string): Promise<MailboxRow[]> {
 			const user = await store.getUser(userId);
 			if (!user || user.is_active !== 1) return [];
+			if (user.role === "ADMIN") {
+				return (await store.listMailboxes()).filter(
+					(mailbox) => mailbox.is_active === 1,
+				);
+			}
 
 			const rows = await store.listMailboxAccessRows(userId);
 			return rows
@@ -170,6 +176,9 @@ export function createMailboxAccess(store: MailboxAccessStore) {
 		async canAccessMailbox(userId: string, mailboxId: string): Promise<boolean> {
 			const user = await store.getUser(userId);
 			if (!user || user.is_active !== 1) return false;
+			if (user.role === "ADMIN") {
+				return (await store.getMailbox(mailboxId))?.is_active === 1;
+			}
 
 			const row = await store.getMailboxAccessRow(userId, mailboxId);
 			return row ? rowGrantsAccess(row, userId) : false;

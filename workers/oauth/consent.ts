@@ -227,7 +227,7 @@ function renderConsent(
 			? "<li>Read and search mailboxes you can access</li>"
 			: "",
 		scopes.has("email.send")
-			? `<li>Create and update reviewable drafts for <strong>${mailbox}</strong> or a Shared Mailbox you belong to. Sending, moving, and deleting stay in the mail portal.</li>`
+			? `<li>Create and update reviewable drafts for <strong>${mailbox}</strong> or any other mailbox you can access. Sending, moving, and deleting stay in the mail portal.</li>`
 			: "",
 		scopes.has("quiz.read")
 			? "<li>Read team quiz results and submitted answers when you are an active administrator</li>"
