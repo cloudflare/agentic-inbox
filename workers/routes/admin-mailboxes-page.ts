@@ -37,7 +37,7 @@ function personalMailboxRows(
 	if (mailboxes.length === 0) {
 		return `<div class="empty-state">
 			<strong>No Personal Mailboxes yet</strong>
-			<span>Creating a user also creates their private Personal Mailbox.</span>
+			<span>Creating a user also creates their own Personal Mailbox.</span>
 		</div>`;
 	}
 

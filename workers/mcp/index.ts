@@ -126,8 +126,9 @@ function mcpServerInfo(b: BrandConfig) {
  * EmailMCP — exposes email tools over the Model Context Protocol, scoped per
  * authenticated user (locked-decisions D-64). Identity arrives as `this.props`,
  * set from the bearer token by the /mcp auth handler:
- * Every operation is authorized from live Personal ownership or Shared
- * membership before mailbox content or storage metadata is retrieved. Email
+ * Every operation is authorized from live mailbox access, meaning Personal
+ * ownership, Shared membership, or an active administrator's role, before
+ * mailbox content or storage metadata is retrieved. Email
  * tools are intentionally limited to read, search, and reviewable Draft
  * creation. Sending and destructive actions stay in the human-operated portal.
  */

@@ -84,7 +84,7 @@ export function createAdminImportRouteHandler(
       !session ||
       !(await dependencies.canAccessMailbox(c.env, session.sub, mailboxId))
     ) {
-      return c.json({ error: "Explicit mailbox membership is required" }, 403);
+      return c.json({ error: "Mailbox access is required" }, 403);
     }
 
     if (!(await dependencies.mailboxExists(c.env, mailboxId))) {
