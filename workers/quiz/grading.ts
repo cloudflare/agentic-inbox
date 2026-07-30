@@ -19,16 +19,25 @@ function setKey(ids: string[]): string {
 }
 
 /**
- * Grade one MCQ answer. Both single- and multi-select award full points ONLY on an
- * exact set match (all correct ids chosen, no incorrect id chosen). Multi-select
- * gets no partial credit. Short answers never reach here.
+ * Grade one MCQ answer. Each distinct correct selection earns one equal unit and
+ * each distinct wrong selection loses one; the result is rounded to two decimals
+ * then clamped to the question's range. `isCorrect` still means an exact set match.
+ * Short answers never reach here.
  */
 export function gradeMcqAnswer(
 	q: GradableQuestion,
 	selected: string[],
 ): { awarded: number; isCorrect: boolean } {
-	const ok = setKey(selected) === setKey(q.correct ?? []);
-	return { awarded: ok ? q.points : 0, isCorrect: ok };
+	const selectedSet = new Set(selected);
+	const correct = new Set(q.correct ?? []);
+	if (correct.size === 0) return { awarded: 0, isCorrect: false };
+
+	const unit = q.points / correct.size;
+	const raw =
+		unit * [...selectedSet].filter((id) => correct.has(id)).length -
+		unit * [...selectedSet].filter((id) => !correct.has(id)).length;
+	const awarded = Math.min(q.points, Math.max(0, Math.round(raw * 100) / 100));
+	return { awarded, isCorrect: setKey(selected) === setKey([...correct]) };
 }
 
 /**

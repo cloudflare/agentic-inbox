@@ -1,0 +1,1264 @@
+{
+  "key": "real-estate-market-2026-08",
+  "title": {
+    "en": "Real Estate Market Quiz — August 2026",
+    "ar": "اختبار سوق العقارات — أغسطس ٢٠٢٦"
+  },
+  "description": {
+    "en": "Tests how well a Whispyr salesperson understands how an Egyptian real estate brokerage actually works — not trivia, but being able to sit with an owner or sales manager and connect their world to Whispyr. 25 objective questions worth 1 point each, and 5 written questions worth 3 points each, 40 points in total. On multi-select questions you get part of the point for every correct option you pick, and the same amount is taken off for every wrong option you pick. A question never goes below zero, and the full point only comes from picking exactly the right set.",
+    "ar": "بيقيس مندوب Whispyr فاهم قد إيه البروكراج المصري بيشتغل إزاي فعلًا — مش معلومات نظرية، لكن إنه يقدر يقعد مع صاحب الشركة أو مدير المبيعات ويربط واقعهم بـ Whispyr. ٢٥ سؤال اختيارات بنقطة لكل سؤال، و٥ أسئلة مكتوبة بـ٣ نقاط لكل سؤال، الإجمالي ٤٠ نقطة. في أسئلة الاختيار المتعدد بتاخد جزء من النقطة على كل اختيار صح تختاره، وينزل منك نفس الجزء على كل اختيار غلط تختاره. السؤال عمره ما ينزل تحت الصفر، والنقطة الكاملة بتيجي بس لما تختار المجموعة الصح بالظبط."
+  },
+  "scoring": {
+    "total": 40,
+    "mcq": 25,
+    "short": 15
+  },
+  "questions": [
+    {
+      "position": 1,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "What the owner is really complaining about",
+        "ar": "صاحب الشركة بيشتكي من إيه فعلًا"
+      },
+      "prompt": {
+        "en": "A brokerage owner with about 40 salespeople across three branches tells you: \"Every month I pay for leads, and every month each branch gives me a different number for how many meetings actually happened. I stopped believing the reports.\" What is he most likely describing?",
+        "ar": "صاحب بروكراج عنده حوالي ٤٠ بياع في تلات فروع بيقول لك: «كل شهر بدفع فلوس على الليدز، وكل شهر كل فرع بيديني رقم مختلف لعدد الاجتماعات اللي حصلت فعلًا. أنا بطّلت أصدّق التقارير.» هو على الأرجح بيوصف إيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "The branches keep no shared record of the work, so every number is written from memory.",
+          "ar": "الفروع مفيش بينها سجل واحد للشغل، فكل رقم بيتكتب من الذاكرة."
+        },
+        {
+          "id": "b",
+          "en": "He needs cheaper leads. Lead price is the real problem in every brokerage, and once the cost per lead drops the arguments about numbers usually stop.",
+          "ar": "هو محتاج ليدز أرخص. سعر الليد هو المشكلة الحقيقية في أي بروكراج، ولما التكلفة تنزل الخناقات على الأرقام بتقف لوحدها."
+        },
+        {
+          "id": "c",
+          "en": "He has one manager too many. If he removes a layer, the numbers will start to agree.",
+          "ar": "عنده مدير زيادة. لو شال مستوى إدارة، الأرقام هتبدأ تتوافق."
+        },
+        {
+          "id": "d",
+          "en": "He needs a stricter monthly report form, so every manager fills in the same fields and the numbers finally match.",
+          "ar": "هو محتاج فورم تقرير شهري أصرم، عشان كل مدير يملّي نفس الخانات والأرقام تظبط أخيرًا."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "The problem is not lead price, and it is not the number of managers. Nobody keeps one record of the work, so every report is really an opinion. Option D is the trap that sounds smart: a form makes the numbers look the same, but it does not create the proof behind them.",
+        "ar": "المشكلة مش في سعر الليد ولا في عدد المديرين. مفيش حد ماسك سجل واحد للشغل، فكل تقرير في الحقيقة رأي. الخيار (د) هو الفخ اللي شكله ذكي: الفورم بيخلّي الأرقام شكلها واحد، بس مش بيعمل الدليل اللي وراها."
+      }
+    },
+    {
+      "position": 2,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "The brokerage with no titles",
+        "ar": "بروكراج من غير ألقاب"
+      },
+      "prompt": {
+        "en": "A brokerage has no official titles on paper. The owner's brother hands out the new leads from his own phone, two senior salespeople train the new ones without being asked to, and an accountant types closed deals into a spreadsheet. Which of these are the real facts about how this company works?",
+        "ar": "بروكراج مفيش فيه ألقاب رسمية على الورق. أخو صاحب الشركة بيوزّع الليدز الجديدة من موبايله، واتنين بياعين قدامى بيدرّبوا الجدد من غير ما حد يطلب منهم، ومحاسب بيكتب الصفقات المقفولة على شيت. أنهي حاجات دي هي الحقائق الحقيقية عن طريقة شغل الشركة دي؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Whoever hands out the leads owns the routing decision, whatever his title is.",
+          "ar": "اللي بيوزّع الليدز هو صاحب قرار التوزيع، مهما كان لقبه."
+        },
+        {
+          "id": "b",
+          "en": "The two senior salespeople do team-leader work, so they need to see their people's leads.",
+          "ar": "الاتنين القدامى بيعملوا شغل تيم ليدر، فمحتاجين يشوفوا ليدز ناسهم."
+        },
+        {
+          "id": "c",
+          "en": "There are no official titles, so the company is too informal for any structure. The simplest and fairest setup is to give everybody the same access and let them sort it out between themselves.",
+          "ar": "مفيش ألقاب رسمية، فالشركة غير منظّمة ومينفعش معاها أي هيكل. وأبسط وأعدل حل إن الكل ياخد نفس الصلاحيات ويظبّطوها مع بعض."
+        },
+        {
+          "id": "d",
+          "en": "The accountant has the only record of results, so nobody can show the work behind them.",
+          "ar": "المحاسب هو الوحيد اللي عنده سجل للنتايج، فمحدش يقدر يوري الشغل اللي وراها."
+        },
+        {
+          "id": "e",
+          "en": "Each of them is protecting something: the routing, his informal authority, or his name.",
+          "ar": "كل واحد فيهم بيحمي حاجة: التوزيع، أو نفوذه غير الرسمي، أو اسمه."
+        },
+        {
+          "id": "f",
+          "en": "The first step is to draw the correct hierarchy for them, show them how a proper brokerage is organised, and ask them to move to it before the demo.",
+          "ar": "أول خطوة إنك ترسم لهم الهيكل الصحيح، وتوريهم البروكراج المحترم بيتنظّم إزاي، وتطلب منهم يمشوا عليه قبل الديمو."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "d",
+        "e"
+      ],
+      "explanation": {
+        "en": "In Egyptian brokerages the responsibility is usually real, even when it is not official. Map who decides, who follows up, who holds the proof, and what each person is protecting. Option C turns a real structure into \"no structure\". Option F sells them a textbook chart instead of listening to them.",
+        "ar": "في البروكراج المصري المسؤولية غالبًا حقيقية، حتى لو مش رسمية. ارسم مين بيقرّر، ومين بيتابع، ومين ماسك الدليل، وكل واحد بيحمي إيه. الخيار (ج) بيحوّل هيكل حقيقي لـ«مفيش هيكل». والخيار (و) بيبيع لهم رسمة نظرية بدل إنه يسمعهم."
+      }
+    },
+    {
+      "position": 3,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "First resale units",
+        "ar": "أول وحدات ريسيل"
+      },
+      "prompt": {
+        "en": "A brokerage that has only ever sold primary units starts taking resale units from individual owners in Sheikh Zayed. What changes most in the daily work?",
+        "ar": "بروكراج عمره ما باع غير بريمري بدأ ياخد وحدات ريسيل من ملّاك أفراد في الشيخ زايد. إيه أكبر حاجة بتتغيّر في الشغل اليومي؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Nothing important changes. A unit is a unit, and the same process works.",
+          "ar": "مفيش حاجة مهمة بتتغيّر. الوحدة وحدة، ونفس الطريقة بتنفع."
+        },
+        {
+          "id": "b",
+          "en": "They now have a seller to manage too, not only a buyer.",
+          "ar": "بقى عندهم بايع يتعاملوا معاه كمان، مش مشتري بس."
+        },
+        {
+          "id": "c",
+          "en": "Resale is simpler, because there is no payment plan to explain and no launch to follow, so the leads need much less qualifying and the deal closes faster.",
+          "ar": "الريسيل أسهل، لأن مفيش بيمنت بلان تشرحه ولا لانش تلاحقه، فالليدز محتاجة تأهيل أقل بكتير والصفقة تتقفل أسرع."
+        },
+        {
+          "id": "d",
+          "en": "Resale commission is higher, so the smart move is to take the whole team off primary and put them on resale listings this quarter.",
+          "ar": "عمولة الريسيل أعلى، فالحركة الذكية إنك تشيل الفريق كله من البريمري وتحطّه على وحدات الريسيل الربع ده."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "In primary, the developer owns the units and the commission scheme is known. In resale, the price and the unit depend on one owner. He can change his mind, raise the price, or sell through somebody else. So the listing has to be checked, and the follow-up runs on both sides of the deal.",
+        "ar": "في البريمري الوحدات بتاعة المطوّر ونظام العمولة معروف. في الريسيل السعر والوحدة معلّقين بمالك واحد. ممكن يغيّر رأيه، أو يرفّع السعر، أو يبيع عن طريق حد تاني. فبيانات الوحدة لازم تتأكد منها، والمتابعة بتشتغل على الطرفين."
+      }
+    },
+    {
+      "position": 4,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Where the money actually goes",
+        "ar": "الفلوس بتمشي إزاي فعلًا"
+      },
+      "prompt": {
+        "en": "In a primary deal, how do the money and the credit move?",
+        "ar": "في صفقة بريمري، الفلوس والفضل بيمشوا إزاي؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "The developer pays the brokerage after the deal is confirmed. The brokerage then pays the salesperson under its own scheme.",
+          "ar": "المطوّر بيدفع للبروكراج بعد ما الصفقة تتأكّد. وبعدين البروكراج بيدفع للبياع حسب نظامه الداخلي."
+        },
+        {
+          "id": "b",
+          "en": "Once the client signs, the commission is the salesperson's own money and the brokerage only does the paperwork.",
+          "ar": "أول ما العميل يوقّع، العمولة تبقى فلوس البياع والبروكراج بيعمل الورق بس."
+        },
+        {
+          "id": "c",
+          "en": "The developer pays the salesperson directly, and the brokerage takes its share back later.",
+          "ar": "المطوّر بيدفع للبياع مباشرة، والبروكراج بياخد نصيبه منه بعدين."
+        },
+        {
+          "id": "d",
+          "en": "The developer pays, so the brokerage has no reason to track which source brought the deal.",
+          "ar": "المطوّر هو اللي بيدفع، فمفيش سبب يخلّي البروكراج يتابع أنهي مصدر جاب الصفقة."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "The money comes late, and it comes through the brokerage. The brokerage carries the gap in between. That is why the owner cares so much about who owned the lead and who did the work. Without that record he cannot pay people fairly or plan his cash.",
+        "ar": "الفلوس بتيجي متأخرة، وبتيجي عن طريق البروكراج. والبروكراج هو اللي شايل الفترة اللي بينهم. وعشان كده صاحب الشركة بيهمه أوي مين كان ماسك الليد ومين عمل الشغل. من غير السجل ده مش هيقدر يدفع بعدل ولا يخطّط فلوسه."
+      }
+    },
+    {
+      "position": 5,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Double commission on a shaky project",
+        "ar": "عمولة الضعف على مشروع مهزوز"
+      },
+      "prompt": {
+        "en": "A developer offers the brokerage double its usual commission on one project. That same project has moved its handover date twice and its price list is hard to explain. A team leader wants to point the whole team at it this month. What is the mature read?",
+        "ar": "مطوّر بيعرض على البروكراج ضعف عمولته المعتادة على مشروع واحد. ونفس المشروع أخّر ميعاد التسليم مرتين وقائمة أسعاره صعب تشرحها. تيم ليدر عايز يوجّه الفريق كله عليه الشهر ده. إيه القراءة الناضجة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Double commission is the strongest signal there is. Commission per hour of a salesperson's time is the only sensible way to choose which project the team works on.",
+          "ar": "عمولة الضعف أقوى إشارة موجودة. العمولة مقابل ساعة شغل البياع هي الطريقة العقلانية الوحيدة تختار بيها الفريق يشتغل على أنهي مشروع."
+        },
+        {
+          "id": "b",
+          "en": "High commission can mean the units are hard to sell, so check the project first.",
+          "ar": "العمولة العالية ممكن تعني إن الوحدات صعبة في البيع، فراجع المشروع الأول."
+        },
+        {
+          "id": "c",
+          "en": "Never sell a developer who raises his commission. A raise always means trouble.",
+          "ar": "عمرك ما تبيع لمطوّر رفّع عمولته. الرفع دايمًا معناه مشكلة."
+        },
+        {
+          "id": "d",
+          "en": "Commission has nothing to do with how easy a project is to sell, so leave it out of the decision.",
+          "ar": "العمولة مالهاش علاقة بسهولة بيع المشروع، فسيبها بره القرار."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "Commission is information, not an answer. A high one can mean the units are hard to move, or that the developer needs cash fast. Look at the delivery record, whether the price list is clear, and whether there is real demand. A team pointed at a project it cannot explain burns leads and trust, and the client remembers who sold it to him. Option A sounds analytical and is the trap. Option C is superstition.",
+        "ar": "العمولة معلومة، مش إجابة. العالية ممكن تعني إن الوحدات صعبة في الحركة، أو إن المطوّر محتاج كاش بسرعة. بص على سجل التسليم، وهل قائمة الأسعار واضحة، وهل فيه طلب حقيقي. والفريق لما يتوجّه على مشروع مش قادر يشرحه بيحرق ليدز وثقة، والعميل بيفضل فاكر مين اللي باعله. الخيار (أ) شكله تحليلي وهو الفخ. والخيار (ج) خرافة."
+      }
+    },
+    {
+      "position": 6,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "A phase reopens in two days",
+        "ar": "مرحلة بتتفتح تاني بعد يومين"
+      },
+      "prompt": {
+        "en": "A developer reopens an earlier phase in two days, with a new price list and a shorter payment plan. Before the team starts calling, what should the brokerage agree on inside the company?",
+        "ar": "مطوّر هيفتح مرحلة قديمة تاني بعد يومين، بقائمة أسعار جديدة وبيمنت بلان أقصر. قبل ما الفريق يبدأ يتصل، البروكراج يتفق على إيه جوه الشركة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "What changed against the old price list.",
+          "ar": "إيه اللي اتغيّر عن قائمة الأسعار القديمة."
+        },
+        {
+          "id": "b",
+          "en": "Which units are really still available.",
+          "ar": "أنهي وحدات لسه متاحة فعلًا."
+        },
+        {
+          "id": "c",
+          "en": "Which leads said no to the old price, whether the new plan fits them, and who owns them now.",
+          "ar": "أنهي ليدز رفضت السعر القديم، وهل الخطة الجديدة تنفع معاها، ومين ماسكها دلوقتي."
+        },
+        {
+          "id": "d",
+          "en": "Who is allowed to confirm a reservation.",
+          "ar": "مين له حق يأكّد حجز."
+        },
+        {
+          "id": "e",
+          "en": "One agreed answer to \"why is it cheaper now?\" for buyers who paid the old price.",
+          "ar": "رد واحد متفق عليه على «ليه بقى أرخص دلوقتي؟» للمشترين اللي دفعوا بالسعر القديم."
+        },
+        {
+          "id": "f",
+          "en": "Which salesperson closes best, so every launch lead goes to him for three days.",
+          "ar": "أنهي بياع بيقفل أحسن، عشان كل ليدز اللانش تروح له تلات أيام."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "explanation": {
+        "en": "A reopened phase is an operations problem before it is a selling problem. The team needs to know what changed, what exists, who can commit a unit, and what to say to buyers who paid the old price. They also need one rule for what happens if two salespeople bring a buyer for the same unit. Option F sounds fair, and it is how a brokerage loses the rest of the team and their leads in the same week.",
+        "ar": "المرحلة اللي بتتفتح تاني مشكلة تشغيل قبل ما تكون مشكلة بيع. الفريق لازم يعرف إيه اللي اتغيّر، وإيه الموجود، ومين يقدر يلتزم بوحدة، وهيقول إيه للمشترين اللي دفعوا بالسعر القديم. وكمان لازم يكون فيه قاعدة واحدة لو بياعين اتنين جابوا مشتري لنفس الوحدة. الخيار (و) شكله عدل، وهو الطريق إن البروكراج يخسر باقي الفريق وليدزهم في نفس الأسبوع."
+      }
+    },
+    {
+      "position": 7,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "\"Your colleague said prices go up next week\"",
+        "ar": "«زميلك قال لي الأسعار هتزيد الأسبوع الجاي»"
+      },
+      "prompt": {
+        "en": "A buyer says: \"Your colleague told me the price goes up 10% next week — is that true?\" The salesperson does not know. What is the strongest move?",
+        "ar": "مشتري بيقول: «زميلك قال لي إن السعر هيزيد ١٠٪ الأسبوع الجاي — ده صح؟» والبياع مش عارف. إيه أقوى تصرّف؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Tell him what he can check today, and confirm the rest before repeating it.",
+          "ar": "يقول له اللي يقدر يتأكد منه النهاردة، ويراجع الباقي قبل ما يكرّره."
+        },
+        {
+          "id": "b",
+          "en": "Confirm it. Backing up a colleague protects the brokerage in front of the client, and prices in Egypt go up anyway, so he will not be wrong for long.",
+          "ar": "يأكّد الكلام. إنه يسند زميله بيحمي البروكراج قصاد العميل، والأسعار في مصر بتزيد أصلًا، فمش هيبقى غلطان كتير."
+        },
+        {
+          "id": "c",
+          "en": "Tell the buyer prices do not really move, so there is no reason to hurry.",
+          "ar": "يقول للمشتري إن الأسعار مبتتحركش فعلًا، فمفيش سبب للاستعجال."
+        },
+        {
+          "id": "d",
+          "en": "Repeat the 10%, but say it is only something he heard from a colleague, and let the buyer decide what to do with it.",
+          "ar": "يكرّر الـ١٠٪، بس يقول إنها حاجة سمعها من زميله، ويسيب المشتري يقرّر يعمل بيها إيه."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "He can stand behind the current price list and what is still available. He cannot stand behind a number he has not checked. So he should check the developer's real next step first, then tie the urgency to the unit this buyer wants. Option D is the trap that sounds honest: passing on a number you have not checked is still passing it on, and the brokerage pays for it if the number is wrong.",
+        "ar": "هو يقدر يقف ورا قائمة الأسعار الحالية وورا اللي متاح. ومش يقدر يقف ورا رقم مراجعوش. فالمفروض يتأكد من خطوة المطوّر الجاية الأول، وبعدين يربط الإلحاح بالوحدة اللي المشتري عايزها. الخيار (د) هو الفخ اللي شكله أمين: إنك تنقل رقم مش متأكد منه ده برضه نقل، والبروكراج هو اللي بيدفع لو الرقم طلع غلط."
+      }
+    },
+    {
+      "position": 8,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "\"I want the New Capital, it is the future\"",
+        "ar": "«عايز العاصمة، دي المستقبل»"
+      },
+      "prompt": {
+        "en": "A buyer says: \"I want the New Administrative Capital, it is the future.\" Why does that one sentence matter to the salesperson?",
+        "ar": "مشتري بيقول: «عايز العاصمة الإدارية الجديدة، دي المستقبل.» ليه الجملة الواحدة دي مهمة للبياع؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "It ends the qualification. The area is decided, so the next step is to send options.",
+          "ar": "بتقفل التأهيل. المنطقة اتحدّدت، فالخطوة الجاية إنه يبعت خيارات."
+        },
+        {
+          "id": "b",
+          "en": "It only matters for the paperwork. Area is just a filter on the unit list.",
+          "ar": "مهمة بس في الورق. المنطقة مجرد فلتر على قائمة الوحدات."
+        },
+        {
+          "id": "c",
+          "en": "It opens the useful questions: will he live there or hold it, and what can he afford in that area?",
+          "ar": "بتفتح الأسئلة المفيدة: هيسكن هناك ولا ماسكها، وقادر على إيه في المنطقة دي؟"
+        },
+        {
+          "id": "d",
+          "en": "It tells the salesperson to stay on that area and never mention another one.",
+          "ar": "بتقول للبياع يفضل على المنطقة دي وميذكرش غيرها."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "\"The future\" is investment talk, so ask whether he will live there or hold it. Then ask about his commute and his family, which developers and delivery dates he can afford there, and whether he plans to resell. The area answer is one of the fastest ways to understand what he really wants, and it shows the salesperson which honest alternatives he can offer if the first request does not fit the budget.",
+        "ar": "«المستقبل» كلام عن استثمار، فاسأله هيسكن ولا ماسكها. وبعدين اسأل عن مشواره وعيلته، وأنهي مطوّرين ومواعيد تسليم قادر عليها هناك، وهل ناوي يبيعها بعدين. إجابة المنطقة من أسرع الطرق تفهم بيها هو عايز إيه فعلًا، وبتوري البياع أنهي بدائل صادقة يعرضها لو الطلب الأول ميناسبش الميزانية."
+      }
+    },
+    {
+      "position": 9,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "\"Interested, will send options\"",
+        "ar": "«مهتم، هبعت له خيارات»"
+      },
+      "prompt": {
+        "en": "After a six-minute call, a salesperson writes one note: \"Interested, will send options.\" What is still missing before this buyer can be treated as qualified?",
+        "ar": "بعد مكالمة ٦ دقايق، بياع كتب ملاحظة واحدة: «مهتم، هبعت له خيارات.» إيه اللي لسه ناقص قبل ما المشتري ده يتعامل معاه كمؤهل؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "What he can pay now, and what he can pay monthly.",
+          "ar": "قادر يدفع كام دلوقتي، وقادر يدفع كام شهري."
+        },
+        {
+          "id": "b",
+          "en": "Which areas he would really consider.",
+          "ar": "أنهي مناطق هو فعلًا هيفكّر فيها."
+        },
+        {
+          "id": "c",
+          "en": "How the brokerage will split the commission on his deal, so the salesperson knows what the call is worth to him.",
+          "ar": "البروكراج هيقسّم العمولة إزاي على صفقته، عشان البياع يعرف المكالمة دي قيمتها كام له."
+        },
+        {
+          "id": "d",
+          "en": "Why he is buying: to live in it, or to invest.",
+          "ar": "بيشتري ليه: عشان يسكن، ولا يستثمر."
+        },
+        {
+          "id": "e",
+          "en": "When he wants to buy or reserve.",
+          "ar": "إمتى عايز يشتري أو يحجز."
+        },
+        {
+          "id": "f",
+          "en": "Whether he was polite and easy to talk to, because a buyer who is pleasant on the phone is usually the one who ends up buying.",
+          "ar": "هل كان مهضوم وسهل في الكلام، لأن المشتري اللي لطيف على التليفون غالبًا هو اللي بيشتري في الآخر."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "d",
+        "e"
+      ],
+      "explanation": {
+        "en": "Being interested is not being qualified. Without money, area, reason, and timing there is no useful next step. The note also leaves the next person with nothing. If this lead moves to somebody else, or the salesperson calls back in two weeks, nobody knows what was said.",
+        "ar": "إنه مهتم مش معناه إنه مؤهل. من غير الفلوس، والمنطقة، والسبب، والتوقيت مفيش خطوة تالية مفيدة. والملاحظة دي كمان بتسيب اللي جاي بعده من غير حاجة. لو الليد اتنقل لحد تاني، أو البياع رجع له بعد أسبوعين، محدش هيعرف اتقال إيه."
+      }
+    },
+    {
+      "position": 10,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "The budget depends on one event",
+        "ar": "الميزانية معلّقة على حاجة واحدة"
+      },
+      "prompt": {
+        "en": "A buyer needs a unit ready within a year for his daughter's marriage, will only look at Nasr City or Heliopolis, and says: \"I will know my budget once I sell my current flat.\" How should the salesperson classify him, and what is the next step?",
+        "ar": "مشتري محتاج وحدة جاهزة في خلال سنة لجواز بنته، ومش هيبص غير على مدينة نصر أو مصر الجديدة، وبيقول: «هعرف ميزانيتي لما أبيع شقتي الحالية.» البياع يصنّفه إزاي، وإيه الخطوة الجاية؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Fully qualified. Three of the four points are clear, and the budget will come, so he can be treated like any buyer who is ready to move.",
+          "ar": "مؤهل تمامًا. تلات نقاط من الأربعة واضحة، والميزانية هتيجي، فيتعامل معاه زي أي مشتري جاهز يتحرّك."
+        },
+        {
+          "id": "b",
+          "en": "Not qualified. With no budget there is nothing to work with.",
+          "ar": "مش مؤهل. من غير ميزانية مفيش حاجة نشتغل عليها."
+        },
+        {
+          "id": "c",
+          "en": "Qualified with a condition, and the follow-up should track the flat sale.",
+          "ar": "مؤهل بشرط، والمتابعة لازم تتابع بيع الشقة."
+        },
+        {
+          "id": "d",
+          "en": "Qualified with a condition, so the right move is to stop following up and wait until he calls back with a number of his own.",
+          "ar": "مؤهل بشرط، وعشان كده الصح إنك توقّف المتابعة وتستنى لحد ما هو يكلّمك برقم من عنده."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "The need, the area, and the timing are clear. Only the budget is open, and it depends on one event: selling his flat. So the follow-up should carry a date for that sale, and the brokerage may even be able to sell it for him. Option D has the right label and the wrong action. When you hand the timing back to the buyer, a live opportunity goes cold.",
+        "ar": "الحاجة والمنطقة والتوقيت واضحين. الميزانية بس هي المفتوحة، ومعلّقة على حدث واحد: بيع شقته. فالمتابعة لازم يبقى لها تاريخ للبيع ده، وممكن البروكراج نفسه يبيعها له. الخيار (د) شايل التصنيف الصح والتصرّف الغلط. لما تسلّم التوقيت للمشتري، الفرصة الحيّة بتبرد."
+      }
+    },
+    {
+      "position": 11,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "Six replies to one campaign",
+        "ar": "٦ ردود على كامبين واحد"
+      },
+      "prompt": {
+        "en": "Six people replied to the same WhatsApp campaign. Which replies still leave the salesperson without a real opportunity, so he should qualify before booking a meeting?",
+        "ar": "٦ ناس ردّوا على نفس كامبين الواتساب. أنهي ردود لسه سايبة البياع من غير فرصة حقيقية، فلازم يأهّل قبل ما يحجز اجتماع؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "\"Send me whatever is cheapest, the area does not matter.\"",
+          "ar": "«ابعت لي أرخص حاجة، المنطقة مش فارقة.»"
+        },
+        {
+          "id": "b",
+          "en": "\"I am collecting prices for a friend who lives abroad, I do not know his budget.\"",
+          "ar": "«أنا بجمّع أسعار لصاحبي اللي بره، ومش عارف ميزانيته.»"
+        },
+        {
+          "id": "c",
+          "en": "\"Add me to your list, maybe in two or three years.\"",
+          "ar": "«حطّني في اللستة، يمكن بعد سنتين تلاتة.»"
+        },
+        {
+          "id": "d",
+          "en": "\"I have the down payment ready and I need delivery before next summer, near my mother in Heliopolis.\"",
+          "ar": "«المقدّم جاهز معايا ومحتاج تسليم قبل الصيف الجاي، وجنب والدتي في مصر الجديدة.»"
+        },
+        {
+          "id": "e",
+          "en": "\"How much is the installment? I want to see if it fits with my salary, but I have not sat and worked it out yet.\"",
+          "ar": "«القسط كام؟ عايز أشوف يظبط مع مرتبي، بس لسه مقعدتش أحسبها بالورقة والقلم.»"
+        },
+        {
+          "id": "f",
+          "en": "\"I saw the units last week with my brother and I want to reserve the corner one.\"",
+          "ar": "«شفت الوحدات الأسبوع اللي فات مع أخويا وعايز أحجز اللي في الكورنر.»"
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "e"
+      ],
+      "explanation": {
+        "en": "A reply is not readiness. A vague area, no budget, a far-off date, and an installment he has not worked out all need qualifying first. D and F carry a real need, a real date, and a specific unit.",
+        "ar": "الرد مش جاهزية. منطقة مش محددة، ومفيش ميزانية، وتاريخ بعيد، وقسط محسبوش — كلها محتاجة تأهيل الأول. الخيارين (د) و(و) فيهم حاجة حقيقية، وتاريخ حقيقي، ووحدة محدّدة."
+      }
+    },
+    {
+      "position": 12,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Marketing says 300, sales says 70",
+        "ar": "الماركتنج بيقول ٣٠٠ والسيلز بيقول ٧٠"
+      },
+      "prompt": {
+        "en": "Marketing reports 300 leads from last month's campaign. The sales manager says only about 70 were \"real\". The owner asks the Whispyr salesperson who is right. What should he do first?",
+        "ar": "الماركتنج بيقول إن كامبين الشهر اللي فات جاب ٣٠٠ ليد. والسيلز مانجر بيقول إن حوالي ٧٠ بس كانوا «حقيقيين». صاحب الشركة بيسأل مندوب Whispyr: مين فيهم صح؟ يعمل إيه الأول؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Believe the sales manager. The team is closest to the buyers.",
+          "ar": "يصدّق السيلز مانجر. الفريق هو الأقرب للمشترين."
+        },
+        {
+          "id": "b",
+          "en": "Believe the platform reports. They are automatic, so they are neutral, and a report cannot have an opinion about the sales team.",
+          "ar": "يصدّق تقارير المنصة. دي أوتوماتيك يعني محايدة، والتقرير مالوش رأي في فريق السيلز."
+        },
+        {
+          "id": "c",
+          "en": "Ask what happened to the 300 leads before deciding who is right.",
+          "ar": "يسأل حصل إيه في الـ٣٠٠ ليد قبل ما يقرّر مين صح."
+        },
+        {
+          "id": "d",
+          "en": "Move the budget to a different advertising platform, so the argument stops and everybody starts again with a clean sheet.",
+          "ar": "ينقل الميزانية لمنصة إعلانات تانية، عشان الخلاف يقف والكل يبدأ من جديد."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "The word \"real\" is hiding a lot here. Ask how many were called at all, how fast, how many times, how many answered, and what the salespeople wrote. Until you separate what the campaign delivered from how the team handled it, nobody knows whether the numbers were bad or the leads were never worked. Option B sounds solid and is the trap: a platform can only report what it sent, not what happened after.",
+        "ar": "كلمة «حقيقيين» مخبّية كتير هنا. اسأل كام واحد اتصلوا بيه من الأساس، وبعد قد إيه، وكام مرة، وكام واحد ردّ، والبياعين كتبوا إيه. لحد ما تفصل اللي الكامبين وصّله عن طريقة تعامل الفريق، محدش عارف هل الأرقام كانت وحشة ولا الليدز أصلًا محدش شغل عليها. الخيار (ب) شكله متين وهو الفخ: المنصة تقدر تقول بعتت إيه، مش اللي حصل بعد كده."
+      }
+    },
+    {
+      "position": 13,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Nine hours to first contact",
+        "ar": "٩ ساعات لحد أول تواصل"
+      },
+      "prompt": {
+        "en": "Leads arrive on a form at all hours, and first contact happens after about nine hours on average. The sales manager says: \"We call everyone eventually, so speed is not our problem.\" What is the strongest response?",
+        "ar": "الليدز بتدخل من فورم في أي وقت، وأول تواصل بيحصل بعد حوالي ٩ ساعات في المتوسط. والسيلز مانجر بيقول: «إحنا بنكلّم الكل في الآخر، فالسرعة مش مشكلتنا.» إيه أقوى رد؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Agree. A serious buyer will wait for a call.",
+          "ar": "توافقه. المشتري الجدّي هيستنى المكالمة."
+        },
+        {
+          "id": "b",
+          "en": "Ask him to compare the fast leads with the slow ones in his own numbers.",
+          "ar": "تطلب منه يقارن الليدز السريعة بالبطيئة في أرقامه هو."
+        },
+        {
+          "id": "c",
+          "en": "Tell him to hire a night shift straight away. When leads come in at every hour, more people on the phone is always the answer.",
+          "ar": "تقول له يعيّن شيفت ليلي على طول. لما الليدز بتدخل في كل الأوقات، ناس أكتر على التليفون دايمًا هي الحل."
+        },
+        {
+          "id": "d",
+          "en": "Tell him to stop collecting leads outside working hours, so the queue stays short and the team starts every morning with a clean list.",
+          "ar": "تقول له يبطّل يجمّع ليدز بره أوقات العمل، عشان الطابور يفضل قصير والفريق يبدأ كل صباح بلستة نضيفة."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "Do not argue about speed as a slogan. Ask him to look at answer rate and meeting rate for leads called in the first minutes, next to leads called hours later. If there is a gap, his own numbers make the point for you, and the brokerage keeps that measurement after the meeting.",
+        "ar": "متتخانقش على السرعة كشعار. اطلب منه يبص على معدل الرد ومعدل الاجتماعات لليدز اللي اتكلّمت في أول دقايق، جنب اللي اتكلّمت بعد ساعات. لو فيه فرق، أرقامه هي اللي هتوصّل الكلام، والبروكراج بيفضل ماسك القياس ده بعد الاجتماع."
+      }
+    },
+    {
+      "position": 14,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "Same 150 leads, two salespeople",
+        "ar": "نفس الـ١٥٠ ليد، وبياعين اتنين"
+      },
+      "prompt": {
+        "en": "Two salespeople each received 150 leads this month. Salesperson A: 110 contacted, 44 answered, 21 meetings booked, 7 attended, 0 deals. Salesperson B: 72 contacted, 38 answered, 11 meetings booked, 9 attended, 2 deals. Which readings are reasonable?",
+        "ar": "بياعين كل واحد فيهم خد ١٥٠ ليد الشهر ده. البياع (أ): اتصل بـ١١٠، ردّ عليه ٤٤، حجز ٢١ اجتماع، حضر منها ٧، وصفر صفقات. البياع (ب): اتصل بـ٧٢، ردّ عليه ٣٨، حجز ١١ اجتماع، حضر منها ٩، وقفل صفقتين. أنهي قراءات معقولة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "A books plenty of meetings but few people come, so his qualifying and his confirmation need work.",
+          "ar": "(أ) بيحجز اجتماعات كتير بس قليل بيحضروا، فالتأهيل والتأكيد محتاجين شغل."
+        },
+        {
+          "id": "b",
+          "en": "A is clearly the better salesperson, because he booked almost twice as many meetings.",
+          "ar": "(أ) واضح إنه البياع الأحسن، لأنه حجز تقريبًا ضعف الاجتماعات."
+        },
+        {
+          "id": "c",
+          "en": "B closes well but never touched 78 paid-for leads.",
+          "ar": "(ب) بيقفل كويس بس ملمسش ٧٨ ليد مدفوع فيها."
+        },
+        {
+          "id": "d",
+          "en": "Judging them on deals alone hides two different problems.",
+          "ar": "لو حكمت عليهم بالصفقات بس هتخبّي مشكلتين مختلفتين."
+        },
+        {
+          "id": "e",
+          "en": "Tell B to stop qualifying so carefully and just call all 150.",
+          "ar": "قول لـ(ب) يبطّل يأهّل بالدقة دي ويكلّم الـ١٥٠ كلهم."
+        }
+      ],
+      "correct": [
+        "a",
+        "c",
+        "d"
+      ],
+      "explanation": {
+        "en": "The numbers show where things break. A loses people between booking and attending, so he needs to qualify better before the meeting and confirm properly. B converts well but left 78 leads untouched, and the brokerage paid for those. One number each would hide both problems.",
+        "ar": "الأرقام بتوري بيتكسر فين. (أ) بيخسر الناس بين الحجز والحضور، فمحتاج يأهّل أحسن قبل الاجتماع ويأكّد صح. و(ب) بيحوّل كويس بس ساب ٧٨ ليد محدش لمسها، والبروكراج دفع فيها. رقم واحد لكل واحد كان هيخبّي المشكلتين."
+      }
+    },
+    {
+      "position": 15,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Twenty-five second calls",
+        "ar": "مكالمات بـ٢٥ ثانية"
+      },
+      "prompt": {
+        "en": "A salesperson's answered calls last about 25 seconds on average. His opening is: \"Good morning, I am calling from [the brokerage] — do you have a minute to hear about our projects?\" What is the strongest coaching?",
+        "ar": "مكالمات بياع اللي بيتردّ عليها بتاخد حوالي ٢٥ ثانية في المتوسط. وافتتاحيته: «صباح الخير، أنا بكلّمك من [البروكراج] — عندك دقيقة تسمع عن مشاريعنا؟» إيه أقوى توجيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Raise his daily call target so the numbers come back up.",
+          "ar": "ترفّع تارجت المكالمات اليومي عشان الأرقام ترجع تطلع."
+        },
+        {
+          "id": "b",
+          "en": "Give him a longer, more complete script, so nothing important is left out of the call and every project gets mentioned.",
+          "ar": "تديله سكريبت أطول وأكمل، عشان مفيش حاجة مهمة تفوت من المكالمة وكل المشاريع تتذكر."
+        },
+        {
+          "id": "c",
+          "en": "Send every lead a voice note before calling, so they know his voice and pick up when he rings.",
+          "ar": "يبعت لكل ليد فويس نوت قبل ما يتصل، عشان يعرفوا صوته ويردّوا لما يرن."
+        },
+        {
+          "id": "d",
+          "en": "Change the opening so it is about this lead, and ask one easy question.",
+          "ar": "يغيّر الافتتاحية عشان تبقى عن الليد ده، ويسأل سؤال واحد سهل."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "The opening asks the buyer to sit and listen, so he says no. Name the thing this lead asked about, then ask one question he can answer in a few words. That is what buys the next thirty seconds. Option B makes the same call longer, not better.",
+        "ar": "الافتتاحية بتطلب من المشتري يقعد يسمع، فبيقول لأ. سمّي الحاجة اللي الليد ده سأل عنها، وبعدين اسأل سؤال واحد يقدر يجاوبه في كلمتين. ده اللي بيشتري التلاتين ثانية اللي بعدها. الخيار (ب) بيطوّل نفس المكالمة، مش بيحسّنها."
+      }
+    },
+    {
+      "position": 16,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Three sources, one quarter",
+        "ar": "تلات مصادر في ربع سنة"
+      },
+      "prompt": {
+        "en": "Last quarter: a paid campaign cost EGP 60,000 and produced 300 leads, 12 meetings, 2 deals. Referrals cost nothing and produced 25 leads, 14 meetings, 4 deals. A property portal cost EGP 90,000 and produced 140 leads, 9 meetings, 1 deal. What should the owner conclude?",
+        "ar": "الربع اللي فات: كامبين مدفوع كلّف ٦٠ ألف جنيه وجاب ٣٠٠ ليد، و١٢ اجتماع، وصفقتين. والترشيحات مكلّفتش حاجة وجابت ٢٥ ليد، و١٤ اجتماع، و٤ صفقات. وبورتال عقاري كلّف ٩٠ ألف جنيه وجاب ١٤٠ ليد، و٩ اجتماعات، وصفقة واحدة. صاحب الشركة يستنتج إيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "The paid campaign wins. Its cost per lead is by far the lowest, and cost per lead is the number every marketing team is judged on.",
+          "ar": "الكامبين المدفوع هو الفايز. تكلفة الليد عنده الأقل بفرق كبير، وتكلفة الليد هي الرقم اللي بيتحاسب عليه أي فريق ماركتنج."
+        },
+        {
+          "id": "b",
+          "en": "Keep the portal. 140 leads keeps the team busy.",
+          "ar": "يسيب البورتال. ١٤٠ ليد بتخلّي الفريق مشغول."
+        },
+        {
+          "id": "c",
+          "en": "Stop all paid sources and live on referrals. They cost nothing and they close better, so the money is better kept in the company.",
+          "ar": "يبطّل كل المصادر المدفوعة ويعيش على الترشيحات. مبتكلّفش حاجة وبتقفل أحسن، فالفلوس تفضل في الشركة أحسن."
+        },
+        {
+          "id": "d",
+          "en": "Referrals convert best, so work them on purpose, and fix or cut the portal.",
+          "ar": "الترشيحات بتحوّل أحسن، فاشتغل عليها بقصد، وصلّح البورتال أو اقفله."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "Cost per lead makes the weakest source look best here. Judge a source by what it costs per meeting and per deal, and by whether it can be grown on purpose. Referrals do that best, but they do not grow by themselves. Option C sounds decisive and is a trap: no brokerage can scale on referrals alone.",
+        "ar": "تكلفة الليد بتخلّي أضعف مصدر يبان أحسن هنا. احكم على المصدر بتكلفته مقابل اجتماع ومقابل صفقة، وهل ينفع يكبر بقصد. الترشيحات أحسن في ده، بس مبتكبرش لوحدها. الخيار (ج) شكله حاسم وهو فخ: مفيش بروكراج يكبر على الترشيحات لوحدها."
+      }
+    },
+    {
+      "position": 17,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "A board that stopped being true",
+        "ar": "بورد بطّل يكون حقيقي"
+      },
+      "prompt": {
+        "en": "A manager opens the board and sees 22 leads in \"Meeting Scheduled\" with dates that already passed, and 6 leads sitting in EOI for two months. What should he conclude?",
+        "ar": "سيلز مانجر فتح البورد ولقى ٢٢ ليد في مرحلة «Meeting متحدد» بمواعيد عدّت خلاص، و٦ ليدز واقفين على EOI بقالهم شهرين. يستنتج إيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "The board is not true any more, so the forecast built on it is wrong.",
+          "ar": "البورد مبقى حقيقي، فالتوقّع المبني عليه غلط."
+        },
+        {
+          "id": "b",
+          "en": "The pipeline is full, which is a healthy sign.",
+          "ar": "الـبايبلاين مليان، ودي علامة صحة."
+        },
+        {
+          "id": "c",
+          "en": "Clean the old records out before the monthly meeting, so the board looks tidy and the owner sees a clear picture.",
+          "ar": "نظّف السجلات القديمة قبل الاجتماع الشهري، عشان البورد يبان مرتّب وصاحب الشركة يشوف صورة واضحة."
+        },
+        {
+          "id": "d",
+          "en": "Stage names are just admin work. A manager should look only at closed deals, because that is the only number that pays salaries.",
+          "ar": "أسماء المراحل مجرد شغل إداري. المدير يبص على الصفقات المقفولة بس، لأن ده الرقم الوحيد اللي بيدفع مرتبات."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "The meetings were never moved forward, so nobody knows who attended. An EOI sitting for two months is either dead or a follow-up that stopped. Both need a decision, not deletion: deleting the record removes the only proof of what happened. Stages standing still usually mean salespeople are parking leads instead of marking them lost.",
+        "ar": "الاجتماعات محدش حرّكها، فمحدش عارف مين حضر. والـEOI اللي واقف شهرين يا إما ميت يا إما متابعة وقفت. الاتنين محتاجين قرار، مش مسح: المسح بيشيل الإثبات الوحيد لللي حصل. والمراحل الواقفة غالبًا معناها إن البياعين بيوقّفوا الليدز بدل ما يعلّموها ضايعة."
+      }
+    },
+    {
+      "position": 18,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "\"I have three done deals this month\"",
+        "ar": "«عندي ٣ دون ديل الشهر ده»"
+      },
+      "prompt": {
+        "en": "A salesperson tells his manager: \"I have three done deals this month.\" One buyer paid a reservation deposit, one signed the contract with the developer, and one promised verbally to transfer tomorrow. How should the manager record this?",
+        "ar": "بياع بيقول لمديره: «عندي ٣ دون ديل الشهر ده.» واحد دفع مقدّم حجز، وواحد وقّع العقد مع المطوّر، وواحد وعد بالكلام إنه هيحوّل بكرة. المدير يسجّل ده إزاي؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "All three count. Each client committed in his own way, and the salesperson should get credit for the work he did on all of them.",
+          "ar": "التلاتة بيتحسبوا. كل عميل التزم بطريقته، والبياع لازم ياخد حقه على الشغل اللي عمله فيهم كلهم."
+        },
+        {
+          "id": "b",
+          "en": "Record all three as done, and correct them later if one of them falls through during the month.",
+          "ar": "سجّلهم تلاتة دون ديل، وصلّح بعدين لو واحد فيهم وقع خلال الشهر."
+        },
+        {
+          "id": "c",
+          "en": "None of them count until the commission reaches the brokerage's account.",
+          "ar": "ولا واحد فيهم يتحسب لحد ما العمولة توصل حساب البروكراج."
+        },
+        {
+          "id": "d",
+          "en": "Only the signed one is done. The others are a reservation and a promise.",
+          "ar": "اللي وقّع بس هو الدون ديل. التانيين حجز ووعد."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "EOI, reservation, and done deal are different levels of commitment. If all three are called done, the forecast is wrong and the salesperson expects commission he has not earned yet. Option C sounds strict, but it mixes up collecting the cash with the stage of the deal.",
+        "ar": "الـEOI والحجز والدون ديل مستويات التزام مختلفة. لو التلاتة اتسمّوا دون ديل، التوقّع يبقى غلط والبياع يستنى عمولة هو لسه مستحقهاش. الخيار (ج) شكله صرم، بس بيخلط بين تحصيل الكاش ومرحلة الصفقة."
+      }
+    },
+    {
+      "position": 19,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Untouched for eight days, then closed",
+        "ar": "٨ أيام محدش لمسه، وبعدين اتقفل"
+      },
+      "prompt": {
+        "en": "A Meta lead was assigned to salesperson A, sat untouched for eight days, rotated to salesperson B, and B closed it. A now demands the commission because \"the lead was mine first.\" How should the sales manager settle it?",
+        "ar": "ليد من Meta اتوزّع على البياع (أ)، وقعد ٨ أيام محدش لمسه، وبعدين اتنقل للبياع (ب) و(ب) قفله. دلوقتي (أ) بيطالب بالعمولة لأن «الليد كان بتاعي الأول». السيلز مانجر يحلّها إزاي؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Split the commission between them, so the two of them calm down and the team does not take sides.",
+          "ar": "يقسّم العمولة بينهم، عشان الاتنين يهدوا والفريق ميتحيّزش لحد."
+        },
+        {
+          "id": "b",
+          "en": "Always give it to the first one it was assigned to. Assignment is ownership, and a salesperson who can lose a lead after a week will never trust the system.",
+          "ar": "دايمًا يديها للي اتوزّعت عليه الأول. التوزيع معناه الملكية، والبياع اللي ممكن يخسر ليد بعد أسبوع عمره ما هيثق في النظام."
+        },
+        {
+          "id": "c",
+          "en": "Settle it from the record, then publish the rule before the next case.",
+          "ar": "يحلّها من السجل، وبعدين ينشر القاعدة قبل الحالة الجاية."
+        },
+        {
+          "id": "d",
+          "en": "Always give it to whoever closed, because closing is what pays.",
+          "ar": "دايمًا يديها للي قفل، لأن القفل هو اللي بيجيب فلوس."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "The record shows who was assigned, what was done, and when. Ownership with no activity behind it is only a name on a screen. The rule also has to be known in advance, or the same fight comes back. Option A buys quiet this month and guarantees the same argument next month.",
+        "ar": "السجل بيوري مين اتوزّع عليه، واتعمل إيه، وإمتى. والملكية من غير نشاط وراها مجرد اسم على الشاشة. والقاعدة كمان لازم تبقى معروفة قبل، وإلا نفس الخناقة هترجع. الخيار (أ) بيشتري هدوء الشهر ده ويضمن نفس الخلاف الشهر الجاي."
+      }
+    },
+    {
+      "position": 20,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "The closer who logs nothing",
+        "ar": "البياع اللي بيقفل ومش بيسجّل"
+      },
+      "prompt": {
+        "en": "The strongest closer in the team brings about 30% of the deals, refuses to log anything, and keeps his buyers in his personal phone. Which risks should the owner hear?",
+        "ar": "أقوى بياع في الفريق بيجيب حوالي ٣٠٪ من الصفقات، ورافض يسجّل أي حاجة، وماسك مشتريينه على موبايله الشخصي. أنهي مخاطر لازم صاحب الشركة يسمعها؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "If he leaves, the brokerage loses the relationships and the history it paid to build.",
+          "ar": "لو مشي، البروكراج يخسر العلاقات والتاريخ اللي دفع عشان يبنيهم."
+        },
+        {
+          "id": "b",
+          "en": "Others may call the same buyers, because nobody can see them.",
+          "ar": "ناس تانية ممكن تكلّم نفس المشتريين، لأن محدش شايفهم."
+        },
+        {
+          "id": "c",
+          "en": "Nobody can tell if the 30% is skill or the best leads.",
+          "ar": "محدش يقدر يعرف الـ٣٠٪ شطارة ولا أحسن ليدز."
+        },
+        {
+          "id": "d",
+          "en": "There is no real risk. Results are what matter, and he delivers them every month.",
+          "ar": "مفيش خطر حقيقي. النتيجة هي المهمة، وهو بيجيبها كل شهر."
+        },
+        {
+          "id": "e",
+          "en": "Take his leads away until he agrees to log his work.",
+          "ar": "تشيل ليدزه منه لحد ما يوافق يسجّل شغله."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c"
+      ],
+      "explanation": {
+        "en": "The risk is that everything sits with one person. The brokerage is renting its best relationships from an employee, it cannot separate his skill from the leads he gets first, and his way of working never spreads to the team. Option E turns a business risk into a fight the owner will lose.",
+        "ar": "الخطر إن كل حاجة قاعدة عند شخص واحد. البروكراج بيستأجر أحسن علاقاته من موظف، ومش قادر يفصل شطارته عن الليدز اللي بتوصله الأول، وطريقته في الشغل عمرها ما بتنتقل للفريق. الخيار (هـ) بيحوّل خطر تجاري لخناقة صاحب الشركة هيخسرها."
+      }
+    },
+    {
+      "position": 21,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "Five out of fourteen arrived",
+        "ar": "حضروا ٥ من ١٤"
+      },
+      "prompt": {
+        "en": "A brokerage booked 14 buyers on a Friday site visit to a project two hours outside Cairo. Five arrived. What should be checked before blaming the clients?",
+        "ar": "بروكراج حجز ١٤ مشتري في معاينة يوم جمعة لمشروع بعيد ساعتين عن القاهرة. حضر ٥. لازم نتأكد من إيه قبل ما نلوم العملاء؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Whether every buyer was confirmed the day before and that morning.",
+          "ar": "هل كل مشتري اتأكّد منه امبارح والصبح."
+        },
+        {
+          "id": "b",
+          "en": "Whether each buyer knew how long the trip was.",
+          "ar": "هل كل مشتري كان عارف الطريق قد إيه."
+        },
+        {
+          "id": "c",
+          "en": "Whether each buyer was booked because he was ready.",
+          "ar": "هل كل مشتري اتحجز لأنه جاهز."
+        },
+        {
+          "id": "d",
+          "en": "Whether anyone recorded who cancelled and who did not answer.",
+          "ar": "هل حد سجّل مين ألغى ومين مردّش."
+        },
+        {
+          "id": "e",
+          "en": "Whether Friday visits should be stopped for good.",
+          "ar": "هل معاينات الجمعة تتوقف نهائي."
+        },
+        {
+          "id": "f",
+          "en": "Whether the distance should be left out of the invitation, so buyers do not hesitate and the bus goes out full every week.",
+          "ar": "هل الأحسن إن المسافة متتقالش في الدعوة، عشان المشترين ميترددوش والأتوبيس ينزل مليان كل أسبوع."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "explanation": {
+        "en": "No-shows come from weak qualification, weak confirmation, unclear logistics, or missing records, and all four can be fixed. Buyers also need to know who else is going and what they will see when they get there. Option F is the shortcut that sounds clever: it trades one no-show today for a buyer who never trusts the brokerage again.",
+        "ar": "عدم الحضور بييجي من تأهيل ضعيف، أو تأكيد ضعيف، أو تنظيم مش واضح، أو تسجيل ناقص، والأربعة بيتصلّحوا. والمشترين كمان لازم يعرفوا مين نازل معاهم وهيشوفوا إيه لما يوصلوا. الخيار (و) هو الطريق القصير اللي شكله ذكي: بيقايض عدم حضور واحد النهاردة بمشتري عمره ما هيثق في البروكراج تاني."
+      }
+    },
+    {
+      "position": 22,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Forty-five days in",
+        "ar": "بعد ٤٥ يوم"
+      },
+      "prompt": {
+        "en": "Two new salespeople, 45 days in. One has no deal, but 14 qualified buyers, 9 meetings that happened, and follow-up notes a manager can read. The other has one deal from a relative who walked into the office, and nothing else in the pipeline. How should the manager read this?",
+        "ar": "بياعين جداد بعد ٤٥ يوم. واحد مفيش عنده صفقة، بس عنده ١٤ مشتري مؤهل، و٩ اجتماعات حصلت، وملاحظات متابعة المدير يقدر يقراها. والتاني عنده صفقة واحدة من قريب دخل المكتب، ومفيش حاجة تانية في الـبايبلاين. المدير يقرأ ده إزاي؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "The second one is performing and the first one is not. A deal is a deal, and at the end of the month the company lives on deals, not on notes.",
+          "ar": "التاني شغّال والأول لأ. الصفقة صفقة، وفي آخر الشهر الشركة عايشة على الصفقات مش على الملاحظات."
+        },
+        {
+          "id": "b",
+          "en": "The first is building a pipeline; the second had one lucky deal.",
+          "ar": "الأول بيبني بايبلاين؛ والتاني جابته صفقة حظ."
+        },
+        {
+          "id": "c",
+          "en": "They are equal, because both produced something this month.",
+          "ar": "الاتنين زي بعض، لأن الاتنين طلّعوا حاجة الشهر ده."
+        },
+        {
+          "id": "d",
+          "en": "Wait six months before judging either of them. Real estate takes time, and a new salesperson should not be measured in his first months.",
+          "ar": "استنى ٦ شهور قبل ما تحكم على أي واحد فيهم. العقارات بتاخد وقت، والبياع الجديد ميتقاسش في أول شهوره."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "Deals come late, so at 45 days the leading indicators say more than the deal count. The first one has qualified buyers, meetings that happened, and notes a manager can read, so his work can be checked and coached. The second one has an empty pipeline, and that is the bigger worry.",
+        "ar": "الصفقات بتيجي متأخرة، فبعد ٤٥ يوم المؤشرات الاستباقية بتقول أكتر من عدد الصفقات. الأول عنده مشتريين مؤهلين، واجتماعات حصلت، وملاحظات المدير يقدر يقراها، فشغله ينفع يتفحص ويتدرّب عليه. والتاني بايبلاينه فاضي، ودي المشكلة الأكبر."
+      }
+    },
+    {
+      "position": 23,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "\"Rates were cut, let us chase mortgage buyers\"",
+        "ar": "«الفايدة اتخفّضت، خلّينا نجري ورا التمويل العقاري»"
+      },
+      "prompt": {
+        "en": "It is July 2026. A brokerage owner says: \"The Central Bank has been cutting rates this year, so buyers can finally get mortgages — let us move the team onto mortgage buyers.\" What is the sound answer?",
+        "ar": "إحنا في يوليو ٢٠٢٦. صاحب بروكراج بيقول: «البنك المركزي بيخفّض الفايدة السنة دي، فالمشترين بقى ينفع ياخدوا تمويل عقاري — خلّينا نحوّل الفريق على مشتريين التمويل.» إيه الرد السليم؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Agree. With rates coming down, bank finance is now the main route for most buyers.",
+          "ar": "توافقه. مع نزول الفايدة، تمويل البنوك بقى الطريق الأساسي لمعظم المشترين."
+        },
+        {
+          "id": "b",
+          "en": "Tell him interest rates no longer affect how buyers pay.",
+          "ar": "تقول له إن الفايدة مبقى لها تأثير على طريقة دفع المشترين."
+        },
+        {
+          "id": "c",
+          "en": "Tell him bank instalments are now cheaper than developer plans, so every buyer should be pushed towards a bank and the team should build a mortgage desk.",
+          "ar": "تقول له إن أقساط البنك بقت أرخص من خطط المطوّرين، فكل مشتري يتوجّه للبنك والفريق يعمل قسم تمويل عقاري."
+        },
+        {
+          "id": "d",
+          "en": "Say there was only one small cut this year, so most buyers will stay on developer plans.",
+          "ar": "تقول له إن اللي حصل تخفيض واحد صغير السنة دي، فمعظم المشترين هيفضلوا على خطط المطوّرين."
+        },
+        {
+          "id": "e",
+          "en": "Tell him rates will keep falling at every meeting for the rest of the year, so he should hold inventory now and sell it later at a better price.",
+          "ar": "تقول له إن الفايدة هتنزل في كل اجتماع لآخر السنة، فيمسك مخزون دلوقتي ويبيعه بعدين بسعر أحسن."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "There was one cut of one percentage point in February 2026, and the rates have been held since. The overnight deposit rate is still 19%. So borrowing is still expensive, and one cut does not turn this into a mortgage market. For the brokerage that means developer payment plans stay at the centre, so the team should be trained to explain a plan properly: the total price, the schedule, the delivery date, and the fees. Option C states a comparison nobody has checked, and Option E sells the owner a forecast.",
+        "ar": "اللي حصل تخفيض واحد بنقطة مئوية في فبراير ٢٠٢٦، والفايدة متثبّتة من بعده. وسعر الإيداع لليلة واحدة لسه ١٩٪. يعني الاقتراض لسه غالي، وتخفيض واحد مش بيحوّل السوق ده لسوق تمويل عقاري. وبالنسبة للبروكراج معناها إن خطط سداد المطوّرين هي اللي هتفضل في المركز، فالفريق لازم يتدرّب يشرح الخطة صح: السعر الإجمالي، وجدول الدفع، وميعاد التسليم، والمصاريف. الخيار (ج) بيقول مقارنة محدش راجعها، و(هـ) بيبيع لصاحب الشركة تنبؤ."
+      }
+    },
+    {
+      "position": 24,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "\"The market is in a correction, cut the team in half\"",
+        "ar": "«السوق في تصحيح، نصّف الفريق»"
+      },
+      "prompt": {
+        "en": "An owner read a headline saying the market is in a correction and wants to cut his sales team in half. Which readings of the first half of 2026 are fair to give him?",
+        "ar": "صاحب بروكراج قرأ عنوان بيقول إن السوق في مرحلة تصحيح، وعايز يقلّل فريق المبيعات للنص. أنهي قراءات لأول نص ٢٠٢٦ عادل إنك تقولها له؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Sales value fell only a little, but the number of units sold fell much more, so the average deal got bigger.",
+          "ar": "قيمة البيع نزلت شوية، بس عدد الوحدات المبيعة نزل أكتر بكتير، يعني متوسط الصفقة كبر."
+        },
+        {
+          "id": "b",
+          "en": "Some developers grew in the same quarter that others fell.",
+          "ar": "فيه مطوّرين كبروا في نفس الربع اللي غيرهم نزل فيه."
+        },
+        {
+          "id": "c",
+          "en": "East Cairo took the biggest share, and the North Coast is busy this summer.",
+          "ar": "شرق القاهرة خد أكبر نصيب، والساحل الشمالي مزنوق الصيف ده."
+        },
+        {
+          "id": "d",
+          "en": "A falling headline means every developer sold less, so halving the team is safe.",
+          "ar": "الرقم النازل في العنوان معناه إن كل مطوّر باع أقل، فتنصيف الفريق آمن."
+        },
+        {
+          "id": "e",
+          "en": "Developers are competing on payment terms, so more buyers can start.",
+          "ar": "المطوّرين بيتنافسوا على شروط السداد، فمشترين أكتر يقدروا يبدأوا."
+        },
+        {
+          "id": "f",
+          "en": "One big developer reported record sales, so the correction talk is invented.",
+          "ar": "مطوّر كبير أعلن مبيعات قياسية، يبقى كلام التصحيح مفتعل."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "e"
+      ],
+      "explanation": {
+        "en": "Reported first-quarter figures for the top developers showed total sales value down only slightly against the year before, while the number of units sold fell much more. So the average deal got bigger; buyers did not disappear. Results were also very uneven between developers, which is why \"the market\" is the wrong thing to size a team against. East Cairo took the largest share of that quarter's reported sales, and the North Coast has been this summer's busiest launch season, so where the team is pointed matters more than the headline. Smaller first payments and longer plans mean more buyers can start, and more explaining per buyer, not less. Both wrong options are the same mistake in opposite directions: treating one headline number as the whole market.",
+        "ar": "الأرقام المنشورة للربع الأول لأكبر المطوّرين ورّت إن إجمالي قيمة البيع نزل نزول بسيط عن السنة اللي فاتت، بينما عدد الوحدات المبيعة نزل أكتر بكتير. يعني متوسط الصفقة كبر؛ المشترين مختفوش. والنتايج كانت متفاوتة جدًا بين المطوّرين، وعشان كده «السوق» حاجة غلط تحدّد بيها حجم الفريق. وشرق القاهرة خد أكبر نصيب من مبيعات الربع ده حسب المنشور، والساحل الشمالي كان أشغل موسم لانشات الصيف، فمكان توجيه الفريق أهم من العنوان. والمقدّمات الأقل والخطط الأطول معناها مشترين أكتر يقدروا يبدأوا، وشرح أكتر لكل مشتري مش أقل. والخيارين الغلط نفس الغلطة في اتجاهين متعاكسين: إنك تاخد عنوان واحد على إنه السوق كله."
+      }
+    },
+    {
+      "position": 25,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "\"The rules got stricter and the platforms do everything\"",
+        "ar": "«القواعد بقت أصرم والمنصات بتعمل كل حاجة»"
+      },
+      "prompt": {
+        "en": "An owner asks: \"The brokerage rules got stricter this year, and the big online platforms now do brokerage, financing, and rentals themselves. What is left for a company like mine?\" Which points are sound?",
+        "ar": "صاحب بروكراج بيسأل: «قواعد الوساطة العقارية بقت أصرم السنة دي، والمنصات الكبيرة أونلاين بقت تعمل وساطة وتمويل وإيجارات بنفسها. فضل إيه لشركة زي بتاعتي؟» أنهي نقط سليمة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Being on the official brokers register is now a condition of working.",
+          "ar": "إنك تكون في سجل الوسطاء العقاريين الرسمي بقى شرط للشغل."
+        },
+        {
+          "id": "b",
+          "en": "A brokerage that already keeps electronic records is closer to the requirements.",
+          "ar": "البروكراج اللي بيسجّل إلكتروني بالفعل أقرب للمطلوب."
+        },
+        {
+          "id": "c",
+          "en": "The platforms now do brokerage, financing and rentals, so his edge has to change.",
+          "ar": "المنصات بقت تعمل وساطة وتمويل وإيجارات، فميزته لازم تتغيّر."
+        },
+        {
+          "id": "d",
+          "en": "His value was never forwarding units; it is advice and follow-through.",
+          "ar": "قيمته عمرها ما كانت تمرير وحدات؛ هي المشورة والمتابعة للآخر."
+        },
+        {
+          "id": "e",
+          "en": "The platforms are bigger, so the only way to survive is to close the company and join one of them as a freelance agent.",
+          "ar": "المنصات أكبر، فالطريقة الوحيدة تعيش إنك تقفل الشركة وتشتغل معاهم كوسيط مستقل."
+        },
+        {
+          "id": "f",
+          "en": "Registration is paperwork for the owner's lawyer. It has nothing to do with how the sales team records its work day to day.",
+          "ar": "التسجيل ورق بيخصّ محامي صاحب الشركة. مالوش علاقة بطريقة تسجيل فريق السيلز لشغله كل يوم."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "explanation": {
+        "en": "This year's amendments require registration in the official real estate brokers register, electronic records of transactions, and disclosure of commission. The grace period for regularising ended in July 2026, so this is no longer optional. A brokerage whose leads, activity, and deals are already recorded electronically is closer to meeting that than one running on phone notes and memory. At the same time the large platforms now cover discovery, brokerage, financing, rentals, and freelance agents, so the brokerage's edge moves to trustworthy advice, fast handling of leads, follow-up discipline, and being able to show what was done. That was always the real value: qualifying buyers, explaining areas, developers, plans, and delivery trade-offs, and carrying the buyer through visits, negotiation, and reservation. Option F is the answer that costs the owner his right to operate. Option E gives up a business that still has a job to do.",
+        "ar": "تعديلات السنة دي بتطلب التسجيل في سجل الوسطاء العقاريين الرسمي، وسجلات إلكترونية للتعاملات، وإفصاح عن العمولة. ومهلة التوفيق انتهت في يوليو ٢٠٢٦، فالموضوع مبقى اختياري. والبروكراج اللي ليدزه ونشاطه وصفقاته متسجّلين إلكتروني بالفعل أقرب للمطلوب من واحد شغّال بملاحظات على الموبايل وبالذاكرة. وفي نفس الوقت المنصات الكبيرة بقت ماشية في البحث والوساطة والتمويل والإيجارات والوسطاء المستقلين، فميزة البروكراج بتنتقل للمشورة الموثوقة، وسرعة التعامل مع الليدز، وانضباط المتابعة، وإنه يقدر يوري اللي اتعمل. ودي كانت القيمة الحقيقية دايمًا: تأهيل المشترين، وشرح المناطق والمطوّرين والخطط ومفاضلات التسليم، وإنه يشيل المشتري في المعاينات والتفاوض والحجز. الخيار (و) هو اللي هيكلّف صاحب الشركة حقه إنه يشتغل. والخيار (هـ) بيسلّم شركة لسه عندها شغل تعمله."
+      }
+    },
+    {
+      "position": 26,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "The CRM they already stopped using",
+        "ar": "الـCRM اللي بطّلوا يفتحوه"
+      },
+      "prompt": {
+        "en": "An owner already pays for another CRM, and he tells you his team barely opens it. Before you demo Whispyr, write the 6-8 things you want to understand about how this brokerage really works, and about why the old system was dropped.",
+        "ar": "صاحب بروكراج بيدفع بالفعل لـCRM تاني، وبيقول لك إن فريقه بالعافية بيفتحه. قبل ما تعمل ديمو لـ Whispyr، اكتب الـ٦ لـ٨ حاجات اللي عايز تفهمها عن طريقة شغل البروكراج ده فعلًا، وعن سبب إن النظام القديم اتسيب."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Asks where the leads come from and how they arrive, who hands them out and by what rule, who really does team-leader work, what the team does on WhatsApp and the phone outside any system, how they qualify and move stages, who owns follow-up, and what the owner cannot see today. Also asks why the old system was dropped: what the salespeople were asked to do, what they got back, and what \"barely uses it\" looks like in evidence, such as last logins or records created. Brings up the lead-ownership and commission fear without being asked.\n- 2 points: Asks about several parts of the operation, but skips why the old system was dropped, or skips the salespeople's side. Explains the brokerage but not the failure.\n- 1 point: Generic discovery questions, or a feature-by-feature comparison with the other CRM.\n- 0 points: Does not answer, or goes straight to features and price.",
+        "ar": "معايير التصحيح:\n\n- ٣ نقاط: بيسأل الليدز جاية منين وبتدخل إزاي، ومين بيوزّعها وبأي قاعدة، ومين فعلًا بيعمل شغل التيم ليدر، والفريق بيعمل إيه على الواتساب والتليفون بره أي نظام، وبيأهّلوا ويحرّكوا المراحل إزاي، ومين مسؤول عن المتابعة، وصاحب الشركة مش شايف إيه دلوقتي. وكمان بيسأل ليه النظام القديم اتسيب: البياعين اتطلب منهم إيه، وخدوا إيه في المقابل، و«بالعافية بيفتحه» شكلها إيه في الدليل، زي آخر دخول أو عدد السجلات المتعملة. وبيفتح موضوع ملكية الليد والعمولة من غير ما حد يسأله.\n- نقطتين: بيسأل عن كذا جزء من الشغل، بس بيسيب سبب إن النظام القديم اتسيب، أو بيسيب ناحية البياعين. بيشرح البروكراج مش بيشرح الفشل.\n- نقطة: أسئلة استكشاف عامة، أو مقارنة ميزة بميزة مع الـCRM التاني.\n- صفر: مش بيجاوب، أو بينطّ على المزايا والسعر على طول."
+      }
+    },
+    {
+      "position": 27,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "Marketing versus sales, in front of the owner",
+        "ar": "الماركتنج والسيلز قصاد صاحب الشركة"
+      },
+      "prompt": {
+        "en": "Marketing brings platform reports for 300 leads from Friday's campaign. The sales manager brings a WhatsApp screenshot of wrong numbers and says only 70 were real. The owner asks you to settle it in the meeting. Write how you would run that conversation, and what you would ask to see, in order.",
+        "ar": "الماركتنج جايب تقارير المنصة لـ٣٠٠ ليد من كامبين الجمعة. والسيلز مانجر جايب صورة واتساب لأرقام غلط وبيقول إن ٧٠ بس كانوا حقيقيين. صاحب الشركة طلب منك تحسم الموضوع في الاجتماع. اكتب هتدير الكلام إزاي، وهتطلب تشوف إيه، وبأي ترتيب."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Takes no side without evidence, and asks for the lead list itself. Separates what the campaign delivered from how the team handled it: how many were called at all, time to first call, attempts per lead, answer rate, duplicates and wrong numbers as a share, what the notes say, then meetings booked, meetings attended, and stage movement. Separates source quality (targeting, form, offer, number quality) from execution (speed, attempts, opening, follow-up). Says what would prove each side right, and ends with one next step, one owner for it, and how the next campaign gets measured.\n- 2 points: Lists funnel stages, but does not clearly separate source quality from execution, or does not name what to ask for.\n- 1 point: Shallow answer such as \"check the ads\", \"train the team\", or \"look at the CRM\".\n- 0 points: Takes a side, or blames one team with no diagnosis.",
+        "ar": "معايير التصحيح:\n\n- ٣ نقاط: مش بياخد صف من غير دليل، وبيطلب لستة الليدز نفسها. بيفصل اللي الكامبين وصّله عن طريقة تعامل الفريق: كام واحد اتصلوا بيه من الأساس، والوقت لحد أول مكالمة، وعدد المحاولات لكل ليد، ومعدل الرد، والتكرار والأرقام الغلط كنسبة، والملاحظات بتقول إيه، وبعدين الاجتماعات المتحجوزة واللي حضرت وحركة المراحل. بيفصل جودة المصدر (الاستهداف، والفورم، والعرض، وجودة الأرقام) عن التنفيذ (السرعة، والمحاولات، والافتتاحية، والمتابعة). وبيقول إيه اللي هيثبت كل طرف، وبيقفل بخطوة واحدة، ومسؤول واحد ليها، وطريقة قياس للكامبين الجاي.\n- نقطتين: بيسرد مراحل الفانل، بس مش بيفصل جودة المصدر عن التنفيذ بوضوح، أو مش بيسمّي هيطلب إيه.\n- نقطة: إجابة سطحية زي «بص على الإعلانات» أو «درّب الفريق» أو «شوف الـCRM».\n- صفر: بياخد صف، أو بيلوم فريق واحد من غير تشخيص."
+      }
+    },
+    {
+      "position": 28,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "North Coast season, launch this week",
+        "ar": "موسم الساحل، ولانش الأسبوع ده"
+      },
+      "prompt": {
+        "en": "It is the North Coast season and a developer launch lands on your client's team this week. The owner asks what he should prepare inside the company. Write your answer.",
+        "ar": "إحنا في موسم الساحل الشمالي وفيه لانش لمطوّر نازل على فريق عميلك الأسبوع ده. صاحب الشركة بيسألك يجهّز إيه جوه الشركة. اكتب إجابتك."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Covers the units and phases and what is really available, the price list and the payment plan with what changed, delivery dates, which buyers fit and which of last season's refused leads are worth calling again, the likely objections and honest urgency, how launch leads get routed and how fast the team must answer, who owns follow-up, who can take an EOI or a reservation and what happens when two salespeople bring buyers for one unit, one agreed story so nobody quotes different numbers, and how the manager will see during the week which leads were never called.\n- 2 points: Covers product knowledge and follow-up, but misses who can confirm a reservation, or routing, or getting the team aligned.\n- 1 point: Mostly \"call the leads\" or \"send campaigns\", with no launch operations.\n- 0 points: Irrelevant answer, or invents developer terms and prices.",
+        "ar": "معايير التصحيح:\n\n- ٣ نقاط: بيغطّي الوحدات والمراحل وإيه المتاح فعلًا، وقائمة الأسعار والبيمنت بلان وإيه اللي اتغيّر، ومواعيد التسليم، وأنهي مشترين مناسبين وأنهي ليدز رفضت الموسم اللي فات ومستاهلة نكلّمها تاني، والاعتراضات المتوقعة والإلحاح الصادق، وليدز اللانش بتتوزّع إزاي والفريق لازم يردّ بسرعة قد إيه، ومين مسؤول عن المتابعة، ومين ياخد EOI أو حجز وإيه اللي يحصل لو بياعين اتنين جابوا مشترين لنفس الوحدة، وقصة واحدة متفق عليها عشان محدش يقول أرقام مختلفة، وإزاي المدير هيشوف خلال الأسبوع أنهي ليدز محدش كلّمها.\n- نقطتين: بيغطّي معرفة المنتج والمتابعة، بس بيفوّت مين يأكّد الحجز، أو التوزيع، أو توحيد الفريق.\n- نقطة: في الغالب «اتصلوا بالليدز» أو «ابعتوا كامبينز»، من غير عمليات لانش.\n- صفر: إجابة مالهاش علاقة، أو بيختلق شروط وأسعار للمطوّر."
+      }
+    },
+    {
+      "position": 29,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "The team leader who keeps the real notes elsewhere",
+        "ar": "التيم ليدر اللي شايل الملاحظات في مكان تاني"
+      },
+      "prompt": {
+        "en": "A team leader tells his team to keep the real notes in a private WhatsApp group, and to put only the minimum into the system, \"so nobody can use it against us.\" The owner asks you why his team behaves like this, and what to do. Write your answer.",
+        "ar": "تيم ليدر بيقول لفريقه يحطّوا الملاحظات الحقيقية في جروب واتساب خاص، ويسجّلوا الحد الأدنى بس في النظام، «عشان محدش يستخدمها ضدنا». صاحب الشركة بيسألك: فريقه بيتصرّف كده ليه، وإيه الحل. اكتب إجابتك."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Names the real fear — commission and lead ownership, being judged on half the picture, admin work with nothing back, and protecting his people's leads from rotation or reassignment. Treats the team leader as somebody defending his team, not as somebody being difficult. Turns the record around: it holds ownership and effort, it gives the leader proof when he defends his people, and it keeps the context when somebody leaves. Gives real steps, such as writing the ownership and rotation rules down, showing the leader what he personally gets, keeping logging light, and using activity to support people instead of punishing them. Does not ask the owner to force it, and does not sell him a monitoring tool.\n- 2 points: Mentions the fear and the owner's need to see, but does not connect it to commission or ownership, or gives no practical step.\n- 1 point: Says the team leader should be ordered to comply, or replaced.\n- 0 points: Dismisses the team, or sells Whispyr as a monitoring tool.",
+        "ar": "معايير التصحيح:\n\n- ٣ نقاط: بيسمّي الخوف الحقيقي — العمولة وملكية الليد، وإنه يتحاسب على نص الصورة، وشغل إداري من غير مقابل، وحماية ليدز ناسه من التدوير أو إعادة التوزيع. وبيتعامل مع التيم ليدر كواحد بيدافع عن فريقه، مش كواحد بيعمل مشاكل. وبيقلب السجل لصالحهم: بيثبت الملكية والمجهود، ويدّي الليدر دليل لما يدافع عن ناسه، ويحفظ السياق لو حد مشي. وبيدّي خطوات حقيقية، زي إن قواعد الملكية والتدوير تتكتب، وإن الليدر يشوف هو بياخد إيه، وإن التسجيل يبقى خفيف، وإن النشاط يُستخدم لدعم الناس مش لعقابهم. ومش بيطلب من صاحب الشركة يفرضه بالعافية، ولا بيبيع له أداة مراقبة.\n- نقطتين: بيذكر الخوف وحاجة صاحب الشركة إنه يشوف، بس مش بيربطه بالعمولة أو الملكية، أو مش بيدّي خطوة عملية.\n- نقطة: بيقول إن التيم ليدر يتأمر يلتزم أو يتغيّر.\n- صفر: بيتجاهل الفريق، أو بيبيع Whispyr كأداة مراقبة."
+      }
+    },
+    {
+      "position": 30,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "Sixty seconds, July 2026",
+        "ar": "٦٠ ثانية، يوليو ٢٠٢٦"
+      },
+      "prompt": {
+        "en": "It is July 2026. Borrowing is still expensive, buyers take longer to decide, and developers are competing on payment plans. An owner gives you 60 seconds: \"Why do I need Whispyr this year?\" Write what you would say.",
+        "ar": "إحنا في يوليو ٢٠٢٦. الاقتراض لسه غالي، والمشترين بياخدوا وقت أطول في القرار، والمطوّرين بيتنافسوا على خطط السداد. صاحب بروكراج مديك ٦٠ ثانية: «أنا محتاج Whispyr ليه السنة دي؟» اكتب اللي هتقوله."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Starts from this year's pressure: every lead costs more and every buyer takes longer, so a lost lead and a slow follow-up cost more than they used to. Then connects that to real brokerage work: handling new leads fast, leaving no lead uncalled, ownership and rotation rules that cut the arguments, follow-up that survives a longer decision, WhatsApp and calls kept in one place, honest stages so the owner's forecast is real, and knowing what each source is worth. Ends on the owner's own need for control. Promises no leads and no guaranteed deals, and talks like a brokerage, not like software.\n- 2 points: Reasonable, but feature-led or generic, or ignores this year's market pressure.\n- 1 point: Describes Whispyr as only a CRM, only WhatsApp, or only reports.\n- 0 points: Says things that are not true, or promises leads or guaranteed deals.",
+        "ar": "معايير التصحيح:\n\n- ٣ نقاط: بيبدأ من ضغط السنة دي: كل ليد بقى بيكلّف أكتر وكل مشتري بياخد وقت أطول، فالليد الضايع والمتابعة البطيئة بيكلّفوا أكتر من الأول. وبعدين بيربطه بشغل البروكراج الحقيقي: التعامل السريع مع الليدز الجديدة، وإن مفيش ليد يفضل من غير مكالمة، وقواعد ملكية وتدوير تقلّل الخناقات، ومتابعة تستحمل قرار أطول، وواتساب ومكالمات في مكان واحد، ومراحل صادقة عشان توقّعات صاحب الشركة تبقى حقيقية، وإنه يعرف كل مصدر قيمته كام. وبيقفل على حاجة صاحب الشركة نفسه للسيطرة. ومش بيوعد بليدز ولا صفقات مضمونة، وبيتكلّم زي البروكراج مش زي البرمجيات.\n- نقطتين: معقول، بس مركّز على المزايا أو عام، أو بيتجاهل ضغط السوق السنة دي.\n- نقطة: بيوصف Whispyr إنه مجرد CRM، أو مجرد واتساب، أو مجرد تقارير.\n- صفر: بيقول كلام مش صح، أو بيوعد بليدز أو صفقات مضمونة."
+      }
+    }
+  ]
+}
