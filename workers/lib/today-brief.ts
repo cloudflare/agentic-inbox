@@ -11,7 +11,7 @@ import { buildAiCacheKey } from "./ai-cost-control.ts";
 export const TODAY_BRIEF_AI_CONFIG = {
 	feature: "today_brief",
 	requestedTier: "cheap",
-	promptVersion: "today-brief-v1",
+	promptVersion: "today-brief-v2",
 	sourceVersion: "today-brief-source-v1",
 	estimatedCostMicros: 8_000,
 	maxTokens: 1_000,
