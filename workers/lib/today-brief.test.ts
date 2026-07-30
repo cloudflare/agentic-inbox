@@ -10,6 +10,7 @@ import {
 	buildTodayBriefModelMessages,
 	fingerprintTodayBriefInput,
 	parseTodayBriefOutput,
+	TodayBriefValidationError,
 } from "./today-brief.ts";
 
 function candidate(id: string): TodayBriefCandidateInput {
@@ -295,5 +296,50 @@ test("Today brief output applies a strict UTF-8 byte bound before parsing", () =
 	assert.throws(
 		() => parseTodayBriefOutput(`{"items":[]} ${"😀".repeat(5_000)}`, input),
 		/oversized/i,
+	);
+});
+
+test("Today brief policy states every whyNow precondition the validator enforces", () => {
+	const policy = buildTodayBriefModelMessages(normalized())[0]!.content;
+	assert.match(policy, /"overdue_reminder" only when that candidate's reasons include "overdue_reminder"/);
+	assert.match(policy, /"due_today" only when its reasons include "today_reminder"/);
+	assert.match(policy, /reasons include "unread_in_mailbox"/);
+	assert.match(policy, /sourceEmailId/);
+	assert.match(policy, /folderId is "inbox"/);
+	assert.match(policy, /"time_sensitive" or "review_needed"/);
+});
+
+test("Today brief validation failures carry the subcode of the rule they broke", () => {
+	const input = normalized(2);
+	function withFirstItem(patch: Record<string, unknown>) {
+		const base = outputFor(input);
+		return JSON.stringify({
+			items: base.items.map((item, index) => (index === 0 ? { ...item, ...patch } : item)),
+		});
+	}
+	function subcodeOf(raw: string, options: { requireUnreadSourceCitation?: boolean } = {}) {
+		try {
+			parseTodayBriefOutput(raw, input, options);
+		} catch (error) {
+			return error instanceof TodayBriefValidationError ? error.subcode : null;
+		}
+		return null;
+	}
+
+	assert.equal(subcodeOf("not-json"), "malformed_json");
+	assert.equal(subcodeOf(JSON.stringify({ items: [] })), "incomplete_coverage");
+	assert.equal(subcodeOf(JSON.stringify({ items: "no" })), "invalid_structure");
+	assert.equal(subcodeOf(withFirstItem({ candidateId: "unknown" })), "unknown_candidate");
+	assert.equal(subcodeOf(withFirstItem({ rank: 2 })), "invalid_rank");
+	assert.equal(subcodeOf(withFirstItem({ messageIds: ["message-c2"] })), "foreign_citation");
+	assert.equal(subcodeOf(withFirstItem({ whyNow: "overdue_reminder" })), "unsupported_overdue_reminder");
+	assert.equal(subcodeOf(withFirstItem({ whyNow: "due_today" })), "unsupported_due_today");
+
+	// The unread codes carry an extra source-citation precondition for the
+	// aggregate brief only, so the same output passes the Mailbox-scoped rules.
+	assert.equal(subcodeOf(withFirstItem({ whyNow: "unread_request" })), null);
+	assert.equal(
+		subcodeOf(withFirstItem({ whyNow: "unread_request" }), { requireUnreadSourceCitation: true }),
+		"unsupported_unread_state",
 	);
 });
