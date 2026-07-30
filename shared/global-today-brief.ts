@@ -7,10 +7,15 @@ import {
 
 export const GLOBAL_TODAY_BRIEF_AI_CONFIG = {
 	feature: "global_today_brief",
-	requestedTier: "cheap",
-	promptVersion: "global-today-brief-v1",
+	// The cheap model has no Workers AI JSON mode and could not hold the brief's
+	// citation preconditions, so this feature runs on the strong tier.
+	requestedTier: "strong",
+	escalationReason:
+		"The cheap model has no JSON mode and cannot hold the brief's citation preconditions.",
+	promptVersion: "global-today-brief-v2",
 	sourceVersion: "global-today-brief-source-v1",
-	estimatedCostMicros: 8_000,
+	// Strong-tier completions cost roughly 2.5x the cheap tier per token.
+	estimatedCostMicros: 20_000,
 	maxTokens: 1_000,
 	temperature: 0,
 } as const;
@@ -80,4 +85,12 @@ export type GlobalTodayBriefResponse =
 	| { state: "overview_incomplete" }
 	| { state: "preparing"; counts: GlobalTodayBriefCounts; omittedCount: number }
 	| { state: "stale"; counts: GlobalTodayBriefCounts; omittedCount: number }
-	| { state: "budget_paused"; reason: string; counts: GlobalTodayBriefCounts; omittedCount: number };
+	| { state: "budget_paused"; reason: string; counts: GlobalTodayBriefCounts; omittedCount: number }
+	// Generation failed. Today still renders its deterministic content, so counts
+	// are carried whenever a snapshot was read before the failure.
+	| {
+			state: "brief_unavailable";
+			reason: string;
+			counts?: GlobalTodayBriefCounts;
+			omittedCount?: number;
+	  };

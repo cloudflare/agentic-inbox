@@ -34,6 +34,8 @@ test("aggregate Today brief validator accepts exact compound guidance and every 
 		{ state: "preparing", counts: generated.counts, omittedCount: 1 },
 		{ state: "stale", counts: generated.counts, omittedCount: 1 },
 		{ state: "budget_paused", reason: "admin_review_required", counts: generated.counts, omittedCount: 1 },
+		{ state: "brief_unavailable", reason: "global_today_brief_failed:inferenceupstreamerror", counts: generated.counts, omittedCount: 1 },
+		{ state: "brief_unavailable", reason: "invalid_global_today_brief_output:malformed_json" },
 	]) assert.equal(parseGlobalTodayBriefResponse(value).state, value.state);
 });
 

@@ -29,10 +29,35 @@ import type { TodayBriefDayBoundary } from "./today-brief-timezone.ts";
 import {
 	buildTodayBriefModelMessages,
 	parseTodayBriefOutput,
+	TODAY_BRIEF_OUTPUT_JSON_SCHEMA,
+	TodayBriefValidationError,
 } from "./today-brief.ts";
 
 const CACHE_TTL_MS = 48 * 60 * 60 * 1_000;
 const CLAIM_TTL_MS = 2 * 60 * 1_000;
+/** Keeps every ledger error code inside the 100-char bound failUsage enforces. */
+const PROVIDER_FAILURE_NAME_CHARS = 40;
+/** The shape of a JavaScript error class name. Prose never matches it. */
+const ERROR_CLASS_NAME = /^[A-Za-z][A-Za-z0-9_$.]*$/;
+
+/**
+ * A provider rejection carries an error class name plus a message that can echo
+ * the mail evidence it was given. Only the class name classifies the failure,
+ * and only when it is shaped like a class name, so no free text can reach the
+ * ledger even if a provider puts prose in the wrong field.
+ */
+export function globalTodayBriefFailureCode(error: unknown): string {
+	if (error instanceof TodayBriefValidationError) {
+		return `invalid_global_today_brief_output:${error.subcode}`;
+	}
+	const name = error instanceof Error ? error.name : "";
+	if (!ERROR_CLASS_NAME.test(name)) return "global_today_brief_failed";
+	const classified = name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "_")
+		.slice(0, PROVIDER_FAILURE_NAME_CHARS);
+	return `global_today_brief_failed:${classified}`;
+}
 
 export class GlobalTodayBriefAccessChangedError extends Error {
 	constructor() {
@@ -149,6 +174,7 @@ async function validatedCachedResponse(
 		feature: GLOBAL_TODAY_BRIEF_AI_CONFIG.feature,
 		actorUserId: input.actorUserId,
 		requestedTier: GLOBAL_TODAY_BRIEF_AI_CONFIG.requestedTier,
+		escalationReason: GLOBAL_TODAY_BRIEF_AI_CONFIG.escalationReason,
 		estimatedCostMicros: GLOBAL_TODAY_BRIEF_AI_CONFIG.estimatedCostMicros,
 		cacheKey: snapshot.cacheKey,
 		cacheHit: true,
@@ -161,7 +187,6 @@ async function validatedCachedResponse(
 async function automaticRefreshGate(
 	dependencies: GlobalTodayBriefRuntimeDependencies,
 	input: RunGlobalTodayBriefInput,
-	snapshot: GlobalTodayBriefSnapshot,
 	cacheScope: string,
 ) {
 	if (input.refresh) return false;
@@ -216,6 +241,7 @@ async function generate(
 		feature: GLOBAL_TODAY_BRIEF_AI_CONFIG.feature,
 		actorUserId: input.actorUserId,
 		requestedTier: GLOBAL_TODAY_BRIEF_AI_CONFIG.requestedTier,
+		escalationReason: GLOBAL_TODAY_BRIEF_AI_CONFIG.escalationReason,
 		estimatedCostMicros: GLOBAL_TODAY_BRIEF_AI_CONFIG.estimatedCostMicros,
 		cacheKey: snapshot.cacheKey,
 		cacheHit: false,
@@ -285,9 +311,7 @@ async function generate(
 	} catch (error) {
 		const actualCostMicros = calculateAiUsageCostMicros(decision.tier, { promptTokens, completionTokens });
 		await dependencies.failUsage(decision.reservationId, {
-			errorCode: error instanceof Error && error.name === "TodayBriefValidationError"
-				? "invalid_global_today_brief_output"
-				: "global_today_brief_failed",
+			errorCode: globalTodayBriefFailureCode(error),
 			...(actualCostMicros > 0 ? { actualCostMicros } : {}),
 			promptTokens,
 			completionTokens,
@@ -296,14 +320,11 @@ async function generate(
 	}
 }
 
-async function runOnce(
+async function runReadySnapshot(
 	dependencies: GlobalTodayBriefRuntimeDependencies,
 	input: RunGlobalTodayBriefInput,
+	snapshot: GlobalTodayBriefSnapshot,
 ): Promise<GlobalTodayBriefResponse> {
-	const snapshotResult = await dependencies.readSnapshot();
-	if (snapshotResult.state === "access_changed") throw new GlobalTodayBriefAccessChangedError();
-	if (snapshotResult.state !== "ready") return { state: "overview_incomplete" };
-	const snapshot = snapshotResult.snapshot;
 	if (snapshot.prepared.input.candidates.length === 0) {
 		const freshness = await dependencies.freshnessStatus(snapshot);
 		return freshness === "current"
@@ -318,7 +339,7 @@ async function runOnce(
 		if (error instanceof GlobalTodayBriefAccessChangedError) throw error;
 		// Corrupt or unavailable cache entries never become user-facing guidance.
 	}
-	if (await automaticRefreshGate(dependencies, input, snapshot, cacheScope)) {
+	if (await automaticRefreshGate(dependencies, input, cacheScope)) {
 		return automaticGateResponse(dependencies, snapshot);
 	}
 	const claimToken = crypto.randomUUID();
@@ -340,7 +361,7 @@ async function runOnce(
 	try {
 		const cached = await validatedCachedResponse(dependencies, input, snapshot, cacheScope);
 		if (cached) return cached;
-		if (await automaticRefreshGate(dependencies, input, snapshot, cacheScope)) {
+		if (await automaticRefreshGate(dependencies, input, cacheScope)) {
 			return automaticGateResponse(dependencies, snapshot);
 		}
 		renewal = setInterval(() => {
@@ -355,6 +376,29 @@ async function runOnce(
 	} finally {
 		if (renewal !== undefined) clearInterval(renewal);
 		await dependencies.releaseGeneration({ cacheKey: generationKey, cacheScope, claimToken }).catch(() => undefined);
+	}
+}
+
+async function runOnce(
+	dependencies: GlobalTodayBriefRuntimeDependencies,
+	input: RunGlobalTodayBriefInput,
+): Promise<GlobalTodayBriefResponse> {
+	const snapshotResult = await dependencies.readSnapshot();
+	if (snapshotResult.state === "access_changed") throw new GlobalTodayBriefAccessChangedError();
+	if (snapshotResult.state !== "ready") return { state: "overview_incomplete" };
+	const snapshot = snapshotResult.snapshot;
+	try {
+		return await runReadySnapshot(dependencies, input, snapshot);
+	} catch (error) {
+		if (error instanceof GlobalTodayBriefAccessChangedError) throw error;
+		// A brief that cannot be generated degrades to Today's deterministic
+		// content instead of failing the request.
+		return {
+			state: "brief_unavailable",
+			reason: globalTodayBriefFailureCode(error),
+			counts: snapshot.counts,
+			omittedCount: snapshot.prepared.omittedCount,
+		};
 	}
 }
 
@@ -429,9 +473,18 @@ export function createGlobalTodayBriefRuntime(
 				messages,
 				max_tokens: GLOBAL_TODAY_BRIEF_AI_CONFIG.maxTokens,
 				temperature: GLOBAL_TODAY_BRIEF_AI_CONFIG.temperature,
-			}) as { response?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+				// Workers AI JSON mode. The strong tier supports it; it removes the
+				// malformed-JSON failure mode but not the evidence preconditions.
+				response_format: {
+					type: "json_schema",
+					json_schema: TODAY_BRIEF_OUTPUT_JSON_SCHEMA,
+				},
+			}) as { response?: string | object; usage?: { prompt_tokens?: number; completion_tokens?: number } };
 			return {
-				text: (response.response ?? "").trim(),
+				// JSON mode can hand back a parsed object rather than a string.
+				text: typeof response.response === "object" && response.response !== null
+					? JSON.stringify(response.response)
+					: (response.response ?? "").trim(),
 				promptTokens: Math.max(0, Math.floor(response.usage?.prompt_tokens ?? 0)),
 				completionTokens: Math.max(0, Math.floor(response.usage?.completion_tokens ?? 0)),
 			};

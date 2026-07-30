@@ -7,10 +7,15 @@ import {
 } from "./global-today-brief-candidates.ts";
 
 import {
+	createGlobalTodayBriefRuntime,
+	globalTodayBriefFailureCode,
 	GlobalTodayBriefAccessChangedError,
 	runGlobalTodayBrief,
 	type GlobalTodayBriefRuntimeDependencies,
 } from "./global-today-brief-runtime.ts";
+import { TodayBriefValidationError } from "./today-brief.ts";
+import { GLOBAL_TODAY_BRIEF_AI_CONFIG } from "../../shared/global-today-brief.ts";
+import type { Env } from "../types.ts";
 import type { GlobalTodayBriefSnapshot } from "./global-today-brief-snapshot.ts";
 
 const day = {
@@ -95,6 +100,7 @@ function dependencies(current = snapshot()) {
 		put: 0,
 		complete: 0,
 		fail: 0,
+		failureCodes: [] as Array<string | undefined>,
 	};
 	let cached: Parameters<GlobalTodayBriefRuntimeDependencies["putCached"]>[2] | null = null;
 	const allowed: AiUsageDecision = {
@@ -117,7 +123,7 @@ function dependencies(current = snapshot()) {
 		beginUsage: async (input) => { calls.begin.push(input as unknown as Record<string, unknown>); return allowed; },
 		startUsage: async () => true,
 		completeUsage: async () => { calls.complete += 1; },
-		failUsage: async () => { calls.fail += 1; },
+		failUsage: async (_reservationId, failure) => { calls.fail += 1; calls.failureCodes.push(failure.errorCode); },
 		runModel: async () => { calls.provider += 1; return { text: modelOutput(), promptTokens: 100, completionTokens: 20 }; },
 		now: () => Date.parse("2026-07-12T12:00:00.000Z"),
 	};
@@ -146,7 +152,7 @@ test("incomplete and empty snapshots perform zero cache, claim, ledger, and prov
 	const incomplete = dependencies();
 	incomplete.deps.readSnapshot = async () => ({ state: "overview_incomplete" });
 	assert.deepEqual(await runGlobalTodayBrief(incomplete.deps, input("incomplete")), { state: "overview_incomplete" });
-	assert.deepEqual(incomplete.calls, { claim: 0, provider: 0, begin: [], put: 0, complete: 0, fail: 0 });
+	assert.deepEqual(incomplete.calls, { claim: 0, provider: 0, begin: [], put: 0, complete: 0, fail: 0, failureCodes: [] });
 
 	const empty = dependencies(snapshot({ empty: true }));
 	assert.deepEqual(await runGlobalTodayBrief(empty.deps, input("empty")), {
@@ -285,7 +291,13 @@ test("automatic contention is actor-day scoped across different fingerprints and
 
 test("budget pause, cache failure, and invalid provider output preserve deterministic Today", async () => {
 	const budget = dependencies();
-	budget.deps.beginUsage = async () => ({ decision: "block", reason: "admin_review_required", reviewRequired: true });
+	budget.deps.beginUsage = async () => ({
+		decision: "block",
+		reason: "admin_review_required",
+		reviewRequired: true,
+		fallback: "deterministic_only",
+		ledgerRecorded: true,
+	});
 	const paused = await runGlobalTodayBrief(budget.deps, input("budget"));
 	assert.equal(paused.state, "budget_paused");
 	assert.equal(budget.calls.provider, 0);
@@ -298,8 +310,10 @@ test("budget pause, cache failure, and invalid provider output preserve determin
 
 	const invalid = dependencies();
 	invalid.deps.runModel = async () => { invalid.calls.provider += 1; return { text: "not-json", promptTokens: 10, completionTokens: 2 }; };
-	await assert.rejects(runGlobalTodayBrief(invalid.deps, input("invalid-output")), /malformed JSON/);
+	const invalidResult = await runGlobalTodayBrief(invalid.deps, input("invalid-output"));
+	assert.equal(invalidResult.state, "brief_unavailable");
 	assert.equal(invalid.calls.fail, 1);
+	assert.deepEqual(invalid.calls.failureCodes, ["invalid_global_today_brief_output:malformed_json"]);
 	assert.equal(invalid.calls.put, 0);
 });
 
@@ -312,7 +326,8 @@ test("pre-provider source drift spends nothing and a failed reservation start is
 
 	const startFailure = dependencies();
 	startFailure.deps.startUsage = async () => false;
-	await assert.rejects(runGlobalTodayBrief(startFailure.deps, input("start-failure")), /could not be started/);
+	const startResult = await runGlobalTodayBrief(startFailure.deps, input("start-failure"));
+	assert.equal(startResult.state, "brief_unavailable");
 	assert.equal(startFailure.calls.fail, 1);
 	assert.equal(startFailure.calls.provider, 0);
 });
@@ -368,4 +383,71 @@ test("same-day gate revocation routes through access loss without exposing old c
 	await assert.rejects(runGlobalTodayBrief(gated.deps, input("gate-revoked")), GlobalTodayBriefAccessChangedError);
 	assert.equal(gated.calls.claim, 0);
 	assert.equal(gated.calls.provider, 0);
+});
+
+test("ledger failure codes name the broken rule without carrying free text", () => {
+	assert.equal(
+		globalTodayBriefFailureCode(new TodayBriefValidationError("ignored", "unsupported_unread_state")),
+		"invalid_global_today_brief_output:unsupported_unread_state",
+	);
+	assert.equal(
+		globalTodayBriefFailureCode(new TodayBriefValidationError("ignored", "malformed_json")),
+		"invalid_global_today_brief_output:malformed_json",
+	);
+
+	const provider = new Error("prompt 'invoice for alice@example.com' was rejected");
+	provider.name = "InferenceUpstreamError";
+	assert.equal(
+		globalTodayBriefFailureCode(provider),
+		"global_today_brief_failed:inferenceupstreamerror",
+	);
+
+	// Prose in the name field is not a classification and must not be persisted.
+	const prose = new Error("boom");
+	prose.name = "Rejected: alice@example.com asked about invoice 42";
+	assert.equal(globalTodayBriefFailureCode(prose), "global_today_brief_failed");
+	assert.equal(globalTodayBriefFailureCode("not-an-error"), "global_today_brief_failed");
+	assert.equal(globalTodayBriefFailureCode(new Error("boom")), "global_today_brief_failed:error");
+
+	const longName = new Error("boom");
+	longName.name = `A${"b".repeat(300)}`;
+	const bounded = globalTodayBriefFailureCode(longName);
+	// failUsage truncates at 100 characters; a truncated code would be unqueryable.
+	assert.ok(bounded.length <= 100, bounded);
+	assert.match(bounded, /^[a-z0-9_:]+$/);
+});
+
+test("the provider call requests Workers AI JSON mode against the brief schema", async () => {
+	const calls: Array<{ model: string; body: Record<string, unknown> }> = [];
+	const env = {
+		AI: {
+			run: async (model: string, body: Record<string, unknown>) => {
+				calls.push({ model, body });
+				return { response: { items: [] }, usage: { prompt_tokens: 7, completion_tokens: 3 } };
+			},
+		},
+		AI_STRONG_MODEL: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+	} as unknown as Env;
+	const runtime = createGlobalTodayBriefRuntime(env, { actorUserId: "actor-a", day });
+
+	const result = await runtime.runModel("strong-model", [
+		{ role: "system", content: "policy" },
+		{ role: "user", content: "instruction" },
+	]);
+
+	assert.equal(calls.length, 1);
+	const body = calls[0]!.body as {
+		max_tokens: number;
+		temperature: number;
+		response_format: { type: string; json_schema: { type: string; required: string[] } };
+	};
+	assert.equal(body.max_tokens, GLOBAL_TODAY_BRIEF_AI_CONFIG.maxTokens);
+	assert.equal(body.temperature, GLOBAL_TODAY_BRIEF_AI_CONFIG.temperature);
+	assert.equal(body.response_format.type, "json_schema");
+	assert.equal(body.response_format.json_schema.type, "object");
+	assert.deepEqual(body.response_format.json_schema.required, ["items"]);
+	// JSON mode may return a parsed object, which the validator still receives as text.
+	assert.deepEqual(JSON.parse(result.text), { items: [] });
+	assert.equal(result.promptTokens, 7);
+	assert.equal(result.completionTokens, 3);
 });

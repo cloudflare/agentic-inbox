@@ -309,7 +309,9 @@ export function createGlobalTodayBriefSnapshotDependencies(env: Env): GlobalToda
 	const reminderStore = followUpReminderD1Store(env);
 	const config = resolveAiCostControlConfig(env);
 	return {
-		model: config.cheapModel,
+		// Must track the tier the brief actually runs on, or the cache key would
+		// name a model that never produced the entry.
+		model: config.strongModel,
 		listRoster: async (actorUserId) => (await access.listAccessibleMailboxes(actorUserId)).map((row) => ({
 			mailboxId: row.address,
 			address: row.address,

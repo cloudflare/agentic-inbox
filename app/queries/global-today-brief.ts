@@ -15,7 +15,9 @@ function retry(failureCount: number, error: unknown) {
 
 export function markGlobalTodayBriefStale(queryClient: QueryClient, timeZone: string) {
 	queryClient.setQueryData<GlobalTodayBriefResponse>(globalTodayBriefKeys.detail(timeZone), (current) => {
-		if (!current || !("counts" in current) || current.state === "stale") return current;
+		// A brief that failed to generate stays failed: mail changing underneath it
+		// is not why it is missing, and staling it would offer the wrong recovery.
+		if (!current || !("counts" in current) || current.state === "stale" || current.state === "brief_unavailable") return current;
 		return { state: "stale", counts: current.counts, omittedCount: current.omittedCount };
 	});
 }

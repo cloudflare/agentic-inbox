@@ -189,6 +189,7 @@ export type AiUsageDecision =
 const STRONG_TIER_FEATURES = new Set([
 	"assistant_chat",
 	"compose_draft",
+	"global_today_brief",
 	"reply_draft",
 	"relationship_insight",
 ]);
