@@ -291,7 +291,13 @@ test("automatic contention is actor-day scoped across different fingerprints and
 
 test("budget pause, cache failure, and invalid provider output preserve deterministic Today", async () => {
 	const budget = dependencies();
-	budget.deps.beginUsage = async () => ({ decision: "block", reason: "admin_review_required", reviewRequired: true });
+	budget.deps.beginUsage = async () => ({
+		decision: "block",
+		reason: "admin_review_required",
+		reviewRequired: true,
+		fallback: "deterministic_only",
+		ledgerRecorded: true,
+	});
 	const paused = await runGlobalTodayBrief(budget.deps, input("budget"));
 	assert.equal(paused.state, "budget_paused");
 	assert.equal(budget.calls.provider, 0);

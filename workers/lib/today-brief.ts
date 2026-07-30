@@ -201,6 +201,9 @@ const outputSchema = z
 	.object({ items: z.array(focusItemSchema).max(TODAY_BRIEF_LIMITS.focusItems) })
 	.strict();
 
+/** The raw model output contract, before evidence validation rewrites it to copy. */
+export type TodayBriefModelOutput = z.infer<typeof outputSchema>;
+
 /**
  * JSON Schema mirror of outputSchema for Workers AI JSON mode. It constrains
  * shape only; the evidence preconditions stay in the validator, which still runs

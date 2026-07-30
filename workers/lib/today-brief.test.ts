@@ -11,6 +11,7 @@ import {
 	fingerprintTodayBriefInput,
 	parseTodayBriefOutput,
 	TodayBriefValidationError,
+	type TodayBriefModelOutput,
 } from "./today-brief.ts";
 
 function candidate(id: string): TodayBriefCandidateInput {
@@ -48,14 +49,14 @@ function normalized(count = 2, actorUserId = "user-1") {
 	});
 }
 
-function outputFor(input: ReturnType<typeof normalized>, ids?: string[]) {
+function outputFor(input: ReturnType<typeof normalized>, ids?: string[]): TodayBriefModelOutput {
 	const selected = ids ?? input.candidates.slice(0, 5).map((candidate) => candidate.id);
 	return {
 		items: selected.map((candidateId, index) => ({
 			candidateId,
 			rank: index + 1,
-			whyNow: "review_needed" as const,
-			suggestedNextStep: "review" as const,
+			whyNow: "review_needed",
+			suggestedNextStep: "review",
 			messageIds: [`message-${candidateId}`],
 			requiresHumanReview: true,
 		})),
