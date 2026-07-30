@@ -30,7 +30,7 @@ import {
 } from "./conversation-intelligence-runtime.ts";
 import type { NormalizedConversationIntelligenceInput } from "./conversation-intelligence.ts";
 import { mailboxAccess } from "./mailbox-access.ts";
-import { systemPromptFor } from "./prompts.ts";
+import { resolveAgentSystemPrompt } from "./prompts.ts";
 import { resolveBrand } from "../routes/brand.ts";
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -492,11 +492,11 @@ async function readMailboxWritingPrompt(
 	} catch {
 		throw new ReplyRefinementWritingPromptUnavailableError();
 	}
-	const custom = settings.agentSystemPrompt;
 	return normalizeReplyRefinementWritingPrompt(
-		typeof custom === "string" && custom.trim()
-			? custom
-			: systemPromptFor(resolveBrand(env.BRAND).id),
+		resolveAgentSystemPrompt(
+			settings.agentSystemPrompt,
+			resolveBrand(env.BRAND).id,
+		),
 	);
 }
 

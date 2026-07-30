@@ -9,8 +9,10 @@ import {
 	buildComposeDraftMessages,
 	buildComposeDraftSourceVersion,
 	buildReplyDraftMessages,
+	getMailboxSystemPrompt,
 	parseComposeDraftOutput,
 } from "./agent-context.ts";
+import { SUPERSEDED_SYSTEM_PROMPTS, WISER_SYSTEM_PROMPT } from "./prompts.ts";
 
 test("reply drafting keeps hostile thread instructions out of system instructions", () => {
 	const hostileMail =
@@ -176,5 +178,34 @@ test("refinement output cannot invent a fallback subject or erase the draft body
 	assert.deepEqual(
 		parseComposeDraftOutput("An initial body", { isRefinement: false }),
 		{ subject: "New email", body: "<p>An initial body</p>" },
+	);
+});
+
+function wiserEnvHolding(agentSystemPrompt: unknown) {
+	return {
+		BRAND: "wiser",
+		BUCKET: {
+			get: async () => ({ json: async () => ({ fromName: "Wiser", agentSystemPrompt }) }),
+		},
+	} as unknown as Parameters<typeof getMailboxSystemPrompt>[0];
+}
+
+test("a mailbox seeded with a superseded default gets the current brand prompt", async () => {
+	assert.equal(
+		await getMailboxSystemPrompt(
+			wiserEnvHolding(SUPERSEDED_SYSTEM_PROMPTS.wiser[0]),
+			"team@wiserchat.ai",
+		),
+		WISER_SYSTEM_PROMPT,
+	);
+});
+
+test("a mailbox with its own prompt keeps driving the assistant with it", async () => {
+	assert.equal(
+		await getMailboxSystemPrompt(
+			wiserEnvHolding("Always answer in Arabic and cc Omar."),
+			"team@wiserchat.ai",
+		),
+		"Always answer in Arabic and cc Omar.",
 	);
 });
