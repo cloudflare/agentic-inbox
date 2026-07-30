@@ -7,8 +7,11 @@ import {
   beginEmergencyForward,
   commitIngressForwardAcceptance,
   EMERGENCY_FORWARD_LEASE_SECONDS,
+  EMERGENCY_FORWARD_MAX_ATTACHMENT_BYTES,
   EMERGENCY_FORWARD_RECONCILIATION_CURSOR_KEY,
+  EMERGENCY_FORWARD_RETRY_SECONDS,
   emergencyForwardMarkerKey,
+  emergencyForwardNotification,
   type EmergencyForwardEnvelope,
   processEmergencyForwardBatch,
   processEmergencyForwardMessage,
@@ -101,7 +104,7 @@ function receiptBody(
 }
 
 function fixture(options: {
-  sendResult?: { messageId: string };
+  sendResult?: unknown;
   sendThrows?: boolean;
   receiptCommitFailsAfterSend?: boolean;
   suppressionCommitFails?: boolean;
@@ -119,7 +122,6 @@ function fixture(options: {
   const truth = [...(options.truths ?? ["active", "active"] )];
   let truthIndex = 0;
   const currentTruth = () => truth[truthIndex] ?? "active";
-  let lastProjectionWasStored = false;
   let putCount = 0;
   let forwardedReceiptCommitFailed = false;
 
@@ -284,7 +286,9 @@ function fixture(options: {
       async send(message: unknown) {
         sent.push(message);
         if (options.sendThrows) throw new Error("ambiguous provider failure");
-        return options.sendResult ?? { messageId: "provider-message-id" };
+        return ("sendResult" in options
+          ? options.sendResult
+          : { messageId: "provider-message-id" }) as { messageId: string };
       },
     },
     EMERGENCY_FORWARD_FROM: "emergency-forward@example.com",
@@ -313,13 +317,7 @@ function fixture(options: {
           async getEmail() {
             const current = currentTruth();
             truthIndex += 1;
-            lastProjectionWasStored = current === "stored";
-            return lastProjectionWasStored ? { id: pointer.ingressId } : null;
-          },
-          async getInboundProjectionAuthority() {
-            const stored = lastProjectionWasStored;
-            lastProjectionWasStored = false;
-            return stored ? { generation: 1 } : null;
+            return current === "stored" ? { id: pointer.ingressId } : null;
           },
         };
       },
@@ -327,9 +325,6 @@ function fixture(options: {
   };
   const runtime = {
     now: () => new Date("2026-07-17T10:30:00.000Z"),
-    createEmailMessage(from: string, to: string, raw: ReadableStream) {
-      return { from, to, raw } as unknown as EmailMessage;
-    },
   };
   const message = {
     id: "queue-message-1",
@@ -530,7 +525,7 @@ test("missing SHA authority is audited and never reaches either delivery Queue",
   assert.deepEqual(f.acks, ["ack"]);
 });
 
-test("streams exact R2 raw through Email Service and commits forwarded truth", async () => {
+test("sends the exact R2 raw as a fresh notification and commits forwarded truth", async () => {
   const f = fixture();
   await beginEmergencyForward(f.env, pointer, "MIME_PARSE_FAILED", f.runtime);
   await processEmergencyForwardMessage(f.message, f.env, f.runtime);
@@ -549,18 +544,95 @@ test("streams exact R2 raw through Email Service and commits forwarded truth", a
   assert.match(receipt.providerRef, /^[a-f0-9]{16}$/);
 });
 
-test("retries ambiguous and invalid provider results while retaining marker", async () => {
-  for (const options of [
-    { sendThrows: true },
-    { sendResult: { messageId: "" } },
-  ]) {
-    const f = fixture(options);
+test("retries an ambiguous provider failure while retaining marker", async () => {
+  const f = fixture({ sendThrows: true });
+  await beginEmergencyForward(f.env, pointer, "MIME_PARSE_FAILED", f.runtime);
+  await processEmergencyForwardMessage(f.message, f.env, f.runtime);
+  assert.deepEqual(f.acks, []);
+  assert.equal(f.retries.length, 1);
+  assert.equal(f.values.has(emergencyForwardMarkerKey(pointer.rawKey)), true);
+});
+
+test("a send that returns no usable messageId still settles as delivered", async () => {
+  for (const sendResult of [undefined, {}, { messageId: "" }] as const) {
+    const f = fixture({ sendResult });
     await beginEmergencyForward(f.env, pointer, "MIME_PARSE_FAILED", f.runtime);
     await processEmergencyForwardMessage(f.message, f.env, f.runtime);
-    assert.deepEqual(f.acks, []);
-    assert.equal(f.retries.length, 1);
-    assert.equal(f.values.has(emergencyForwardMarkerKey(pointer.rawKey)), true);
+    const label = JSON.stringify(sendResult ?? null);
+    assert.equal(f.sent.length, 1, label);
+    assert.deepEqual(f.acks, ["ack"], label);
+    assert.deepEqual(f.retries, [], label);
+    assert.equal(
+      f.values.has(emergencyForwardMarkerKey(pointer.rawKey)),
+      false,
+      label,
+    );
+    const receipt = JSON.parse(
+      f.values.get(`receipts/${pointer.ingressId}.json`) ?? "null",
+    );
+    assert.equal(receipt.state, "forwarded", label);
+    assert.equal(receipt.providerAccepted, true, label);
+    assert.equal(receipt.providerRef, undefined, label);
   }
+});
+
+test("the notification the binding accepts carries the byte-exact original", async () => {
+  const f = fixture();
+  await beginEmergencyForward(f.env, pointer, "MIME_PARSE_FAILED", f.runtime);
+  await processEmergencyForwardMessage(f.message, f.env, f.runtime);
+
+  const notification = f.sent[0] as {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    headers?: Record<string, string>;
+    raw?: unknown;
+    attachments: Array<{
+      content: ArrayBuffer;
+      disposition: string;
+      filename: string;
+      type: string;
+    }>;
+  };
+  // The binding rejects a re-sent original on exactly two rules: the From:
+  // header must equal the envelope sender, and no Received: header may survive
+  // into the message it is asked to send.
+  assert.equal(notification.from, f.env.EMERGENCY_FORWARD_FROM);
+  assert.equal(notification.to, f.env.EMERGENCY_FORWARD_DESTINATION);
+  assert.equal(notification.raw, undefined);
+  assert.equal(
+    Object.keys(notification.headers ?? {}).some(
+      (key) => key.toLowerCase() === "received",
+    ),
+    false,
+  );
+  assert.equal(/^received:/im.test(notification.text), false);
+  assert.match(notification.subject, /MIME_PARSE_FAILED/);
+  assert.equal(notification.attachments.length, 1);
+  assert.equal(notification.attachments[0].type, "message/rfc822");
+  assert.equal(notification.attachments[0].disposition, "attachment");
+  assert.equal(
+    new TextDecoder().decode(notification.attachments[0].content),
+    rawSource,
+  );
+});
+
+test("an original past the outbound attachment cap is announced without it", () => {
+  const notification = emergencyForwardNotification(
+    {
+      EMERGENCY_FORWARD_FROM: "emergency-forward@example.com",
+      EMERGENCY_FORWARD_DESTINATION: "heshamelmahdi@gmail.com",
+    },
+    pointer,
+    "EMAXLEN",
+    new ArrayBuffer(EMERGENCY_FORWARD_MAX_ATTACHMENT_BYTES + 1),
+  );
+
+  assert.equal("attachments" in notification, false);
+  assert.match(notification.text, new RegExp(pointer.rawKey));
+  assert.equal(/^received:/im.test(notification.text), false);
+  assert.equal(notification.from, "emergency-forward@example.com");
 });
 
 test("accepted send with a transient receipt CAS failure commits on retry without resending", async () => {
@@ -767,7 +839,7 @@ test("accepted precedence survives a receipt CAS loss and converges without rese
   };
 
   await processEmergencyForwardMessage(f.message, f.env, f.runtime);
-  assert.deepEqual(f.retries, [{ delaySeconds: 30 }]);
+  assert.deepEqual(f.retries, [{ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS }]);
   assert.equal(f.values.has(markerKey), true);
   await processEmergencyForwardMessage(f.message, f.env, f.runtime);
 
@@ -867,6 +939,55 @@ test("suppresses a stored or deleted race both before and after raw fetch", asyn
     assert.deepEqual(f.acks, ["ack"]);
     assert.equal(f.values.has(emergencyForwardMarkerKey(pointer.rawKey)), false);
   }
+});
+
+test("a live Mailbox row settles the loop while an absent one still forwards", async () => {
+  const delivered = fixture({ truths: ["stored"] });
+  await beginEmergencyForward(
+    delivered.env,
+    pointer,
+    "MIME_PARSE_FAILED",
+    delivered.runtime,
+  );
+  await processEmergencyForwardMessage(
+    delivered.message,
+    delivered.env,
+    delivered.runtime,
+  );
+  assert.equal(delivered.sent.length, 0);
+  assert.deepEqual(delivered.retries, []);
+  assert.deepEqual(delivered.acks, ["ack"]);
+  assert.equal(
+    JSON.parse(
+      delivered.values.get(`receipts/${pointer.ingressId}.json`) ?? "null",
+    ).state,
+    "stored",
+  );
+  // The reconciler must not resurrect what the consumer just settled.
+  assert.equal(
+    delivered.values.has(emergencyForwardMarkerKey(pointer.rawKey)),
+    false,
+  );
+  await reconcileEmergencyForwardMarkers(delivered.env, delivered.runtime);
+  assert.deepEqual(delivered.queues.slice(1), []);
+
+  const undelivered = fixture({ truths: ["active"] });
+  await beginEmergencyForward(
+    undelivered.env,
+    pointer,
+    "MIME_PARSE_FAILED",
+    undelivered.runtime,
+  );
+  await processEmergencyForwardMessage(
+    undelivered.message,
+    undelivered.env,
+    undelivered.runtime,
+  );
+  assert.equal(undelivered.sent.length, 1);
+});
+
+test("a redelivery lands after the lease it was scheduled behind expires", () => {
+  assert.ok(EMERGENCY_FORWARD_RETRY_SECONDS >= EMERGENCY_FORWARD_LEASE_SECONDS);
 });
 
 test("stored and deleted receipts suppress only with matching authoritative Mailbox truth", async () => {
@@ -1063,7 +1184,7 @@ test("an absent raw archive retains forwarding authority and retries", async () 
 
   assert.equal(f.sent.length, 0);
   assert.deepEqual(f.acks, []);
-  assert.deepEqual(f.retries, [{ delaySeconds: 30 }]);
+  assert.deepEqual(f.retries, [{ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS }]);
   assert.equal(f.values.has(emergencyForwardMarkerKey(pointer.rawKey)), true);
   assert.equal(
     JSON.parse(
@@ -1086,7 +1207,7 @@ test("a failed raw archive read retains forwarding authority and retries", async
 
   assert.equal(f.sent.length, 0);
   assert.deepEqual(f.acks, []);
-  assert.deepEqual(f.retries, [{ delaySeconds: 30 }]);
+  assert.deepEqual(f.retries, [{ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS }]);
   assert.equal(f.values.has(emergencyForwardMarkerKey(pointer.rawKey)), true);
   assert.equal(
     JSON.parse(
@@ -1137,9 +1258,10 @@ test("a hung first provider send cannot block a healthy second Queue message or 
   let finishFirst!: (value: { messageId: string }) => void;
   f.env.EMERGENCY_EMAIL.send = async (message) => {
     sendCount += 1;
-    const source = await new Response(
-      (message as unknown as { raw: ReadableStream }).raw,
-    ).text();
+    const source = new TextDecoder().decode(
+      (message as unknown as { attachments: Array<{ content: ArrayBuffer }> })
+        .attachments[0].content,
+    );
     if (source === rawSource) {
       return new Promise((resolve) => {
         finishFirst = resolve;
@@ -1199,12 +1321,16 @@ test("a hung first provider send cannot block a healthy second Queue message or 
   scheduler.fireDelay(60_000);
   await work;
 
-  assert.deepEqual(dispositions.first, ["retry:30"]);
+  assert.deepEqual(dispositions.first, [
+    `retry:${EMERGENCY_FORWARD_RETRY_SECONDS}`,
+  ]);
   assert.deepEqual(dispositions.second, ["ack"]);
   finishFirst({ messageId: "late-provider-message" });
   await Promise.resolve();
   await Promise.resolve();
-  assert.deepEqual(dispositions.first, ["retry:30"]);
+  assert.deepEqual(dispositions.first, [
+    `retry:${EMERGENCY_FORWARD_RETRY_SECONDS}`,
+  ]);
   assert.equal(
     JSON.parse(
       f.values.get(`receipts/${pointer.ingressId}.json`) ?? "null",
@@ -1286,7 +1412,9 @@ test("a hung sidecar operation is cut off at the infrastructure budget without b
     },
   );
 
-  assert.deepEqual(dispositions.first, ["retry:30"]);
+  assert.deepEqual(dispositions.first, [
+    `retry:${EMERGENCY_FORWARD_RETRY_SECONDS}`,
+  ]);
   assert.deepEqual(dispositions.second, ["ack"]);
   assert.equal(f.sent.length, 1);
 
@@ -1295,7 +1423,7 @@ test("a hung sidecar operation is cut off at the infrastructure budget without b
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.deepEqual(
     dispositions.first,
-    ["retry:30"],
+    [`retry:${EMERGENCY_FORWARD_RETRY_SECONDS}`],
     "a late sidecar completion must not replace the timeout disposition",
   );
 });
@@ -1382,7 +1510,7 @@ test("provider ambiguity is fenced for 180 seconds before a new generation may s
   );
   assert.deepEqual(f.queues.map(({ generation }) => generation), [1, 2]);
   assert.equal(f.sent.length, 1);
-  assert.deepEqual(f.retries, [{ delaySeconds: 30 }]);
+  assert.deepEqual(f.retries, [{ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS }]);
 });
 
 test("repairs a missing marker from exact pending receipt and raw authority", async () => {
@@ -1490,7 +1618,7 @@ test("raw-integrity quarantine is terminal only while the exact mismatch remains
   await processEmergencyForwardMessage(f.message, f.env, f.runtime);
   assert.equal(f.sent.length, 0);
   assert.deepEqual(f.acks, ["ack"]);
-  assert.deepEqual(f.retries, [{ delaySeconds: 30 }]);
+  assert.deepEqual(f.retries, [{ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS }]);
 });
 
 test("retains marker and retries when suppression receipt CAS fails", async () => {
@@ -1500,7 +1628,7 @@ test("retains marker and retries when suppression receipt CAS fails", async () =
   await processEmergencyForwardMessage(f.message, f.env, f.runtime);
   assert.equal(f.sent.length, 0);
   assert.deepEqual(f.acks, []);
-  assert.deepEqual(f.retries, [{ delaySeconds: 30 }]);
+  assert.deepEqual(f.retries, [{ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS }]);
   assert.equal(f.values.has(emergencyForwardMarkerKey(pointer.rawKey)), true);
 });
 
@@ -1511,7 +1639,7 @@ test("legacy rejected CAS winner cannot suppress an integrity-mismatch retry", a
   await processEmergencyForwardMessage(f.message, f.env, f.runtime);
   assert.equal(f.sent.length, 0);
   assert.deepEqual(f.acks, []);
-  assert.deepEqual(f.retries, [{ delaySeconds: 30 }]);
+  assert.deepEqual(f.retries, [{ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS }]);
   assert.equal(f.values.has(emergencyForwardMarkerKey(pointer.rawKey)), true);
 });
 

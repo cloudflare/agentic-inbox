@@ -10,7 +10,6 @@ import { routeAgentRequest } from "agents";
 import { Hono, type Context } from "hono";
 import { createRequestHandler } from "react-router";
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
-import { EmailMessage } from "cloudflare:email";
 import { app as apiApp } from "./index";
 import { receiveEmail } from "./inbound-email";
 import {
@@ -467,11 +466,15 @@ export default {
 		await processInboundDeadLetterBatch(batch, env);
 		return;
 	}
-	if (batch.queue === env.EMERGENCY_FORWARD_QUEUE_NAME) {
+	// The parking lane runs the same consumer: a message that exhausts the
+	// primary lane keeps its marker, its lease, and its generation fence, and the
+	// named backlog makes exhaustion visible instead of silently dropped.
+	if (
+		batch.queue === env.EMERGENCY_FORWARD_QUEUE_NAME ||
+		batch.queue === env.EMERGENCY_FORWARD_PARKING_NAME
+	) {
 		await processEmergencyForwardBatch(batch, env, {
 			now: () => new Date(),
-			createEmailMessage: (from, to, raw) =>
-				new EmailMessage(from, to, raw),
 		});
 		return;
 	}
