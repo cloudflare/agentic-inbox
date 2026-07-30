@@ -29,6 +29,7 @@ import type { TodayBriefDayBoundary } from "./today-brief-timezone.ts";
 import {
 	buildTodayBriefModelMessages,
 	parseTodayBriefOutput,
+	TODAY_BRIEF_OUTPUT_JSON_SCHEMA,
 	TodayBriefValidationError,
 } from "./today-brief.ts";
 
@@ -173,6 +174,7 @@ async function validatedCachedResponse(
 		feature: GLOBAL_TODAY_BRIEF_AI_CONFIG.feature,
 		actorUserId: input.actorUserId,
 		requestedTier: GLOBAL_TODAY_BRIEF_AI_CONFIG.requestedTier,
+		escalationReason: GLOBAL_TODAY_BRIEF_AI_CONFIG.escalationReason,
 		estimatedCostMicros: GLOBAL_TODAY_BRIEF_AI_CONFIG.estimatedCostMicros,
 		cacheKey: snapshot.cacheKey,
 		cacheHit: true,
@@ -240,6 +242,7 @@ async function generate(
 		feature: GLOBAL_TODAY_BRIEF_AI_CONFIG.feature,
 		actorUserId: input.actorUserId,
 		requestedTier: GLOBAL_TODAY_BRIEF_AI_CONFIG.requestedTier,
+		escalationReason: GLOBAL_TODAY_BRIEF_AI_CONFIG.escalationReason,
 		estimatedCostMicros: GLOBAL_TODAY_BRIEF_AI_CONFIG.estimatedCostMicros,
 		cacheKey: snapshot.cacheKey,
 		cacheHit: false,
@@ -471,9 +474,18 @@ export function createGlobalTodayBriefRuntime(
 				messages,
 				max_tokens: GLOBAL_TODAY_BRIEF_AI_CONFIG.maxTokens,
 				temperature: GLOBAL_TODAY_BRIEF_AI_CONFIG.temperature,
-			}) as { response?: string; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+				// Workers AI JSON mode. The strong tier supports it; it removes the
+				// malformed-JSON failure mode but not the evidence preconditions.
+				response_format: {
+					type: "json_schema",
+					json_schema: TODAY_BRIEF_OUTPUT_JSON_SCHEMA,
+				},
+			}) as { response?: string | object; usage?: { prompt_tokens?: number; completion_tokens?: number } };
 			return {
-				text: (response.response ?? "").trim(),
+				// JSON mode can hand back a parsed object rather than a string.
+				text: typeof response.response === "object" && response.response !== null
+					? JSON.stringify(response.response)
+					: (response.response ?? "").trim(),
 				promptTokens: Math.max(0, Math.floor(response.usage?.prompt_tokens ?? 0)),
 				completionTokens: Math.max(0, Math.floor(response.usage?.completion_tokens ?? 0)),
 			};

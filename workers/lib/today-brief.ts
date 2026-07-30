@@ -170,26 +170,29 @@ export function buildTodayBriefModelMessages(
 	return messages;
 }
 
+const WHY_NOW_CODES = [
+	"overdue_reminder",
+	"due_today",
+	"unread_request",
+	"unread_question",
+	"time_sensitive",
+	"new_information",
+	"review_needed",
+] as const;
+const NEXT_STEP_CODES = [
+	"review",
+	"prepare_reply",
+	"follow_up",
+	"schedule_review",
+	"no_action",
+] as const;
+
 const focusItemSchema = z
 	.object({
 		candidateId: z.string(),
 		rank: z.number().int(),
-		whyNow: z.enum([
-			"overdue_reminder",
-			"due_today",
-			"unread_request",
-			"unread_question",
-			"time_sensitive",
-			"new_information",
-			"review_needed",
-		]),
-		suggestedNextStep: z.enum([
-			"review",
-			"prepare_reply",
-			"follow_up",
-			"schedule_review",
-			"no_action",
-		]),
+		whyNow: z.enum(WHY_NOW_CODES),
+		suggestedNextStep: z.enum(NEXT_STEP_CODES),
 		messageIds: z.array(z.string()).min(1).max(TODAY_BRIEF_LIMITS.citationsPerItem),
 		requiresHumanReview: z.literal(true),
 	})
@@ -197,6 +200,48 @@ const focusItemSchema = z
 const outputSchema = z
 	.object({ items: z.array(focusItemSchema).max(TODAY_BRIEF_LIMITS.focusItems) })
 	.strict();
+
+/**
+ * JSON Schema mirror of outputSchema for Workers AI JSON mode. It constrains
+ * shape only; the evidence preconditions stay in the validator, which still runs
+ * on every response.
+ */
+export const TODAY_BRIEF_OUTPUT_JSON_SCHEMA = {
+	type: "object",
+	properties: {
+		items: {
+			type: "array",
+			maxItems: TODAY_BRIEF_LIMITS.focusItems,
+			items: {
+				type: "object",
+				properties: {
+					candidateId: { type: "string" },
+					rank: { type: "integer" },
+					whyNow: { type: "string", enum: [...WHY_NOW_CODES] },
+					suggestedNextStep: { type: "string", enum: [...NEXT_STEP_CODES] },
+					messageIds: {
+						type: "array",
+						minItems: 1,
+						maxItems: TODAY_BRIEF_LIMITS.citationsPerItem,
+						items: { type: "string" },
+					},
+					requiresHumanReview: { type: "boolean", enum: [true] },
+				},
+				required: [
+					"candidateId",
+					"rank",
+					"whyNow",
+					"suggestedNextStep",
+					"messageIds",
+					"requiresHumanReview",
+				],
+				additionalProperties: false,
+			},
+		},
+	},
+	required: ["items"],
+	additionalProperties: false,
+} as const;
 
 /**
  * Machine subcode per distinct validator rule. The ledger persists it alongside

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { GLOBAL_TODAY_BRIEF_AI_CONFIG } from "../../shared/global-today-brief.ts";
 import {
 	AiCostController,
 	DEFAULT_AI_COST_CONFIG,
@@ -230,6 +231,17 @@ test("strong tier requires a supported feature and a reasoned escalation", async
 	assert.deepEqual(
 		{ decision: unsupported.decision, reason: unsupported.reason },
 		{ decision: "block", reason: "strong_tier_not_allowed_for_feature" },
+	);
+
+	const brief = await controller(store).beginUsage({
+		feature: GLOBAL_TODAY_BRIEF_AI_CONFIG.feature,
+		requestedTier: GLOBAL_TODAY_BRIEF_AI_CONFIG.requestedTier,
+		escalationReason: GLOBAL_TODAY_BRIEF_AI_CONFIG.escalationReason,
+		estimatedCostMicros: GLOBAL_TODAY_BRIEF_AI_CONFIG.estimatedCostMicros,
+	});
+	assert.deepEqual(
+		{ decision: brief.decision, tier: brief.tier, mode: brief.mode },
+		{ decision: "allow", tier: "strong", mode: "paid" },
 	);
 });
 

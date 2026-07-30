@@ -7,12 +7,15 @@ import {
 } from "./global-today-brief-candidates.ts";
 
 import {
+	createGlobalTodayBriefRuntime,
 	globalTodayBriefFailureCode,
 	GlobalTodayBriefAccessChangedError,
 	runGlobalTodayBrief,
 	type GlobalTodayBriefRuntimeDependencies,
 } from "./global-today-brief-runtime.ts";
 import { TodayBriefValidationError } from "./today-brief.ts";
+import { GLOBAL_TODAY_BRIEF_AI_CONFIG } from "../../shared/global-today-brief.ts";
+import type { Env } from "../types.ts";
 import type { GlobalTodayBriefSnapshot } from "./global-today-brief-snapshot.ts";
 
 const day = {
@@ -406,4 +409,39 @@ test("ledger failure codes name the broken rule without carrying free text", () 
 	// failUsage truncates at 100 characters; a truncated code would be unqueryable.
 	assert.ok(bounded.length <= 100, bounded);
 	assert.match(bounded, /^[a-z0-9_:]+$/);
+});
+
+test("the provider call requests Workers AI JSON mode against the brief schema", async () => {
+	const calls: Array<{ model: string; body: Record<string, unknown> }> = [];
+	const env = {
+		AI: {
+			run: async (model: string, body: Record<string, unknown>) => {
+				calls.push({ model, body });
+				return { response: { items: [] }, usage: { prompt_tokens: 7, completion_tokens: 3 } };
+			},
+		},
+		AI_STRONG_MODEL: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+	} as unknown as Env;
+	const runtime = createGlobalTodayBriefRuntime(env, { actorUserId: "actor-a", day });
+
+	const result = await runtime.runModel("strong-model", [
+		{ role: "system", content: "policy" },
+		{ role: "user", content: "instruction" },
+	]);
+
+	assert.equal(calls.length, 1);
+	const body = calls[0]!.body as {
+		max_tokens: number;
+		temperature: number;
+		response_format: { type: string; json_schema: { type: string; required: string[] } };
+	};
+	assert.equal(body.max_tokens, GLOBAL_TODAY_BRIEF_AI_CONFIG.maxTokens);
+	assert.equal(body.temperature, GLOBAL_TODAY_BRIEF_AI_CONFIG.temperature);
+	assert.equal(body.response_format.type, "json_schema");
+	assert.equal(body.response_format.json_schema.type, "object");
+	assert.deepEqual(body.response_format.json_schema.required, ["items"]);
+	// JSON mode may return a parsed object, which the validator still receives as text.
+	assert.deepEqual(JSON.parse(result.text), { items: [] });
+	assert.equal(result.promptTokens, 7);
+	assert.equal(result.completionTokens, 3);
 });
