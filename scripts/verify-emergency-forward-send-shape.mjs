@@ -5,7 +5,13 @@
 // reintroduce a forward that never leaves the Worker.
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { Log, LogLevel, Miniflare } from "miniflare";
+
+// Run under `node --experimental-strip-types` so the harness exercises the
+// production composer itself; a hand-rolled copy could pass here while the
+// payload the Worker actually sends drifts away from it.
+import { emergencyForwardNotification } from "../workers/lib/emergency-forward.ts";
 
 const FROM = "emergency-forward@example.com";
 const DESTINATION = "backup@example.com";
@@ -22,6 +28,8 @@ const ORIGINAL_RAW = [
   "",
 ].join("\r\n");
 
+// The Worker only relays: it rehydrates the base64 attachment the production
+// composer produced and hands the payload to the binding untouched.
 const WORKER = `
 import { EmailMessage } from "cloudflare:email";
 
@@ -30,8 +38,9 @@ const ORIGINAL_RAW = ${JSON.stringify(ORIGINAL_RAW)};
 export default {
   async fetch(request, env) {
     const shape = new URL(request.url).searchParams.get("shape");
+    const composed = shape === "notification" ? await request.json() : null;
     try {
-      const result = await env.EMERGENCY_EMAIL.send(payload(shape, env));
+      const result = await env.EMERGENCY_EMAIL.send(payload(shape, env, composed));
       return Response.json({
         accepted: true,
         resultType: typeof result,
@@ -43,7 +52,7 @@ export default {
   },
 };
 
-function payload(shape, env) {
+function payload(shape, env, composed) {
   if (shape === "raw") {
     return new EmailMessage(env.FROM, env.DESTINATION, ORIGINAL_RAW);
   }
@@ -55,26 +64,53 @@ function payload(shape, env) {
     );
   }
   return {
-    from: env.FROM,
-    to: env.DESTINATION,
-    subject: "Emergency mail forward (MIME_PARSE_FAILED): ingress-1",
-    text: "An inbound email did not reach its mailbox.\\n",
-    attachments: [
-      {
-        content: new TextEncoder().encode(ORIGINAL_RAW).buffer,
-        disposition: "attachment",
-        filename: "original.eml",
-        type: "message/rfc822",
-      },
-    ],
+    ...composed,
+    ...(composed.attachments
+      ? {
+          attachments: composed.attachments.map((attachment) => ({
+            ...attachment,
+            content: Uint8Array.from(atob(attachment.content), (character) =>
+              character.charCodeAt(0),
+            ).buffer,
+          })),
+        }
+      : {}),
   };
 }
 `;
 
-async function send(mf, shape) {
-  const response = await mf.dispatchFetch(
-    `http://localhost/?shape=${shape}`,
+function composeProductionNotification() {
+  const original = new TextEncoder().encode(ORIGINAL_RAW);
+  const notification = emergencyForwardNotification(
+    { EMERGENCY_FORWARD_FROM: FROM, EMERGENCY_FORWARD_DESTINATION: DESTINATION },
+    {
+      schemaVersion: 1,
+      ingressId: "emergency-forward-harness",
+      rawKey: "raw/2026/07/17/10/20/emergency-forward-harness.eml",
+      mailboxId: "team@example.com",
+      rawSize: original.byteLength,
+      rawSha256: createHash("sha256").update(original).digest("hex"),
+      archivedAt: "2026-07-17T10:20:00.000Z",
+      etag: "raw-etag",
+      version: "raw-version",
+    },
+    "MIME_PARSE_FAILED",
+    original.buffer,
   );
+  return {
+    ...notification,
+    attachments: notification.attachments?.map((attachment) => ({
+      ...attachment,
+      content: Buffer.from(attachment.content).toString("base64"),
+    })),
+  };
+}
+
+async function send(mf, shape, body) {
+  const response = await mf.dispatchFetch(`http://localhost/?shape=${shape}`, {
+    method: body === undefined ? "GET" : "POST",
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
   return response.json();
 }
 
@@ -111,7 +147,11 @@ export async function verifyEmergencyForwardSendShape({
     );
     assert.match(rewritten.message, /invalid headers set/);
 
-    const notification = await send(mf, "notification");
+    const composed = composeProductionNotification();
+    assert.equal(composed.from, FROM, "composer must send from the envelope");
+    assert.equal(composed.attachments.length, 1);
+    assert.equal(composed.attachments[0].type, "message/rfc822");
+    const notification = await send(mf, "notification", composed);
     assert.equal(
       notification.accepted,
       true,

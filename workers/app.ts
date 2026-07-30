@@ -18,6 +18,8 @@ import {
 } from "./inbound-queue.ts";
 import { reconcileInboundArchives } from "./inbound-reconciliation.ts";
 import {
+  EMERGENCY_FORWARD_PARKING_RETRY_SECONDS,
+  EMERGENCY_FORWARD_RETRY_SECONDS,
   processEmergencyForwardBatch,
   reconcileEmergencyForwardMarkers,
 } from "./lib/emergency-forward.ts";
@@ -468,13 +470,19 @@ export default {
 	}
 	// The parking lane runs the same consumer: a message that exhausts the
 	// primary lane keeps its marker, its lease, and its generation fence, and the
-	// named backlog makes exhaustion visible instead of silently dropped.
+	// named backlog makes exhaustion visible instead of silently dropped. Only
+	// the redelivery cadence differs, and it has to be explicit because a
+	// per-message delay overrides the lane's configured retry_delay.
 	if (
 		batch.queue === env.EMERGENCY_FORWARD_QUEUE_NAME ||
 		batch.queue === env.EMERGENCY_FORWARD_PARKING_NAME
 	) {
 		await processEmergencyForwardBatch(batch, env, {
 			now: () => new Date(),
+			retryDelaySeconds:
+				batch.queue === env.EMERGENCY_FORWARD_PARKING_NAME
+					? EMERGENCY_FORWARD_PARKING_RETRY_SECONDS
+					: EMERGENCY_FORWARD_RETRY_SECONDS,
 		});
 		return;
 	}
