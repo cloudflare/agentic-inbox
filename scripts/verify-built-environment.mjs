@@ -43,6 +43,7 @@ const ENVIRONMENTS = {
 		inboundDlq: "sales-mail-inbound-dlq",
 		inboundParking: "sales-mail-inbound-parking",
 		emergencyQueue: "sales-mail-emergency-forward",
+		emergencyParking: "sales-mail-emergency-forward-parking",
 		emergencyFrom: "emergency-forward@whispyrcrm.com",
 		kvId: "cd541026bdf949d9ac63b3b5fdff4969",
 		route: "mail.whispyrcrm.com",
@@ -74,6 +75,7 @@ const ENVIRONMENTS = {
 		inboundDlq: "wiser-mail-inbound-dlq",
 		inboundParking: "wiser-mail-inbound-parking",
 		emergencyQueue: "wiser-mail-emergency-forward",
+		emergencyParking: "wiser-mail-emergency-forward-parking",
 		emergencyFrom: "emergency-forward@wiserchat.ai",
 		kvId: "c934d803c2f8430d9088f4a5d9f29d55",
 		route: "mail.wiserchat.ai",
@@ -177,8 +179,17 @@ function expectedQueueTopology(expected) {
 				max_batch_size: 1,
 				max_concurrency: 1,
 				max_batch_timeout: 5,
-				max_retries: 100,
+				max_retries: 10,
 				retry_delay: 300,
+				dead_letter_queue: expected.emergencyParking,
+			},
+			{
+				queue: expected.emergencyParking,
+				max_batch_size: 1,
+				max_concurrency: 1,
+				max_batch_timeout: 5,
+				max_retries: 100,
+				retry_delay: 3600,
 			},
 		],
 	};
@@ -271,6 +282,12 @@ export async function verifyBuiltEnvironment({
 			config.vars?.EMERGENCY_FORWARD_QUEUE_NAME,
 			expected.emergencyQueue,
 			"EMERGENCY_FORWARD_QUEUE_NAME",
+		);
+		await checkEqual(
+			logger,
+			config.vars?.EMERGENCY_FORWARD_PARKING_NAME,
+			expected.emergencyParking,
+			"EMERGENCY_FORWARD_PARKING_NAME",
 		);
 		await checkEqual(
 			logger,
