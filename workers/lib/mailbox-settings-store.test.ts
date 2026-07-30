@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	MailboxSettingsConflictError,
+	mailboxSettingsInForce,
 	mergeGeneralMailboxSettings,
 	mergeSignatureMailboxSettings,
 	updateMailboxSettings,
 	type MailboxSettingsBucket,
 } from "./mailbox-settings-store.ts";
+import {
+	SUPERSEDED_SYSTEM_PROMPTS,
+	WHISPYR_SYSTEM_PROMPT,
+	WISER_SYSTEM_PROMPT,
+} from "./prompts.ts";
 
 function racingBucket(
 	concurrentUpdate: (settings: Record<string, unknown>) => Record<string, unknown> =
@@ -96,4 +102,47 @@ test("general settings CAS preserves the latest signature and unrelated fields",
 		signature: { enabled: true, text: "Concurrent signature" },
 		forwarding: { enabled: true },
 	});
+});
+
+test("served settings show the prompt in force, so the form can't display a superseded default", () => {
+	const served = mailboxSettingsInForce(
+		{
+			fromName: "Wiser team",
+			forwarding: { enabled: false, email: "" },
+			agentSystemPrompt: SUPERSEDED_SYSTEM_PROMPTS.wiser[0],
+		},
+		"wiser",
+	);
+
+	assert.deepEqual(served, {
+		fromName: "Wiser team",
+		forwarding: { enabled: false, email: "" },
+		agentSystemPrompt: WISER_SYSTEM_PROMPT,
+	});
+});
+
+test("served settings never rewrite a prompt the user wrote", () => {
+	const stored = {
+		fromName: "Wiser team",
+		agentSystemPrompt: "  Always answer in Arabic and cc Omar.\n",
+	};
+
+	assert.deepEqual(mailboxSettingsInForce(stored, "wiser"), stored);
+	assert.deepEqual(
+		mailboxSettingsInForce(
+			{ agentSystemPrompt: WHISPYR_SYSTEM_PROMPT },
+			"whispyr",
+		),
+		{ agentSystemPrompt: WHISPYR_SYSTEM_PROMPT },
+	);
+});
+
+test("served settings leave an unset prompt unset, so the form keeps its placeholder", () => {
+	assert.deepEqual(mailboxSettingsInForce({ fromName: "Wiser team" }, "wiser"), {
+		fromName: "Wiser team",
+	});
+	assert.deepEqual(
+		mailboxSettingsInForce({ fromName: "Wiser team", agentSystemPrompt: "" }, "wiser"),
+		{ fromName: "Wiser team", agentSystemPrompt: "" },
+	);
 });

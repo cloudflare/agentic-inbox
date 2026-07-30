@@ -90,6 +90,7 @@ import {
 import {
 	MailboxSettingsConflictError,
 	MailboxSettingsNotFoundError,
+	mailboxSettingsInForce,
 	mergeGeneralMailboxSettings,
 	updateMailboxSettings,
 } from "./lib/mailbox-settings-store";
@@ -318,11 +319,12 @@ app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.var.authorizedMailboxId;
 	const obj = await c.env.BUCKET.get(`mailboxes/${mailboxId}.json`);
 	if (!obj) return c.json({ error: "Not found" }, 404);
+	const settings = await obj.json<Record<string, unknown>>();
 	return c.json({
 		id: mailboxId,
 		name: mailboxId,
 		email: mailboxId,
-		settings: await obj.json(),
+		settings: mailboxSettingsInForce(settings, resolveBrand(c.env.BRAND).id),
 	});
 });
 
@@ -346,7 +348,7 @@ app.put("/api/v1/mailboxes/:mailboxId", async (c) => {
 			id: mailboxId,
 			name: mailboxId,
 			email: mailboxId,
-			settings,
+			settings: mailboxSettingsInForce(settings, resolveBrand(c.env.BRAND).id),
 		});
 	} catch (error) {
 		if (error instanceof MailboxSettingsNotFoundError) {

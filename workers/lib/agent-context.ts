@@ -13,7 +13,7 @@ import {
 	stripHtmlToText,
 	textToHtml,
 } from "./email-helpers.ts";
-import { systemPromptFor } from "./prompts.ts";
+import { resolveAgentSystemPrompt, systemPromptFor } from "./prompts.ts";
 import { resolveBrand } from "../routes/brand.ts";
 import { Folders } from "../../shared/folders.ts";
 import type { Env } from "../types.ts";
@@ -258,25 +258,27 @@ export function parseComposeDraftOutput(
 
 /**
  * Resolve the system prompt for a mailbox: the per-mailbox `agentSystemPrompt`
- * from R2 settings if set, otherwise the active brand's canonical prompt.
+ * from R2 settings if the user customised it, otherwise the active brand's
+ * canonical prompt (resolveAgentSystemPrompt owns that call).
  */
 export async function getMailboxSystemPrompt(
 	env: Env,
 	mailboxId: string,
 ): Promise<string> {
+	const brand = resolveBrand(env.BRAND).id;
 	try {
 		const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
 		if (obj) {
 			const settings = await obj.json<Record<string, unknown>>();
-			const custom = settings.agentSystemPrompt;
-			if (typeof custom === "string" && custom.trim()) {
-				return boundAiText(custom.trim(), 8_000);
-			}
+			return boundAiText(
+				resolveAgentSystemPrompt(settings.agentSystemPrompt, brand),
+				8_000,
+			);
 		}
 	} catch {
 		// Fall through to the default.
 	}
-	return boundAiText(systemPromptFor(resolveBrand(env.BRAND).id), 8_000);
+	return boundAiText(systemPromptFor(brand), 8_000);
 }
 
 /**
