@@ -34,7 +34,20 @@ export const EMERGENCY_FORWARD_LEASE_SECONDS = 180;
 export const EMERGENCY_FORWARD_ITEM_TIMEOUT_MS = 75_000;
 export const EMERGENCY_FORWARD_PROVIDER_TIMEOUT_MS = 60_000;
 export const EMERGENCY_FORWARD_INFRASTRUCTURE_TIMEOUT_MS = 5_000;
-export const EMERGENCY_FORWARD_RETRY_SECONDS = 30;
+// A lease-blocked attempt still counts against max_retries, so a redelivery must
+// land after the lease this attempt leaves behind has expired. A shorter delay
+// spends the whole retry budget on attempts that bail on their own live lease.
+export const EMERGENCY_FORWARD_RETRY_SECONDS =
+  EMERGENCY_FORWARD_LEASE_SECONDS + 30;
+// An explicit per-message delay overrides the consumer's queue-level
+// retry_delay, so the parking lane has to restate its own hourly cadence or it
+// would burn its whole retry budget at the primary lane's pace.
+export const EMERGENCY_FORWARD_PARKING_RETRY_SECONDS = 3_600;
+// Inbound accepts 25 MiB of raw MIME, and an outbound send to a verified
+// destination is capped at 25 MiB after base64 expands the attachment by a
+// third. 16 MiB of original therefore leaves headroom, and anything larger is
+// announced without the attachment instead of failing every attempt forever.
+export const EMERGENCY_FORWARD_MAX_ATTACHMENT_BYTES = 16 * 1024 * 1024;
 
 export type EmergencyForwardReason =
   | "EMAXLEN"
@@ -106,9 +119,6 @@ type EmergencyEnvironment = {
       getInboundDeletionAuthority?(
         authority: InboundArchivePointer & { rawSha256: string },
       ): Promise<{ generation: number; deletedAt: string } | null>;
-      getInboundProjectionAuthority?(
-        authority: InboundArchivePointer & { rawSha256: string },
-      ): Promise<{ generation: number } | null>;
     };
   };
 };
@@ -120,11 +130,7 @@ type EmergencyQueueMessage = Pick<
 
 type EmergencyRuntime = {
   now(): Date;
-  createEmailMessage(
-    from: string,
-    to: string,
-    raw: ReadableStream,
-  ): EmailMessage;
+  retryDelaySeconds?: number;
   providerLogRef?(messageId: string): Promise<string>;
   bestEffortTimeoutMs?: number;
   infrastructureTimeoutMs?: number;
@@ -1018,25 +1024,14 @@ async function finalMailboxTruth(
     runtime,
   );
   if (!stored.ok) return "indeterminate";
-  if (stored.value) {
-    const projected =
-      pointer.rawSha256 !== undefined &&
-      mailbox.getInboundProjectionAuthority
-        ? await boundedInfrastructureRead(
-            () =>
-              mailbox.getInboundProjectionAuthority!({
-                ...projectInboundArchivePointer(pointer),
-                rawSha256: pointer.rawSha256!,
-              }),
-            runtime,
-          )
-        : { ok: true as const, value: null };
-    if (!projected.ok) return "indeterminate";
-    if (projected.value?.generation === 1) return "stored";
-  }
+  // A live mailbox row under this ingress id is delivery truth: the recipient
+  // already holds the mail, so the emergency copy has nothing left to rescue.
+  // Requiring an exact generation-1 archive-authority match on top of it left
+  // delivered mail retrying forever whenever the authority row had drifted.
+  if (stored.value) return "stored";
   // Ownership and active status are admission-time policy, not post-acceptance
-  // delivery truth. Once raw MIME is safe, only an exact projection/tombstone
-  // can suppress emergency delivery.
+  // delivery truth. Once raw MIME is safe, only a mailbox projection or an
+  // exact tombstone can suppress emergency delivery.
   return "active";
 }
 
@@ -1480,6 +1475,57 @@ async function readPendingReceiptForMarkerKey(
   };
 }
 
+// The send binding refuses a re-sent original outright: the archived From:
+// header never matches the emergency envelope sender, and the original's
+// Received: headers are rejected as "invalid headers set". So the forward is a
+// freshly composed notification that carries the untouched original as a
+// message/rfc822 attachment, leaving the archived bytes byte-identical.
+export function emergencyForwardNotification(
+  env: Pick<
+    EmergencyEnvironment,
+    "EMERGENCY_FORWARD_DESTINATION" | "EMERGENCY_FORWARD_FROM"
+  >,
+  pointer: InboundArchivePointer,
+  reason: EmergencyForwardReason,
+  original: ArrayBuffer,
+) {
+  const attachable =
+    original.byteLength <= EMERGENCY_FORWARD_MAX_ATTACHMENT_BYTES;
+  const summary = [
+    "An inbound email did not reach its mailbox and is being forwarded for manual recovery.",
+    "",
+    `Reason: ${reason}`,
+    `Mailbox: ${pointer.mailboxId}`,
+    `Ingress: ${pointer.ingressId}`,
+    `Archived at: ${pointer.archivedAt}`,
+    `Raw archive object: ${pointer.rawKey}`,
+    `Raw size: ${pointer.rawSize} bytes`,
+    `Raw SHA-256: ${pointer.rawSha256}`,
+    "",
+    attachable
+      ? "The untouched original is attached as original.eml."
+      : "The original exceeds the outbound attachment limit; read it from the raw archive object above.",
+  ].join("\n");
+  return {
+    from: env.EMERGENCY_FORWARD_FROM,
+    to: env.EMERGENCY_FORWARD_DESTINATION,
+    subject: `Emergency mail forward (${reason}): ${pointer.ingressId}`,
+    text: `${summary}\n`,
+    ...(attachable
+      ? {
+          attachments: [
+            {
+              content: original,
+              disposition: "attachment" as const,
+              filename: "original.eml",
+              type: "message/rfc822",
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
 export async function processEmergencyForwardMessage(
   message: EmergencyQueueMessage,
   env: EmergencyEnvironment,
@@ -1521,7 +1567,10 @@ export async function processEmergencyForwardMessage(
       operation: "emergency_forward",
       status: "retrying",
     });
-    message.retry({ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS });
+    message.retry({
+      delaySeconds:
+        runtime.retryDelaySeconds ?? EMERGENCY_FORWARD_RETRY_SECONDS,
+    });
   };
   try {
     let receipt = await readEmergencyReceipt(env.RAW_MAIL_BUCKET, pointer);
@@ -1736,10 +1785,11 @@ export async function processEmergencyForwardMessage(
     const providerSend = await runInboundWorkWithDeadline(
       async () =>
         env.EMERGENCY_EMAIL.send(
-          runtime.createEmailMessage(
-            env.EMERGENCY_FORWARD_FROM,
-            env.EMERGENCY_FORWARD_DESTINATION,
-            raw.body,
+          emergencyForwardNotification(
+            env,
+            pointer,
+            marker.value.reason,
+            await new Response(raw.body).arrayBuffer(),
           ),
         ),
       {
@@ -1753,10 +1803,14 @@ export async function processEmergencyForwardMessage(
     if (providerSend.status !== "completed") {
       throw new Error("Emergency Email Service acceptance is ambiguous");
     }
-    const result = providerSend.value;
-    if (!result || typeof result.messageId !== "string" || !result.messageId.trim()) {
-      throw new Error("Emergency Email Service response omitted messageId");
-    }
+    // A send that returns without throwing is provider acceptance. The binding
+    // documents a messageId on the result, but it only feeds an optional
+    // telemetry ref, so demanding it would keep an accepted forward retrying.
+    const result: { messageId?: unknown } | undefined = providerSend.value;
+    const providerMessageId =
+      typeof result?.messageId === "string" && result.messageId.trim()
+        ? result.messageId
+        : null;
     const acceptedAt = runtime.now().toISOString();
     const acceptedMarker = await commitProviderAcceptanceMarker(
       env.RAW_MAIL_BUCKET,
@@ -1775,7 +1829,10 @@ export async function processEmergencyForwardMessage(
     if (!committed) {
       throw new Error("Forward accepted but receipt transition was not committed");
     }
-    const providerRef = await privacySafeProviderRef(result.messageId, runtime);
+    const providerRef =
+      providerMessageId === null
+        ? null
+        : await privacySafeProviderRef(providerMessageId, runtime);
     if (providerRef !== null) {
       await settleBestEffort(
         async () => {
@@ -1802,7 +1859,7 @@ export async function processEmergencyForwardMessage(
       );
     }
     await env.RAW_MAIL_BUCKET.delete(emergencyForwardMarkerKey(pointer.rawKey));
-    console.error("[mail-emergency-forward] original raw delivered", {
+    console.error("[mail-emergency-forward] original raw notification sent", {
       attempt: message.attempts,
       ingressRef,
       operation: "emergency_forward",
@@ -1854,7 +1911,8 @@ export async function processEmergencyForwardBatch(
       attempt.close();
       if (!disposition.isSettled()) {
         disposition.retry({
-          delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS,
+          delaySeconds:
+            runtime.retryDelaySeconds ?? EMERGENCY_FORWARD_RETRY_SECONDS,
         });
       }
     }),
@@ -1870,7 +1928,7 @@ async function reconcileOneEmergencyForwardMarker(
   listedKey: string,
   env: Pick<
     EmergencyEnvironment,
-    "RAW_MAIL_BUCKET" | "EMERGENCY_FORWARD_QUEUE"
+    "BUCKET" | "DB" | "EMERGENCY_FORWARD_QUEUE" | "MAILBOX" | "RAW_MAIL_BUCKET"
   >,
   runtime: Pick<
     EmergencyRuntime,
@@ -1966,6 +2024,13 @@ async function reconcileOneEmergencyForwardMarker(
     isForwardEligibleQuarantine(receipt.value) ||
     receiptNeedsMailboxTruth(receipt.value)
   ) {
+    // Repairing a terminal receipt back to forward_pending would resurrect a
+    // forward the consumer already settled, so mailbox truth decides first.
+    const truth = await finalMailboxTruth(env, pointer, runtime);
+    if (truth !== "active" && truth !== "indeterminate") {
+      await suppressForward(env, pointer, truth, runtime);
+      return { authorityDurable: true, reenqueued: false };
+    }
     receipt =
       (await repairReceiptFromMarker(
         env.RAW_MAIL_BUCKET,
@@ -1995,7 +2060,7 @@ async function reconcileOneEmergencyForwardMarker(
 export async function reconcileEmergencyForwardMarkers(
   env: Pick<
     EmergencyEnvironment,
-    "RAW_MAIL_BUCKET" | "EMERGENCY_FORWARD_QUEUE"
+    "BUCKET" | "DB" | "EMERGENCY_FORWARD_QUEUE" | "MAILBOX" | "RAW_MAIL_BUCKET"
   >,
   runtime: Pick<
     EmergencyRuntime,

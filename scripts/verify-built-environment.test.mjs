@@ -21,6 +21,7 @@ const identities = {
 		dlq: "sales-mail-inbound-dlq",
 		parking: "sales-mail-inbound-parking",
 		emergencyQueue: "sales-mail-emergency-forward",
+		emergencyParking: "sales-mail-emergency-forward-parking",
 		emergencyFrom: "emergency-forward@whispyrcrm.com",
 		kvId: "cd541026bdf949d9ac63b3b5fdff4969",
 		route: "mail.whispyrcrm.com",
@@ -39,6 +40,7 @@ const identities = {
 		dlq: "wiser-mail-inbound-dlq",
 		parking: "wiser-mail-inbound-parking",
 		emergencyQueue: "wiser-mail-emergency-forward",
+		emergencyParking: "wiser-mail-emergency-forward-parking",
 		emergencyFrom: "emergency-forward@wiserchat.ai",
 		kvId: "c934d803c2f8430d9088f4a5d9f29d55",
 		route: "mail.wiserchat.ai",
@@ -64,6 +66,7 @@ function validArtifact(brand) {
 			INBOUND_DLQ_NAME: identity.dlq,
 			INBOUND_PARKING_NAME: identity.parking,
 			EMERGENCY_FORWARD_QUEUE_NAME: identity.emergencyQueue,
+			EMERGENCY_FORWARD_PARKING_NAME: identity.emergencyParking,
 			EMERGENCY_FORWARD_FROM: identity.emergencyFrom,
 			EMERGENCY_FORWARD_DESTINATION: "heshamelmahdi@gmail.com",
 		},
@@ -145,8 +148,17 @@ function validArtifact(brand) {
 					max_batch_size: 1,
 					max_concurrency: 1,
 					max_batch_timeout: 5,
-					max_retries: 100,
+					max_retries: 10,
 					retry_delay: 300,
+					dead_letter_queue: identity.emergencyParking,
+				},
+				{
+					queue: identity.emergencyParking,
+					max_batch_size: 1,
+					max_concurrency: 1,
+					max_batch_timeout: 5,
+					max_retries: 100,
+					retry_delay: 3600,
 				},
 			],
 		},
@@ -243,24 +255,31 @@ test("rejects an attachment preview bucket that aliases production", async () =>
 });
 
 test("rejects a missing Queue edge", async () => {
-	const fixture = await runFixture("wiser", (artifact) => {
-		delete artifact.queues.consumers[1].dead_letter_queue;
-	});
-	await assert.rejects(fixture.invocation, /Queue graph and consumer settings/);
+	// Index 3 is the emergency lane: shipping it without a parking dead-letter
+	// queue is the exact regression that let exhausted forwards vanish.
+	for (const index of [1, 3]) {
+		const fixture = await runFixture("wiser", (artifact) => {
+			delete artifact.queues.consumers[index].dead_letter_queue;
+		});
+		await assert.rejects(
+			fixture.invocation,
+			/Queue graph and consumer settings/,
+		);
+	}
 });
 
 test("rejects Queue isolation, concurrency, and recovery-latency regressions", async () => {
 	const mutations = [
-		...Array.from({ length: 4 }, (_, index) => (artifact) => {
+		...Array.from({ length: 5 }, (_, index) => (artifact) => {
 			artifact.queues.consumers[index].max_batch_size = 2;
 		}),
-		...Array.from({ length: 4 }, (_, index) => (artifact) => {
+		...Array.from({ length: 5 }, (_, index) => (artifact) => {
 			artifact.queues.consumers[index].max_concurrency = 2;
 		}),
-		...Array.from({ length: 4 }, (_, index) => (artifact) => {
+		...Array.from({ length: 5 }, (_, index) => (artifact) => {
 			artifact.queues.consumers[index].max_batch_timeout = 1;
 		}),
-		...Array.from({ length: 4 }, (_, index) => (artifact) => {
+		...Array.from({ length: 5 }, (_, index) => (artifact) => {
 			artifact.queues.consumers[index].retry_delay += 1;
 		}),
 	];

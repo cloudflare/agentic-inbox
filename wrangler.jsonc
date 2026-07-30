@@ -43,6 +43,7 @@
 				"INBOUND_DLQ_NAME": "sales-mail-inbound-dlq",
 				"INBOUND_PARKING_NAME": "sales-mail-inbound-parking",
 				"EMERGENCY_FORWARD_QUEUE_NAME": "sales-mail-emergency-forward",
+				"EMERGENCY_FORWARD_PARKING_NAME": "sales-mail-emergency-forward-parking",
 				"EMERGENCY_FORWARD_FROM": "emergency-forward@whispyrcrm.com",
 				"EMERGENCY_FORWARD_DESTINATION": "heshamelmahdi@gmail.com",
 				"AWS_REGION": "eu-west-2",
@@ -106,7 +107,7 @@
 				}
 			],
 			// Queue retention is a control-plane setting, not a Wrangler binding
-			// field. All four queues are locked at 14 days and must be verified
+			// field. All five queues are locked at 14 days and must be verified
 			// separately before deploy.
 			"queues": {
 				"producers": [
@@ -145,8 +146,17 @@
 						"max_batch_size": 1,
 						"max_concurrency": 1,
 						"max_batch_timeout": 5,
+						"max_retries": 10,
+						"retry_delay": 300,
+						"dead_letter_queue": "sales-mail-emergency-forward-parking"
+					},
+					{
+						"queue": "sales-mail-emergency-forward-parking",
+						"max_batch_size": 1,
+						"max_concurrency": 1,
+						"max_batch_timeout": 5,
 						"max_retries": 100,
-						"retry_delay": 300
+						"retry_delay": 3600
 					}
 				]
 			},
@@ -216,6 +226,7 @@
 				"INBOUND_DLQ_NAME": "wiser-mail-inbound-dlq",
 				"INBOUND_PARKING_NAME": "wiser-mail-inbound-parking",
 				"EMERGENCY_FORWARD_QUEUE_NAME": "wiser-mail-emergency-forward",
+				"EMERGENCY_FORWARD_PARKING_NAME": "wiser-mail-emergency-forward-parking",
 				"EMERGENCY_FORWARD_FROM": "emergency-forward@wiserchat.ai",
 				"EMERGENCY_FORWARD_DESTINATION": "heshamelmahdi@gmail.com",
 				"AWS_REGION": "eu-west-2",
@@ -280,7 +291,7 @@
 				}
 			],
 			// Queue retention is a control-plane setting, not a Wrangler binding
-			// field. All four queues are locked at 14 days and must be verified
+			// field. All five queues are locked at 14 days and must be verified
 			// separately before deploy.
 			"queues": {
 				"producers": [
@@ -319,8 +330,17 @@
 						"max_batch_size": 1,
 						"max_concurrency": 1,
 						"max_batch_timeout": 5,
+						"max_retries": 10,
+						"retry_delay": 300,
+						"dead_letter_queue": "wiser-mail-emergency-forward-parking"
+					},
+					{
+						"queue": "wiser-mail-emergency-forward-parking",
+						"max_batch_size": 1,
+						"max_concurrency": 1,
+						"max_batch_timeout": 5,
 						"max_retries": 100,
-						"retry_delay": 300
+						"retry_delay": 3600
 					}
 				]
 			},

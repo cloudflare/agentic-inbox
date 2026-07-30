@@ -423,24 +423,19 @@ test("a maximum scheduled reconciliation shape stays within the Worker service-s
 							bodyObjects: [],
 						};
 					},
-					async getInboundProjectionAuthority(authority: {
-						rawSha256: string;
-					}) {
-						serviceSubrequests += 1;
-						assert.equal(authority.rawSha256, archiveRawSha256);
-						return { generation: 1 };
-					},
 					async isEmailDeleted() {
 						serviceSubrequests += 1;
 						return false;
 					},
-					async hasEmail() {
+					// The emergency ingress ids are the undelivered worst case: a live
+					// row would settle their markers instead of re-enqueuing them.
+					async hasEmail(ingressId: string) {
 						serviceSubrequests += 1;
-						return true;
+						return !ingressId.startsWith("emergency-");
 					},
-					async getEmail() {
+					async getEmail(ingressId: string) {
 						serviceSubrequests += 1;
-						return {};
+						return ingressId.startsWith("emergency-") ? null : {};
 					},
 				};
 			},
@@ -466,10 +461,10 @@ test("a maximum scheduled reconciliation shape stays within the Worker service-s
 		console.error = originalError;
 	}
 
-	assert.equal(INBOUND_RECONCILIATION_WORST_CASE_SERVICE_SUBREQUESTS, 8_865);
+	assert.equal(INBOUND_RECONCILIATION_WORST_CASE_SERVICE_SUBREQUESTS, 8_881);
 	assert.equal(emergencyQueue.length, 8);
 	assert.equal(emergencyServiceSubrequests, 4 + 8 * 13);
-	assert.equal(serviceSubrequests, 8_753);
+	assert.equal(serviceSubrequests, 8_752);
 	assert.ok(
 		serviceSubrequests <= INBOUND_RECONCILIATION_WORST_CASE_SERVICE_SUBREQUESTS,
 	);
