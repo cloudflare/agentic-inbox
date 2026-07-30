@@ -1,0 +1,1258 @@
+{
+  "key": "whispyr-system-2026-08",
+  "title": {
+    "en": "Whispyr System Quiz — August 2026",
+    "ar": "اختبار نظام Whispyr — أغسطس ٢٠٢٦"
+  },
+  "description": {
+    "en": "Tests whether a Whispyr salesperson can explain Whispyr accurately and honestly across the whole product — who sees which leads and why, what happens to lead history, WhatsApp, Meta, Property Finder, cold calls, Meetings, Whispyr AI, and Market Insights — without overpromising. Scoring on multi-select questions: you get partial points for every correct option you pick, an equal deduction for every wrong option you pick, and a question never goes below zero. Full marks only when you pick the exact correct set.",
+    "ar": "بيقيس قدرة مندوب Whispyr على شرح Whispyr بدقة وأمانة على المنتج كله — مين بيشوف أنهي ليدز وليه، وبيحصل إيه لسجل الليد، وواتساب، وMeta، وProperty Finder، والكولد كول، والميتنجز، وWhispyr AI، والسوق العقاري — من غير مبالغة في الوعود. طريقة التصحيح في أسئلة الاختيار المتعدد: بتاخد نقط جزئية على كل اختيار صح بتختاره، وبيتخصم نفس المقدار على كل اختيار غلط بتختاره، والسؤال عمره ما ينزل تحت الصفر. الدرجة الكاملة بس لما تختار المجموعة الصح بالظبط."
+  },
+  "scoring": {
+    "total": 40,
+    "mcq": 25,
+    "short": 15
+  },
+  "questions": [
+    {
+      "position": 1,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Where A Sales Manager's Visibility Stops",
+        "ar": "فين بتقف رؤية السيلز مانجر"
+      },
+      "prompt": {
+        "en": "A newly promoted sales manager complains: \"I can see my three teams fine, but a lead in another division is invisible to me. Please fix my permissions.\"",
+        "ar": "سيلز مانجر اترقّى جديد بيشتكي: «أنا شايف التلات تيمز بتاعتي تمام، بس فيه ليد في قطاع تاني مش ظاهر ليّ خالص. ظبّطوا صلاحياتي.»"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "It is a bug. Any manager-level title should unlock the whole company.",
+          "ar": "دي مشكلة برمجية. أي منصب على مستوى مانجر المفروض يفتح الشركة كلها."
+        },
+        {
+          "id": "b",
+          "en": "Managers see everything in the company except Done Deal leads, which are owner-only.",
+          "ar": "المانجرز بيشوفوا كل حاجة في الشركة ما عدا ليدز الدون ديل، دي لصاحب الشركة بس."
+        },
+        {
+          "id": "c",
+          "en": "Visibility is set per person, so an admin can simply switch on \"see everything\" for any role.",
+          "ar": "الرؤية بتتظبط لكل شخص لوحده، فالأدمن يقدر ببساطة يفتح خيار «يشوف كل حاجة» لأي دور."
+        },
+        {
+          "id": "d",
+          "en": "Visibility follows the reporting line: an agent sees only the leads assigned to them, a team leader sees their team, a sales manager sees the teams in their group, a sales director sees their division's groups and teams, and only the admin level sees the whole organization. A manager is powerful inside their scope, not across it.",
+          "ar": "الرؤية بتمشي مع خط الإدارة: الإيجنت بيشوف بس الليدز الموزّعة ليه، والتيم ليدر بيشوف تيمه، والسيلز مانجر بيشوف التيمز اللي في جروبه، والسيلز ديركتور بيشوف الجروبات والتيمز اللي في قطاعه، ومستوى الأدمن بس هو اللي بيشوف الشركة كلها. المانجر قوي جوه نطاقه، مش برّه نطاقه."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "Each role is dispatched to a progressively narrower slice of the organization, and the agent slice is \"assigned to me.\" Nothing in the product grants a manager visibility across a scope they do not manage, and there is no per-user \"see everything\" switch to flip.",
+        "ar": "كل دور بيتوجّه لجزء أضيق من الشركة، وجزء الإيجنت هو «الموزّع ليّ». مفيش حاجة في المنتج بتدّي المانجر رؤية على نطاق هو مش مسؤول عنه، ومفيش مفتاح «يشوف كل حاجة» لكل مستخدم عشان يتفتح."
+      }
+    },
+    {
+      "position": 2,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Marketing's List Versus Sales' List",
+        "ar": "قايمة الماركتنج مقابل قايمة السيلز"
+      },
+      "prompt": {
+        "en": "A marketing manager asks: \"I can see the leads my team created, but not the ones sales are working. And now that we set a Source and a Campaign on every lead, does that change who sees what?\"",
+        "ar": "مدير ماركتنج بيسأل: «أنا شايف الليدز اللي تيمي عملها، بس مش شايف اللي السيلز شغالين عليها. ودلوقتي بعد ما بقينا نحدد Source وCampaign لكل ليد، ده بيغيّر مين بيشوف إيه؟»"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Yes. Setting a Source or Campaign moves the lead into the marketing team's list.",
+          "ar": "أيوه. تحديد Source أو Campaign بينقّل الليد لقايمة تيم الماركتنج."
+        },
+        {
+          "id": "b",
+          "en": "Marketing visibility follows who created the lead — a marketing member sees their own creations, a marketing manager sees the creators in the team they manage, a marketing director sees marketing-role creators. Sales visibility follows who the lead is assigned to and the reporting line above them. Source, Channel and Campaign are separate acquisition attribution used for filtering and reporting; they do not change who can see a lead.",
+          "ar": "رؤية الماركتنج بتمشي حسب مين اللي أنشأ الليد — موظف الماركتنج بيشوف اللي هو أنشأه، ومدير الماركتنج بيشوف اللي أنشأوه ناس التيم اللي بيديره، ومدير عام الماركتنج بيشوف اللي أنشأه أصحاب أدوار الماركتنج. أما رؤية السيلز بتمشي حسب مين الليد موزّع ليه وخط الإدارة اللي فوقه. أما Source وChannel وCampaign دي بيانات مصدر منفصلة للفلترة والتقارير، ومش بتغيّر مين يقدر يشوف الليد."
+        },
+        {
+          "id": "c",
+          "en": "Both sides see the same list; the only difference is which columns are shown.",
+          "ar": "الطرفين بيشوفوا نفس القايمة؛ الفرق بس في الأعمدة اللي بتتعرض."
+        },
+        {
+          "id": "d",
+          "en": "Marketing can see a lead only once sales moves it to Qualified.",
+          "ar": "الماركتنج يقدر يشوف الليد بس بعد ما السيلز ينقّله لمؤهل."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "Sales visibility and marketing visibility are two different axes — assignment plus hierarchy versus creator. July's Source, Channel and Campaign catalogs are attribution data you can filter and bulk-set; they are not a permission mechanism.",
+        "ar": "رؤية السيلز ورؤية الماركتنج محورين مختلفين — التوزيع والتسلسل الإداري مقابل مين أنشأ الليد. كتالوجات Source وChannel وCampaign اللي نزلت في يوليو بيانات مصدر تقدر تفلتر بيها وتعدّلها بالجملة؛ مش نظام صلاحيات."
+      }
+    },
+    {
+      "position": 3,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Buying Telesales Seats To Save Money",
+        "ar": "شراء مقاعد تليسيلز عشان توفير"
+      },
+      "prompt": {
+        "en": "An owner says: \"Agent seats cost more. I will buy six Telesales seats and have them work my whole leads pipeline.\" What should the Whispyr salesperson say?",
+        "ar": "صاحب شركة بيقول: «مقاعد الإيجنت أغلى. أنا هشتري ستة مقاعد تليسيلز وأخليهم يشتغلوا على مسار الليدز كله.» مندوب Whispyr يقول إيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Telesales is a cold-calling seat built around the Cold Calls workflow. By default it does not get the Leads screen the way an Agent does, and the lead-visibility rules have no Telesales case at all. People who work the full pipeline need Agent seats.",
+          "ar": "التليسيلز مقعد للكولد كول ومبني حوالين سير عمل الكولد كول. افتراضيًا مش بياخد شاشة إدارة الليدز زي الإيجنت، وقواعد رؤية الليدز مفيهاش حالة للتليسيلز خالص. اللي هيشتغلوا على المسار كله محتاجين مقاعد إيجنت."
+        },
+        {
+          "id": "b",
+          "en": "Good plan. Telesales and Agent are the same seat under two names.",
+          "ar": "فكرة حلوة. التليسيلز والإيجنت نفس المقعد باسمين مختلفين."
+        },
+        {
+          "id": "c",
+          "en": "A Telesales seat can browse the whole company's leads, since they call the widest.",
+          "ar": "مقعد التليسيلز يقدر يتصفح ليدز الشركة كلها، لأنهم بيكلموا أوسع قاعدة."
+        },
+        {
+          "id": "d",
+          "en": "Telesales belongs to marketing, so cold calling is not part of it.",
+          "ar": "التليسيلز تابع للماركتنج، فالكولد كول مش من شغله."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "Telesales is deliberately a focused cold-calling seat. Selling it as a cheaper Agent is a real misrepresentation: the Leads page does not admit it and the backend lead scope has no case for it.",
+        "ar": "التليسيلز بقصد مقعد متخصص في الكولد كول. بيعه كإيجنت أرخص ده تضليل حقيقي: صفحة إدارة الليدز مش بتسمح له، ونطاق الليدز في الباك إند مفيهوش حالة له."
+      }
+    },
+    {
+      "position": 4,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "Bringing People Into The System",
+        "ar": "إضافة ناس للنظام"
+      },
+      "prompt": {
+        "en": "A brokerage is onboarding 14 people this month, and two of them already use Whispyr at another company. Which statements about adding and managing members are correct?",
+        "ar": "شركة بتدخّل 14 شخص جديد الشهر ده، واتنين منهم بيستخدموا Whispyr بالفعل في شركة تانية. أنهي عبارات عن إضافة وإدارة الأعضاء صح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Every new person consumes a seat on the subscription, and they are brought in through an email invitation.",
+          "ar": "كل شخص جديد بياخد مقعد من الاشتراك، وبيدخل عن طريق دعوة على الإيميل."
+        },
+        {
+          "id": "b",
+          "en": "Whispyr blocks you from removing a sales team's last leader until you name a replacement.",
+          "ar": "Whispyr بيمنعك إنك تشيل آخر تيم ليدر في تيم السيلز لحد ما تحدد بديل."
+        },
+        {
+          "id": "c",
+          "en": "Inviting members is restricted to the admin tiers, including umbrella and franchise admins where they apply.",
+          "ar": "دعوة الأعضاء مقصورة على مستويات الأدمن، بما فيهم أدمن الأمبريلا وأدمن الفرانشايز لما يكونوا موجودين."
+        },
+        {
+          "id": "d",
+          "en": "An invited email that already belongs to a Whispyr account joins the organization on that existing login, with no second password.",
+          "ar": "الإيميل المدعو لو بيخص حساب Whispyr موجود بالفعل، بينضم للشركة بنفس تسجيل الدخول القديم، من غير باسورد تاني."
+        },
+        {
+          "id": "e",
+          "en": "A team leader can invite new agents into their own team without an admin.",
+          "ar": "التيم ليدر يقدر يدعو إيجنتس جداد لتيمه من غير أدمن."
+        },
+        {
+          "id": "f",
+          "en": "Removing a sales team's last leader is allowed. The team is left leaderless and you get a warning, not a block.",
+          "ar": "شيل آخر تيم ليدر في تيم السيلز مسموح. التيم بيفضل من غير ليدر وإنت بتاخد تحذير، مش منع."
+        }
+      ],
+      "correct": [
+        "a",
+        "c",
+        "d",
+        "f"
+      ],
+      "explanation": {
+        "en": "Invitations are admin-tier, email-based, seat-limited, and carry a role plus an optional team. Option B was the old answer and is now wrong: production returns a warning instead of blocking, and the interface says the team will be left leaderless. Option E is wrong: being a leader does not include invitation rights.",
+        "ar": "الدعوات بتبعت من مستويات الأدمن، بالإيميل، ومحدودة بالمقاعد، وبتتحدد فيها الدور والتيم (اختياري). الخيار B كان الإجابة القديمة وبقى غلط: النظام بيرجّع تحذير مش منع، والواجهة بتقول إن التيم هيفضل من غير ليدر. والخيار E غلط: كونك تيم ليدر مش معناه إن عندك حق الدعوة."
+      }
+    },
+    {
+      "position": 5,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Handing Over A Lead That Was Already Worked",
+        "ar": "تسليم ليد اتشتغل عليه بالفعل"
+      },
+      "prompt": {
+        "en": "A team leader hands a lead his agent has been working for three weeks to a different agent, leaving the handover setting on its default. What is accurate?",
+        "ar": "تيم ليدر بيسلّم ليد الإيجنت بتاعه شغال عليه من تلات أسابيع لإيجنت تاني، وسايب إعداد التسليم على الافتراضي. إيه الصح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "The earlier activity is deleted so the new agent genuinely starts clean.",
+          "ar": "النشاط القديم بيتمسح عشان الإيجنت الجديد يبدأ نضيف فعلًا."
+        },
+        {
+          "id": "b",
+          "en": "Everyone in the company keeps seeing everything; the setting only changes the lead's stage.",
+          "ar": "كل الناس في الشركة بيفضلوا شايفين كل حاجة؛ الإعداد ده بيغيّر مرحلة الليد بس."
+        },
+        {
+          "id": "c",
+          "en": "By default the receiving agent sees history from the handover point forward, and nothing is deleted. Full history with no conditions belongs to the admin tiers — admin, Whispyr admin, umbrella admin — while directors, managers and team leaders see history according to the grant windows of their placement in the chain.",
+          "ar": "افتراضيًا الإيجنت المستلم بيشوف السجل من نقطة التسليم وطالع، ومفيش حاجة بتتمسح. السجل الكامل من غير شروط بيبقى لمستويات الأدمن — أدمن، أدمن Whispyr، أدمن أمبريلا — بينما السيلز ديركتور والسيلز مانجر والتيم ليدر بيشوفوا السجل حسب نوافذ الصلاحية بتاعة مكانهم في السلسلة."
+        },
+        {
+          "id": "d",
+          "en": "Every manager and team leader in the company automatically keeps the complete history, whatever their position.",
+          "ar": "كل سيلز مانجر وتيم ليدر في الشركة بيفضل شايف السجل الكامل تلقائيًا، مهما كان مكانه."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "A clean slate is a visibility window for the receiving agent, not a deletion. The important correction is option D: unconditional full history is an admin-tier privilege. Leaders are not universally privileged; their access follows the chain they are placed in.",
+        "ar": "«البداية النضيفة» دي نافذة رؤية للإيجنت المستلم، مش مسح. والتصحيح المهم هو الخيار D: السجل الكامل من غير شروط ميزة لمستويات الأدمن. الليدرز مش عندهم الميزة دي بشكل عام؛ صلاحيتهم بتمشي مع السلسلة اللي هم موجودين فيها."
+      }
+    },
+    {
+      "position": 6,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Nobody Ever Touched This Lead",
+        "ar": "الليد اللي محدش لمسه خالص"
+      },
+      "prompt": {
+        "en": "A portal lead arrived yesterday: no call, no note, no stage change. An admin assigns it to an agent and deliberately picks the \"new lead / clean slate\" timeline. What does the agent see?",
+        "ar": "ليد جه إمبارح من موقع إعلانات: مفيش مكالمة، مفيش نوت، مفيش تغيير مرحلة. الأدمن وزّعه على إيجنت واختار بقصد سجل «ليد جديد / بداية نضيفة». الإيجنت بيشوف إيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "A blank timeline, since the admin explicitly picked clean slate.",
+          "ar": "سجل فاضي، بما إن الأدمن اختار البداية النضيفة بنفسه."
+        },
+        {
+          "id": "b",
+          "en": "The full timeline. When a lead has never been worked, the assignment step upgrades the clean-slate choice to full history, so the agent can see how the inquiry arrived instead of starting blind.",
+          "ar": "السجل الكامل. لما الليد ميكونش اتشتغل عليه خالص، خطوة التوزيع بترقّي اختيار «البداية النضيفة» للسجل الكامل، عشان الإيجنت يشوف الاستفسار جه إزاي ومايبداش أعمى."
+        },
+        {
+          "id": "c",
+          "en": "Nothing but the contact's number, until the lead answers.",
+          "ar": "مفيش غير رقم العميل، لحد ما الليد يرد."
+        },
+        {
+          "id": "d",
+          "en": "The clean slate holds, so the agent has to ask the admin how the lead arrived.",
+          "ar": "البداية النضيفة بتفضل زي ما هي، فالإيجنت لازم يسأل الأدمن الليد جه إزاي."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "A clean slate only means something when there is real prior work to wall off. With no first-worked mark on the lead, the assignment path forces full history — no assignment path can keep a clean slate on a never-worked lead.",
+        "ar": "البداية النضيفة معناها حاجة بس لما يكون فيه شغل سابق حقيقي محتاج يتعزل. لو الليد مفيهوش علامة إنه اتشتغل عليه، مسار التوزيع بيفرض السجل الكامل — مفيش مسار توزيع يقدر يحافظ على بداية نضيفة على ليد محدش اشتغل عليه."
+      }
+    },
+    {
+      "position": 7,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "What Counts As Working A Lead",
+        "ar": "إيه اللي بيتحسب شغل على الليد"
+      },
+      "prompt": {
+        "en": "A manager asks which actions actually stamp a lead as worked. Which of these do?",
+        "ar": "مانجر بيسأل أنهي أفعال بتعلّم الليد فعلًا إنه اتشتغل عليه. أنهي من دول بيعمل كده؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Logging a call on the lead.",
+          "ar": "تسجيل مكالمة على الليد."
+        },
+        {
+          "id": "b",
+          "en": "Writing a note on the lead yourself.",
+          "ar": "إنك تكتب نوت على الليد بنفسك."
+        },
+        {
+          "id": "c",
+          "en": "The lead sends you a WhatsApp message first, and you have not replied yet.",
+          "ar": "الليد يبعتلك رسالة واتساب هو الأول، وإنت لسه ما رديتش."
+        },
+        {
+          "id": "d",
+          "en": "Moving the lead out of New Lead into a real stage.",
+          "ar": "نقل الليد من ليد جديد لمرحلة حقيقية."
+        },
+        {
+          "id": "e",
+          "en": "Prior activity that came in with the lead when the brokerage's old data was migrated into Whispyr.",
+          "ar": "شغل قديم جه مع الليد وقت ترحيل داتا الشركة القديمة لـ Whispyr."
+        },
+        {
+          "id": "f",
+          "en": "A company campaign message going out to the lead automatically.",
+          "ar": "رسالة كامبين شركة بتطلع للليد تلقائيًا."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "d",
+        "e"
+      ],
+      "explanation": {
+        "en": "Worked means a human reached out or moved the lead forward: a logged call, a human note, a stage transition out of New Lead, a human outbound personal WhatsApp from the current assignee, or migrated evidence of prior work. Inbound WhatsApp and automated or company WhatsApp do not count, and neither do creation, handover, pool claim, system notes, reminders, or edits.",
+        "ar": "«اتشتغل عليه» معناها إن إنسان تواصل أو حرّك الليد لقدّام: مكالمة مسجّلة، نوت من إنسان، نقل من ليد جديد لمرحلة تانية، واتساب شخصي طالع من الإيجنت الموزّع له حاليًا، أو دليل شغل قديم جه بالترحيل. الواتساب الجاي من العميل والواتساب التلقائي أو بتاع الشركة مش بيتحسبوا، وكذلك الإنشاء والتسليم والسحب من الليدز المتاحة ونوتس النظام والتنبيهات والتعديلات."
+      }
+    },
+    {
+      "position": 8,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Three People, Three Different Lead Ages",
+        "ar": "تلات ناس وتلات أعمار مختلفة لنفس الليد"
+      },
+      "prompt": {
+        "en": "In the same review meeting, an agent says a lead is three days old, the team leader says two weeks, and the owner says two months. Nobody is lying. Why?",
+        "ar": "في نفس اجتماع المراجعة، الإيجنت بيقول إن الليد عمره تلات أيام، والتيم ليدر بيقول أسبوعين، وصاحب الشركة بيقول شهرين. ومحدش بيكدب. ليه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "The list is sorting on the wrong column.",
+          "ar": "القايمة بترتّب على العمود الغلط."
+        },
+        {
+          "id": "b",
+          "en": "Only the owner's number is real; the other two are estimates.",
+          "ar": "رقم صاحب الشركة بس هو الحقيقي؛ التنين التانيين تقديرات."
+        },
+        {
+          "id": "c",
+          "en": "The lead was duplicated three times, once per viewer.",
+          "ar": "الليد اتكرّر تلات مرات، مرة لكل واحد."
+        },
+        {
+          "id": "d",
+          "en": "The lead's date is shown relative to the viewer's role. An agent (and a telesales user) sees when it became theirs, a leader sees their current hierarchy clock — when it entered their scope — the admin tiers see the organization's arrival clock, and marketing users see the actual creation date.",
+          "ar": "تاريخ الليد بيتعرض بالنسبة لدور اللي بيشوفه. الإيجنت (والتليسيلز) بيشوف إمتى بقى بتاعه، والليدر بيشوف ساعة التسلسل الإداري بتاعته الحالية — إمتى دخل نطاقه — ومستويات الأدمن بيشوفوا ساعة وصوله للشركة، وناس الماركتنج بيشوفوا تاريخ الإنشاء الفعلي."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "The date field is deliberately role-relative so it is useful to whoever is looking. Note the precision: the admin clock is the organization arrival clock, not necessarily the raw database creation timestamp, and franchise admins get their own franchise clock.",
+        "ar": "خانة التاريخ بقصد نسبية للدور عشان تبقى مفيدة لأي حد بيبص عليها. خد بالك من الدقة: ساعة الأدمن هي ساعة وصول الليد للشركة، مش بالضرورة تاريخ إنشاء الصف في الداتابيز، وأدمن الفرانشايز عنده ساعة الفرانشايز بتاعته."
+      }
+    },
+    {
+      "position": 9,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Merging Two Teams Mid-Month",
+        "ar": "دمج تيمين في نص الشهر"
+      },
+      "prompt": {
+        "en": "A brokerage merges two small teams. An agent and all their assigned leads move under a new team leader. What happens to those leads?",
+        "ar": "شركة بتدمج تيمين صغيرين. إيجنت وكل الليدز الموزّعة له بينقلوا تحت تيم ليدر جديد. بيحصل إيه لليدز دي؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Assignment identity and the existing scope dates are kept, no new handover is created, and the new chain — leader, manager, director — gains access while the old chain's access is removed.",
+          "ar": "هوية التوزيع وتواريخ النطاق الموجودة بتتحفظ، ومفيش تسليم جديد بيتعمل، والسلسلة الجديدة — التيم ليدر والسيلز مانجر والسيلز ديركتور — بتاخد صلاحية، وصلاحية السلسلة القديمة بتتشال."
+        },
+        {
+          "id": "b",
+          "en": "Every moved lead is stamped with today's date, so the new leader starts with a fresh-looking pipeline.",
+          "ar": "كل ليد بينتقل بيتختم بتاريخ النهارده، فالليدر الجديد بيبدأ بمسار شكله جديد."
+        },
+        {
+          "id": "c",
+          "en": "Each moved lead is treated as a new handover, so the agent loses the earlier history.",
+          "ar": "كل ليد بينتقل بيتعامل معاه كتسليم جديد، فالإيجنت بيخسر السجل القديم."
+        },
+        {
+          "id": "d",
+          "en": "The leads stay with the old team leader until the agent reassigns them one by one.",
+          "ar": "الليدز بتفضل مع التيم ليدر القديم لحد ما الإيجنت يعيد توزيعها واحدة واحدة."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "A team move is a realignment, not a reassignment. Every assigned lead is realigned, dates and assignment identity survive, no handover is created, and the access grant delta swaps the old chain for the new one.",
+        "ar": "نقل التيم ده إعادة محاذاة، مش إعادة توزيع. كل ليد موزّع بيتعاد محاذاته، والتواريخ وهوية التوزيع بتفضل، ومفيش تسليم بيتعمل، وفرق الصلاحيات بيبدّل السلسلة القديمة بالجديدة."
+      }
+    },
+    {
+      "position": 10,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "How Automatic Rotation Actually Behaves",
+        "ar": "تدوير الليدز بيتصرّف إزاي فعلًا"
+      },
+      "prompt": {
+        "en": "An owner is deciding whether to switch rotation on. Which statements about automatic rotation are correct?",
+        "ar": "صاحب شركة بيفكر يفتح التدوير. أنهي عبارات عن تدوير الليدز الأوتوماتيكي صح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "A rule fires on selected stages combined with time in stage or no activity from the assigned agent.",
+          "ar": "القاعدة بتشتغل على مراحل مختارة مع مدة القعود في المرحلة أو عدم وجود نشاط من الإيجنت الموزّع له."
+        },
+        {
+          "id": "b",
+          "en": "Outcomes include reassigning inside the team, outside the team, or across the organization, escalating to a leader or manager, and returning the lead to the Lead Pool.",
+          "ar": "النتايج بتشمل إعادة التوزيع جوه التيم، أو لبرّه التيم، أو على مستوى الشركة، والتصعيد لتيم ليدر أو سيلز مانجر، ورجوع الليد لـ الليدز المتاحة."
+        },
+        {
+          "id": "c",
+          "en": "In a franchise or umbrella setup, a rule can also move the lead to another franchise, leave it unassigned at umbrella level, or put it in the umbrella pool.",
+          "ar": "في نظام فرانشايز أو أمبريلا، القاعدة كمان تقدر تنقّل الليد لفرانشايز تاني، أو تسيبه غير موزّع على مستوى الأمبريلا، أو تحطه في بحيرة الأمبريلا."
+        },
+        {
+          "id": "d",
+          "en": "A rule can delete a lead that stayed stale too long.",
+          "ar": "القاعدة تقدر تمسح ليد فضل راكد مدة طويلة."
+        },
+        {
+          "id": "e",
+          "en": "Deleting a lead is a separate, deliberate action with a short undo window for the person who did it. Rotation itself never deletes.",
+          "ar": "مسح الليد إجراء منفصل ومقصود وفيه نافذة تراجع قصيرة للشخص اللي عمله. التدوير نفسه عمره ما بيمسح."
+        },
+        {
+          "id": "f",
+          "en": "Rotation sweeps every lead in the system every night, whatever the rule says.",
+          "ar": "التدوير بيمر على كل ليد في النظام كل ليلة، مهما كانت القاعدة بتقول إيه."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "e"
+      ],
+      "explanation": {
+        "en": "Rotation is a configured recovery tool: selected stages plus inactivity, with reassignment, escalation, or pooling as the outcome, now including the franchise and umbrella destinations. There is no delete action in rotation. Lead deletion is its own authorized action with a short actor-only undo before it finalizes.",
+        "ar": "التدوير أداة استرجاع بتتظبط: مراحل مختارة مع عدم نشاط، والنتيجة إعادة توزيع أو تصعيد أو رجوع للـ pool، ودلوقتي كمان وجهات الفرانشايز والأمبريلا. مفيش إجراء مسح في التدوير. مسح الليد إجراء لوحده لناس مصرّح لهم وفيه تراجع قصير للشخص اللي عمله قبل ما يتثبّت."
+      }
+    },
+    {
+      "position": 11,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Keep The Stage, Hide The History",
+        "ar": "حافظ على المرحلة، وخبّي السجل"
+      },
+      "prompt": {
+        "en": "A sales manager building a rotation rule asks: \"Can the lead reach the next agent still Qualified, but with a clean timeline? Or is that combination blocked?\"",
+        "ar": "سيلز مانجر بيعمل قاعدة تدوير بيسأل: «الليد يقدر يوصل للإيجنت اللي بعده وهو لسه مؤهل، بس بسجل نضيف؟ ولا التوليفة دي ممنوعة؟»"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Blocked. Keeping the stage forces the full timeline to show as well.",
+          "ar": "ممنوعة. الحفاظ على المرحلة بيفرض إن السجل الكامل يبان كمان."
+        },
+        {
+          "id": "b",
+          "en": "Rotation always resets the lead to New Lead with a clean timeline.",
+          "ar": "التدوير دايمًا بيرجّع الليد لليد جديد بسجل نضيف."
+        },
+        {
+          "id": "c",
+          "en": "In a rotation rule, \"preserve stage\" and \"preserve history\" are two independent switches, and all four combinations are valid.",
+          "ar": "في قاعدة التدوير، «الحفاظ على المرحلة» و«الحفاظ على السجل» مفتاحين مستقلين، وكل التوليفات الأربع صح."
+        },
+        {
+          "id": "d",
+          "en": "Rotation never touches stage or timeline; it only changes the assignee.",
+          "ar": "التدوير عمره ما بيمس المرحلة ولا السجل؛ بيغيّر الموزّع إليه بس."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "The rotation rule treats the two switches as independent and documents all four combinations, with separate validation and defaults. Worth knowing alongside it: manual reassignment presents its own choices, and on a full-history manual reassignment the user can now keep the current status and priority instead of resetting to New Lead and Medium.",
+        "ar": "قاعدة التدوير بتتعامل مع المفتاحين كمستقلين وموثّقة فيها التوليفات الأربع، مع تحقّق وقيم افتراضية منفصلة. وحاجة مهمة جنبها: إعادة التوزيع اليدوية عندها اختياراتها هي، ودلوقتي في إعادة التوزيع اليدوية بالسجل الكامل المستخدم يقدر يحافظ على الحالة والأولوية الحالية بدل ما يرجّعها لليد جديد ومتوسط."
+      }
+    },
+    {
+      "position": 12,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "The Lead Pool, Classic And Umbrella",
+        "ar": "الليدز المتاحة: العادية وبحيرة الأمبريلا"
+      },
+      "prompt": {
+        "en": "A group running two franchises under one umbrella asks how the Lead Pool works for them. Which statements are correct?",
+        "ar": "جروب عنده فرانشايزين تحت أمبريلا واحدة بيسأل الليدز المتاحة بتشتغل معاهم إزاي. أنهي عبارات صح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Leads waiting in the pool are offered oldest first.",
+          "ar": "الليدز المستنية في البحيرة بتتعرض الأقدم الأول."
+        },
+        {
+          "id": "b",
+          "en": "The pool is where deleted leads sit before they are erased.",
+          "ar": "البحيرة هي المكان اللي الليدز المتمسوحة بتستنى فيه قبل ما تتشال خالص."
+        },
+        {
+          "id": "c",
+          "en": "Claiming is governed by limits: a cooldown, a must-act requirement, and a daily claim limit.",
+          "ar": "السحب بيتحكم فيه حدود: فترة انتظار، وشرط إنك تتصرّف في اللي أخدته، وحد أقصى يومي للسحب."
+        },
+        {
+          "id": "d",
+          "en": "When a sales-role user claims a lead from their organization's pool, that lead becomes theirs.",
+          "ar": "لما حد من أدوار السيلز يسحب ليد من بحيرة شركته، الليد ده بيبقى بتاعه."
+        },
+        {
+          "id": "e",
+          "en": "When a franchise admin claims from the umbrella pool, the lead lands franchise-unassigned rather than assigned to the admin who claimed it.",
+          "ar": "لما أدمن الفرانشايز يسحب من بحيرة الأمبريلا، الليد بينزل على الفرانشايز غير موزّع، مش موزّع للأدمن اللي سحبه."
+        },
+        {
+          "id": "f",
+          "en": "The pool pushes leads out automatically to whichever agent currently has the fewest leads.",
+          "ar": "البحيرة بتدفع الليدز تلقائيًا للإيجنت اللي عنده أقل عدد ليدز دلوقتي."
+        }
+      ],
+      "correct": [
+        "a",
+        "c",
+        "d",
+        "e"
+      ],
+      "explanation": {
+        "en": "The pool is fair, self-serve recovery: oldest first, with cooldown, must-act, and daily limits. Watch the split — the classic pool assigns the claimed lead to the claiming salesperson, while the umbrella pool hands the lead to the franchise as unassigned. It is not an archive and it does not auto-push.",
+        "ar": "البحيرة استرجاع عادل بخدمة ذاتية: الأقدم الأول، مع فترة انتظار وشرط التصرّف وحدود يومية. خد بالك من الفرق — البحيرة العادية بتوزّع الليد اللي اتسحب على اللي سحبه، بينما بحيرة الأمبريلا بتسلّم الليد للفرانشايز وهو غير موزّع. هي مش أرشيف ومش بتدفع الليدز تلقائيًا."
+      }
+    },
+    {
+      "position": 13,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "Stages Versus Tags",
+        "ar": "المراحل مقابل التاجز"
+      },
+      "prompt": {
+        "en": "A manager wants to run his whole pipeline on tags instead of stages. Which statements about stages and tags are correct?",
+        "ar": "مانجر عايز يشغّل المسار كله بالتاجز بدل المراحل. أنهي عبارات عن المراحل والتاجز صح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "A lead sits in exactly one of eleven stages at a time: New Lead, Qualified, Meeting Scheduled, Meeting Completed, Expression of Interest, Reserved, Done Deal, Unreachable, Lost Lead, Unqualified, Future Contact.",
+          "ar": "الليد بيبقى في مرحلة واحدة بالظبط من إحدى عشر مرحلة: ليد جديد، مؤهل، Meeting متحدد، Meeting تم، EOI، محجوز، دون ديل، لا يمكن الوصول إليه، ليد ضائع، غير مؤهل، تواصل لاحقاً."
+        },
+        {
+          "id": "b",
+          "en": "Some screens shorten Expression of Interest to \"EOI\"; it is the same stage.",
+          "ar": "بعض الشاشات بتختصر Expression of Interest لـ «EOI»؛ ودي نفس المرحلة."
+        },
+        {
+          "id": "c",
+          "en": "A lead can carry many tags at once, each with a name, a color, and an optional description, and a tag can be archived when the brokerage stops using it.",
+          "ar": "الليد يقدر يشيل تاجز كتير في نفس الوقت، كل تاج له اسم ولون ووصف اختياري، والتاج يقدر يتأرشف لما الشركة تبطّل تستخدمه."
+        },
+        {
+          "id": "d",
+          "en": "Adding a tag can be configured to move the lead to a matching stage automatically.",
+          "ar": "إضافة تاج ممكن تتظبط إنها تنقّل الليد للمرحلة المطابقة تلقائيًا."
+        },
+        {
+          "id": "e",
+          "en": "Tags do not drive the pipeline. They are metadata for grouping and filtering.",
+          "ar": "التاجز مش بتحرّك المسار. دي بيانات وصفية للتجميع والفلترة."
+        },
+        {
+          "id": "f",
+          "en": "A lead can sit in two stages at once when the brokerage needs it to.",
+          "ar": "الليد يقدر يبقى في مرحلتين في نفس الوقت لو الشركة محتاجة كده."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "e"
+      ],
+      "explanation": {
+        "en": "The stage is the lead's single position in the process, and there are exactly eleven. Tags are many-to-many metadata with name, color, description, and archive state. Nothing derives a lead's stage from its tags, and nothing lets a lead hold two stages.",
+        "ar": "المرحلة هي مكان الليد الواحد في العملية، وعددها إحدى عشر بالظبط. التاجز بيانات وصفية متعددة لمتعددة فيها اسم ولون ووصف وحالة أرشفة. مفيش حاجة بتستنتج مرحلة الليد من التاجز، ومفيش حاجة بتخلي الليد في مرحلتين."
+      }
+    },
+    {
+      "position": 14,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "The IT Manager Asks For Template Approval",
+        "ar": "مدير الـ IT بيطلب اعتماد القوالب"
+      },
+      "prompt": {
+        "en": "A brokerage's IT manager writes: \"Before we sign, send me your WhatsApp Business API template approval process and the list of approved message templates.\" What is the honest answer?",
+        "ar": "مدير الـ IT في شركة بيكتب: «قبل ما نوقّع، ابعتلي إجراءات اعتماد القوالب بتاعة WhatsApp Business API وقايمة قوالب الرسايل المعتمدة عندكم.» إيه الإجابة الصادقة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Attached. Whispyr is built on Meta's official Cloud API, and these are our approved templates.",
+          "ar": "أهي في المرفقات. Whispyr مبني على Cloud API الرسمي بتاع Meta، ودي القوالب المعتمدة عندنا."
+        },
+        {
+          "id": "b",
+          "en": "Whispyr does not send WhatsApp at all; it only sends email.",
+          "ar": "Whispyr مش بيبعت واتساب خالص؛ بيبعت إيميل بس."
+        },
+        {
+          "id": "c",
+          "en": "There are no templates to approve, because this is not the official WhatsApp Business API. Whispyr connects your existing WhatsApp number as a linked device — the same idea as WhatsApp Web — either by scanning a QR code or by entering a phone pairing code. A company number can be connected for the brokerage, and each agent can connect their own personal number. Upside: no Meta approval and you keep your number. Trade-off: it is a session that can drop and need re-linking, and you carry the normal WhatsApp account-safety risk. Nobody can promise a number will never be limited.",
+          "ar": "مفيش قوالب تتعتمد، لأن ده مش WhatsApp Business API الرسمي. Whispyr بيربط رقم الواتساب اللي عندك كجهاز مرتبط — نفس فكرة واتساب ويب — يا عن طريق مسح QR كود يا عن طريق إدخال كود ربط بالتليفون. وتقدر تربط رقم للشركة، وكل إيجنت يقدر يربط رقمه الشخصي. الميزة: مفيش موافقة من Meta وبتفضل ماسك رقمك. المقابل: دي جلسة ممكن تفصل وتحتاج إعادة ربط، وإنت شايل مخاطرة أمان حساب الواتساب المعتادة. ومحدش يقدر يوعد إن الرقم عمره ما هيتقيّد."
+        },
+        {
+          "id": "d",
+          "en": "Whispyr uses the official API for the company number and a QR session for personal numbers.",
+          "ar": "Whispyr بيستخدم الـ API الرسمي لرقم الشركة وجلسة QR للأرقام الشخصية."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "The transport is the linked-device library, not the Business or Cloud API, so there is no template approval to send. The August correction is the connect method: QR code or phone pairing code. Option D is the new trap — both connection types are linked-device sessions, and neither is the official API.",
+        "ar": "الناقل هو مكتبة الجهاز المرتبط، مش الـ Business ولا الـ Cloud API، فمفيش اعتماد قوالب تتبعت. وتصحيح أغسطس هو طريقة الربط: QR كود أو كود ربط بالتليفون. الخيار D هو الفخ الجديد — النوعين الاتنين جلسات جهاز مرتبط، ومحدش فيهم الـ API الرسمي."
+      }
+    },
+    {
+      "position": 15,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Tokens That Do Not Exist",
+        "ar": "توكنز مش موجودة"
+      },
+      "prompt": {
+        "en": "A Whispyr salesperson writes a launch campaign message containing {{unit_price}} and {{delivery_date}}, plus the Mr/Mrs token, with AI message variations switched off. What actually gets sent?",
+        "ar": "مندوب Whispyr بيكتب رسالة كامبين إطلاق فيها {{unit_price}} و{{delivery_date}}، وكمان توكن Mr/Mrs، وتنويعات رسايل AI مقفولة. اللي بيتبعت فعلًا إيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Only Name and Mr/Mrs are recognized. {{unit_price}} and {{delivery_date}} raise a warning in the builder but are sent literally, exactly as typed. Mr/Mrs needs AI message variations turned on, so with variations off it should not be used.",
+          "ar": "المعروفين بس Name وMr/Mrs. {{unit_price}} و{{delivery_date}} بيطلّعوا تحذير في المحرّر بس بيتبعتوا نصًا زي ما هما بالظبط. وMr/Mrs محتاج تنويعات رسايل AI تكون مفتوحة، فمع التنويعات المقفولة ميستخدمش."
+        },
+        {
+          "id": "b",
+          "en": "Both custom tokens are filled from the lead, and Mr/Mrs is filled from the contact's gender.",
+          "ar": "التوكنين المخصصين بيتملّوا من الليد، وMr/Mrs بيتملّى من نوع العميل."
+        },
+        {
+          "id": "c",
+          "en": "The campaign is blocked from sending until every unrecognized token is removed.",
+          "ar": "الكامبين بيتمنع من الإرسال لحد ما كل توكن غير معروف يتشال."
+        },
+        {
+          "id": "d",
+          "en": "Whispyr replaces unrecognized tokens with a blank space so the message still reads cleanly.",
+          "ar": "Whispyr بيستبدل التوكنز غير المعروفة بمسافة فاضية عشان الرسالة تفضل مقروءة."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "Personalization is deliberately two tokens. Unknown tokens produce a warning and then render literally — they are neither filled, blocked, nor stripped — and the Mr/Mrs honorific depends on AI variations being on.",
+        "ar": "التخصيص بقصد توكنين بس. التوكنز غير المعروفة بتطلّع تحذير وبعدين بتتعرض نصًا زي ما هي — لا بتتملّى ولا بتتمنع ولا بتتشال — ولقب Mr/Mrs متوقف على إن تنويعات AI تكون مفتوحة."
+      }
+    },
+    {
+      "position": 16,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Everything Tonight, Before The Launch",
+        "ar": "كل حاجة الليلة، قبل الإطلاق"
+      },
+      "prompt": {
+        "en": "An owner wants 400 campaign messages out tonight between midnight and 3am, \"so we are first thing in the morning.\" What should the Whispyr salesperson say?",
+        "ar": "صاحب شركة عايز 400 رسالة كامبين تطلع الليلة بين 12 بالليل و3 الفجر، «عشان نبقى أول حاجة الصبح». مندوب Whispyr يقول إيه؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Fine. Whispyr sends as fast as the phone allows and guarantees the number stays safe.",
+          "ar": "ماشي. Whispyr بيبعت بأسرع ما التليفون يسمح ويضمن إن الرقم يفضل آمن."
+        },
+        {
+          "id": "b",
+          "en": "Turn the window off for one night and blast. The limits are advisory.",
+          "ar": "اقفل النافذة ليلة واحدة وابعت على الكل. الحدود دي استرشادية."
+        },
+        {
+          "id": "c",
+          "en": "Whispyr spreads the messages across Meta's official servers, which removes the risk entirely.",
+          "ar": "Whispyr بيوزّع الرسايل على سيرفرات Meta الرسمية، وده بيلغي المخاطرة تمامًا."
+        },
+        {
+          "id": "d",
+          "en": "Sending runs inside a daily window in the organization's timezone, 08:00 to 22:00 by default, so a midnight run simply waits for the window. Messages go out in standard or cautious batches with delays between them, and you can either auto-send or review and approve the prepared messages first. These controls make outreach safer; they are not a guarantee that WhatsApp will never limit the number.",
+          "ar": "الإرسال بيتم جوه نافذة يومية بتوقيت الشركة، من 8 الصبح لـ 10 بالليل افتراضيًا، فالإرسال نص الليل هيستنى النافذة. الرسايل بتطلع بتأخير عادي أو تأخير طويل جدًا على دفعات، وتقدر تخليه أوتوماتيك أو تراجع الرسايل المحضرة وتعتمدها الأول. الأدوات دي بتخلي التواصل أأمن؛ بس هي مش ضمان إن واتساب عمره ما هيقيّد الرقم."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "The window, the pacing, and optional review-before-send are the real controls, and they are timezone-aware with an 08:00 to 22:00 default. The honesty line matters: safer outreach is not immunity, and no rep should promise a number cannot be limited.",
+        "ar": "النافذة ونظام التأخير والمراجعة قبل الإرسال (اختياري) دي الأدوات الحقيقية، وبتحترم توقيت الشركة وافتراضيها من 8 الصبح لـ 10 بالليل. وخط الأمانة مهم: تواصل أأمن مش معناه حصانة، ومفيش مندوب يوعد إن الرقم مش ممكن يتقيّد."
+      }
+    },
+    {
+      "position": 17,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "Company Campaigns And Personal Campaigns",
+        "ar": "كامبينز الشركة وكامبينز الشخصية"
+      },
+      "prompt": {
+        "en": "A brokerage is planning its first developer-launch blast. Which statements about WhatsApp campaigns are correct?",
+        "ar": "شركة بتحضّر أول إرسال جماعي لإطلاق مشروع مطوّر. أنهي عبارات عن كامبينز الواتساب صح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Recipients for a company campaign come either from your leads or from a list you upload.",
+          "ar": "مستلمين كامبين الشركة بيجوا يا من الليدز بتاعتك يا من قايمة بترفعها."
+        },
+        {
+          "id": "b",
+          "en": "The recipient list is materialized when the campaign is created, so leads added afterwards are not pulled into it by themselves.",
+          "ar": "قايمة المستلمين بتتثبّت وقت إنشاء الكامبين، فالليدز اللي بتتضاف بعد كده مش بتتسحب فيه من نفسها."
+        },
+        {
+          "id": "c",
+          "en": "A company campaign built from leads removes duplicate phone numbers and is capped at 100 recipients.",
+          "ar": "كامبين الشركة المعمول من الليدز بيشيل الأرقام المتكررة وبيتوقف عند حد أقصى 100 مستلم."
+        },
+        {
+          "id": "d",
+          "en": "Every campaign in the product, personal ones included, is capped at 100 recipients in every case.",
+          "ar": "كل كامبين في المنتج، بما فيهم الشخصية، حده الأقصى 100 مستلم في كل الحالات."
+        },
+        {
+          "id": "e",
+          "en": "Personal campaigns are a separate story. They can also draw from the persons pool, and they carry a configurable weekly limit on how many campaigns you create across all sources, with a default of 10.",
+          "ar": "الكامبينز الشخصية حكاية تانية. تقدر كمان تسحب من مجمّع الأشخاص، وعندها حد أسبوعي قابل للتظبيط لعدد الكامبينز اللي بتعملها من كل المصادر، افتراضيه 10."
+        },
+        {
+          "id": "f",
+          "en": "If the same phone number appears three times in an uploaded list, it is messaged three times.",
+          "ar": "لو نفس الرقم ظهر تلات مرات في القايمة اللي رفعتها، بتتبعتله الرسالة تلات مرات."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "e"
+      ],
+      "explanation": {
+        "en": "The snapshot and the 100 cap are company-campaign-from-leads behavior, with phone dedupe on creation. Personal campaigns are limited differently: a configurable weekly count across leads, pool, and upload, default 10, with the 100 applying to the pool pull. Selling \"100 everywhere\" or promising a number gets messaged once per duplicate row is inaccurate.",
+        "ar": "التثبيت وحد الـ 100 دول سلوك كامبين الشركة المعمول من الليدز، مع شيل الأرقام المتكررة وقت الإنشاء. الكامبينز الشخصية محدودة بشكل مختلف: عدد أسبوعي قابل للتظبيط من الليدز والـ pool والرفع، افتراضيه 10، والـ 100 بتنطبق على السحب من الـ pool. إنك تبيع «100 في كل حالة» أو توعد إن الرقم المتكرر بياخد رسالة لكل تكرار ده كلام غير دقيق."
+      }
+    },
+    {
+      "position": 18,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Connecting Meta Lead Ads Honestly",
+        "ar": "ربط Lead Ads من Meta بأمانة"
+      },
+      "prompt": {
+        "en": "An owner asks: \"Do I just log in with Facebook and the leads start arriving? And can you promise they land in seconds?\"",
+        "ar": "صاحب شركة بيسأل: «أنا بس بسجّل دخول بـ Facebook والليدز تبدأ تجيلي؟ وتقدر توعدني إنها توصل في ثواني؟»"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Yes to both. One Facebook login, and every lead is in the CRM within seconds.",
+          "ar": "أيوه للاتنين. تسجيل دخول واحد بـ Facebook، وكل ليد بيبقى في النظام في ثواني."
+        },
+        {
+          "id": "b",
+          "en": "No. The brokerage connects its own Meta app credentials and its own Pages, accepts the agreement, and the app has to be Live. After that, a live webhook from Meta is enqueued as soon as it arrives, and an automatic hourly reconciliation is the backstop that recovers anything Meta did not deliver. A seconds-level guarantee is not something a rep should promise.",
+          "ar": "لأ. الشركة بتربط بيانات تطبيق Meta بتاعها هي وPages بتاعتها، وبتوافق على الاتفاقية، والتطبيق لازم يكون Live. بعد كده، الـ webhook المباشر من Meta بيتحط في الطابور أول ما يوصل، وفيه مطابقة تلقائية كل ساعة كشبكة أمان بترجّع أي حاجة Meta ما وصّلتهاش. وضمان مستوى الثواني ده حاجة المندوب ميوعدش بيها."
+        },
+        {
+          "id": "c",
+          "en": "Whispyr emails you a CSV every morning and you import it.",
+          "ar": "Whispyr بيبعتلك ملف CSV على الإيميل كل صباح وإنت بترفعه."
+        },
+        {
+          "id": "d",
+          "en": "Meta has to approve your brokerage as a partner first, or nothing works.",
+          "ar": "Meta لازم تعتمد شركتك كشريك الأول، وإلا مفيش حاجة هتشتغل."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "The live setup is customer-owned app credentials plus connected Pages plus the agreement, with the app in Live mode. Delivery is webhook-immediate with an hourly reconciliation backstop and a longer safety pass. \"Within seconds\" is an operational claim the product cannot guarantee, so it is not part of the honest pitch.",
+        "ar": "الإعداد المباشر هو بيانات تطبيق مملوكة للعميل مع Pages مربوطة مع الاتفاقية، والتطبيق في وضع Live. التوصيل بيبدأ فورًا مع الـ webhook، ومعاه مطابقة كل ساعة كشبكة أمان وفحص أطول احتياطي. «في ثواني» كلام تشغيلي المنتج مش بيضمنه، فمش جزء من العرض الصادق."
+      }
+    },
+    {
+      "position": 19,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "What Arrives With A Meta Lead",
+        "ar": "إيه اللي بيوصل مع ليد Meta"
+      },
+      "prompt": {
+        "en": "A marketing head wants to know exactly what data lands on a Meta lead. Which statements are correct?",
+        "ar": "مدير ماركتنج عايز يعرف بالظبط أنهي بيانات بتنزل على ليد Meta. أنهي عبارات صح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "For paid-ad leads, the campaign, ad set, ad, and form details that Meta sends are stored on the lead.",
+          "ar": "لليدز الإعلانات المدفوعة، تفاصيل الحملة والمجموعة الإعلانية والإعلان والفورم اللي Meta بتبعتها بتتخزن على الليد."
+        },
+        {
+          "id": "b",
+          "en": "Whispyr guarantees ad-level attribution on every Meta lead, organic ones included.",
+          "ar": "Whispyr يضمن مصدر على مستوى الإعلان لكل ليد من Meta، بما فيهم العضوية."
+        },
+        {
+          "id": "c",
+          "en": "Only what the lead form actually asked is captured. A field the form never collected cannot appear on the lead.",
+          "ar": "اللي بيتسجّل هو بس اللي فورم الليد سأل عنه فعلًا. أي خانة الفورم ما جمعهاش مش ممكن تظهر على الليد."
+        },
+        {
+          "id": "d",
+          "en": "If the same person submits twice, each arrival is kept as its own occurrence with its own attribution record.",
+          "ar": "لو نفس الشخص قدّم مرتين، كل وصول بيتحفظ كحدث لوحده وله سجل مصدر خاص بيه."
+        },
+        {
+          "id": "e",
+          "en": "Organic and boosted entries commonly arrive without paid campaign or ad detail, so ad-level attribution should not be promised on every lead.",
+          "ar": "المدخلات العضوية والبوستات الممولة عادةً بتوصل من غير تفاصيل حملة أو إعلان مدفوع، فمينفعش نوعد بمصدر على مستوى الإعلان لكل ليد."
+        },
+        {
+          "id": "f",
+          "en": "Meta Conversion Reporting exists to pull extra fields from Meta into the lead.",
+          "ar": "تقارير التحويلات لـ Meta موجودة عشان تسحب خانات إضافية من Meta وتحطها على الليد."
+        }
+      ],
+      "correct": [
+        "a",
+        "c",
+        "d",
+        "e"
+      ],
+      "explanation": {
+        "en": "Whispyr stores the optional attribution fields Meta supplies and keeps a distinct occurrence per inquiry. Option B is the overpromise: organic and boosted payloads commonly omit that detail. Option F is backwards — Meta Conversion Reporting sends CRM milestones back to Meta, including Done Deal value and currency, with emission history and retry controls.",
+        "ar": "Whispyr بيخزّن خانات المصدر الاختيارية اللي Meta بتبعتها وبيحفظ حدث منفصل لكل استفسار. الخيار E مبالغة: الحمولات العضوية والممولة عادةً مفيهاش التفاصيل دي. والخيار F مقلوب — تقارير التحويلات لـ Meta بتبعت مراحل النظام لـ Meta، بما فيها قيمة الدون ديل وعملته، مع سجل إرسال وأدوات إعادة محاولة."
+      }
+    },
+    {
+      "position": 20,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Can Your AI Read My Chats",
+        "ar": "الـ AI بتاعكم يقدر يقرا شاتاتي"
+      },
+      "prompt": {
+        "en": "An owner says: \"Point your AI at my WhatsApp conversations and my pipeline, and tell me which leads are hot and who on my team is slacking.\" What is the honest answer?",
+        "ar": "صاحب شركة بيقول: «وجّه الـ AI بتاعكم على محادثات الواتساب بتاعتي وعلى المسار، وقولي أنهي ليدز سُخنة ومين في التيم بيتهرّب.» إيه الإجابة الصادقة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "It cannot. Whispyr AI is a market assistant: its tools only retrieve market data — developers, projects, and units from the Whispyr global catalog. It does not read your leads, your CRM or WhatsApp conversations, or your team's performance, and it does not answer from a brokerage's own custom projects.",
+          "ar": "مش بيقدر. Whispyr AI مساعد سوق: أدواته بتجيب بيانات السوق بس — المطورين والمشاريع والوحدات من كتالوج Whispyr العام. مش بيقرا الليدز بتاعتك، ولا محادثات النظام أو الواتساب، ولا أداء التيم، ومش بيجاوب من المشاريع المخصصة بتاعة الشركة."
+        },
+        {
+          "id": "b",
+          "en": "That is exactly what it does. It reads the chats and ranks the pipeline.",
+          "ar": "ده بالظبط اللي بيعمله. بيقرا الشاتات ويرتّب المسار."
+        },
+        {
+          "id": "c",
+          "en": "It can read the chats but not the performance numbers.",
+          "ar": "بيقدر يقرا الشاتات بس مش أرقام الأداء."
+        },
+        {
+          "id": "d",
+          "en": "It reads everything, but only for admins.",
+          "ar": "بيقرا كل حاجة، بس للأدمنز بس."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "Whispyr AI is grounded in the global market catalog only. The CRM sends it a bounded request, and the live AI server's tools are market retrieval tools. Pitching it as a CRM copilot, a chat reader, or a performance analyst is the most common AI overpromise.",
+        "ar": "Whispyr AI متأسس على كتالوج السوق العام بس. النظام بيبعتله طلب محدود، وأدوات سيرفر الـ AI الشغال أدوات جلب بيانات سوق. بيعه كمساعد للنظام أو قارئ شاتات أو محلّل أداء ده أشهر مبالغة في موضوع الـ AI."
+      }
+    },
+    {
+      "position": 21,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "The AI Property Matching Demo",
+        "ar": "ديمو مطابقة العقارات AI"
+      },
+      "prompt": {
+        "en": "A Whispyr salesperson plans to open a lead in tomorrow's demo, type the buyer's budget and area into AI Property Matching, and show the ranked units. What is the correct call today?",
+        "ar": "مندوب Whispyr ناوي يفتح ليد في ديمو بكرة، ويكتب ميزانية المشتري والمنطقة في مطابقة العقارات AI، ويعرض الوحدات مرتبة. إيه القرار الصح النهارده؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Go ahead. Enter the criteria and show the ranked list with scores and reasons.",
+          "ar": "اعملها. دخّل المعايير واعرض القايمة المرتبة بالنِسب والأسباب."
+        },
+        {
+          "id": "b",
+          "en": "It works, but only against the custom projects the brokerage added itself.",
+          "ar": "شغالة، بس على المشاريع المخصصة اللي الشركة ضافتها بنفسها."
+        },
+        {
+          "id": "c",
+          "en": "Do not demo it and do not promise it as working today. The backend machinery for criteria, scoring, and rationale exists, but the deployed lead screen does not submit the entered criteria and does not retrieve or render the results correctly. Present it as coming.",
+          "ar": "ما تعملهاش ديمو وما توعدش بيها كحاجة شغالة النهارده. ماكينة الباك إند بتاعة المعايير والدرجات والتبرير موجودة، بس شاشة الليد المنشورة مش بتبعت المعايير اللي اتكتبت ومش بتجيب ولا بتعرض النتايج صح. اعرضها كحاجة جاية قريب."
+        },
+        {
+          "id": "d",
+          "en": "It was removed from the product, so tell the customer it does not exist.",
+          "ar": "اتشالت من المنتج، فقول للعميل إنها مش موجودة."
+        }
+      ],
+      "correct": [
+        "c"
+      ],
+      "explanation": {
+        "en": "This is the August honesty question. The intended model is real in the backend, but the deployed lead screen discards the criteria, asks for results the wrong way, and does not render the rationale. Demoing it would create a promise the product cannot keep today. Saying it does not exist at all is the opposite error.",
+        "ar": "ده سؤال الأمانة بتاع أغسطس. الفكرة المقصودة موجودة فعلًا في الباك إند، بس شاشة الليد المنشورة بترمي المعايير، وبتطلب النتايج بطريقة غلط، ومش بتعرض التبرير. عرضها في ديمو هيعمل وعد المنتج مش بيقدر يوفيه النهارده. وإنك تقول إنها مش موجودة خالص ده الغلط العكسي."
+      }
+    },
+    {
+      "position": 22,
+      "type": "multi",
+      "points": 1,
+      "title": {
+        "en": "Selling Cold Calls To An Excel Brokerage",
+        "ar": "بيع الكولد كول لشركة شغالة بإكسل"
+      },
+      "prompt": {
+        "en": "A sales director asks what the Cold Calls module actually enforces. Which statements are correct?",
+        "ar": "سيلز ديركتور بيسأل موديول الكولد كول بيفرض إيه فعلًا. أنهي عبارات صح؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Numbers are uploaded straight into a pool from CSV or Excel, and duplicates are removed by normalized phone number within the pool's scope.",
+          "ar": "الأرقام بتترفع على طول في المجمّع من CSV أو Excel، والتكرار بيتشال بالرقم الموحّد جوه نطاق المجمّع."
+        },
+        {
+          "id": "b",
+          "en": "An agent pulls a sheet only after finishing the previous one and within a daily limit, and pulled numbers are reserved so two people never call the same person.",
+          "ar": "الإيجنت بيسحب شيت جديد بس بعد ما يخلّص اللي قبله وفي حدود الحد اليومي، والأرقام المسحوبة بتتحجز عشان عمر اتنين ما يكلموا نفس الشخص."
+        },
+        {
+          "id": "c",
+          "en": "Every number ends on one of exactly six outcomes, and \"Call back later\" can optionally create a reminder — supplying the date is not mandatory.",
+          "ar": "كل رقم بيخلص على واحدة من ست نتايج بالظبط، و«نعاود الاتصال لاحقًا» ممكن تعمل تنبيه اختياريًا — تحديد التاريخ مش إلزامي."
+        },
+        {
+          "id": "d",
+          "en": "Marking a number Interested normally creates a CRM lead assigned to that agent with the call already logged, and it can be qualified on the spot. If the organization's duplicate rules block creation, the Interested outcome is still recorded without creating another lead.",
+          "ar": "لما تحدد رقم «مهتم» عادةً بيتعمل ليد في النظام موزّع للإيجنت ده والمكالمة متسجّلة عليه، وممكن يتأهّل على طول. ولو قواعد تكرار الليدز في الشركة مانعة الإنشاء، نتيجة «مهتم» بتتسجّل برضه من غير ما يتعمل ليد تاني."
+        },
+        {
+          "id": "e",
+          "en": "Whispyr dials the numbers automatically and records the calls.",
+          "ar": "Whispyr بيطلب الأرقام أوتوماتيك وبيسجّل المكالمات."
+        },
+        {
+          "id": "f",
+          "en": "A manager can also assign sheets manually, and pools can be scoped down the hierarchy or run as franchise or umbrella pools, with configurable pull strategies and sheet size.",
+          "ar": "المانجر كمان يقدر يوزّع شيتس بإيده، والمجمّعات تقدر تتحدد على مستويات التسلسل الإداري أو تشتغل كمجمّع فرانشايز أو مجمّع أمبريلا، مع استراتيجيات سحب وحجم شيت قابلين للتظبيط."
+        }
+      ],
+      "correct": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "f"
+      ],
+      "explanation": {
+        "en": "This is the power of Cold Calls stated accurately: pooled and de-duplicated numbers, gated self-serve pulls with reservation so nobody double-calls, six logged outcomes with an optional callback reminder, and Interested converting into an assigned CRM lead with the call already on it. Option E is the invention to avoid — dialing is manual through tel:, copy, and WhatsApp actions, and no auto-dialer exists in the product. Note the July duplicate change: a number that already exists as a CRM lead can stay callable, and the duplicate policy is applied at Interested conversion rather than at upload.",
+        "ar": "دي قوة الكولد كول متقالة بدقة: أرقام في مجمّع ومن غير تكرار، وسحب ذاتي بشروط مع حجز عشان محدش يكلم مرتين، وست نتايج متسجّلة مع تنبيه اختياري للمعاودة، و«مهتم» بيتحوّل لليد في النظام موزّع والمكالمة عليه. الخيار E هو الاختراع اللي لازم نبعد عنه — الطلب بإيد الإيجنت، ومفيش طلب أوتوماتيك للأرقام في المنتج. وخد بالك من تغيير يوليو في التكرار: الرقم اللي موجود بالفعل كليد في النظام يقدر يفضل قابل للاتصال، وسياسة التكرار بتتطبّق وقت التحويل لـ«مهتم» مش وقت الرفع."
+      }
+    },
+    {
+      "position": 23,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Meetings, Not Just A Stage",
+        "ar": "ميتنجز، مش مجرد مرحلة"
+      },
+      "prompt": {
+        "en": "A sales manager says: \"Meeting Scheduled is only a stage. My leaders still track real meetings in a WhatsApp group.\" What can the Whispyr salesperson accurately offer?",
+        "ar": "سيلز مانجر بيقول: «Meeting متحدد دي مجرد مرحلة. الليدرز بتاعتي لسه بيتابعوا الميتنجز الحقيقية في جروب واتساب.» مندوب Whispyr يقدر يعرض إيه بدقة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Nothing yet. Meetings exist in Whispyr only as a lead stage.",
+          "ar": "مفيش حاجة لسه. الميتنجز في Whispyr موجودة كمرحلة ليد بس."
+        },
+        {
+          "id": "b",
+          "en": "Whispyr books the meeting into the customer's own calendar and confirms it with them automatically.",
+          "ar": "Whispyr بيحجز الميتنج في تقويم العميل نفسه ويأكّده معاه تلقائيًا."
+        },
+        {
+          "id": "c",
+          "en": "Meetings can be created only by an admin, one per lead.",
+          "ar": "الميتنجز الأدمن بس هو اللي يقدر يعملها، واحد لكل ليد."
+        },
+        {
+          "id": "d",
+          "en": "Whispyr has a dedicated Meetings surface. You schedule a future meeting or log one that already happened, and from there you reschedule it, cancel it, mark it completed, record the outcome, set reminders, and keep notes on it.",
+          "ar": "Whispyr فيه شاشة ميتنجز مخصصة. بتحدد ميتنج في المستقبل أو بتسجّل ميتنج حصل بالفعل، ومن هناك بتعيد جدولته، أو تلغيه، أو تعلّمه إنه تم، وتسجّل النتيجة، وتحدد تنبيهات، وتكتب نوتس عليه."
+        }
+      ],
+      "correct": [
+        "d"
+      ],
+      "explanation": {
+        "en": "July made meetings first-class: scheduling future meetings, logging past ones, and managing reschedule, cancellation, completion, outcomes, reminders, and notes from a dedicated surface. Option B is the overpromise — the product manages the brokerage's meeting record, not the customer's calendar.",
+        "ar": "يوليو خلّى الميتنجز حاجة أساسية: تحديد ميتنجز مستقبلية، وتسجيل اللي حصل، وإدارة إعادة الجدولة والإلغاء والإتمام والنتايج والتنبيهات والنوتس من شاشة مخصصة. الخيار C مبالغة — المنتج بيدير سجل ميتنجز الشركة، مش تقويم العميل."
+      }
+    },
+    {
+      "position": 24,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Property Finder Leads",
+        "ar": "ليدز Property Finder"
+      },
+      "prompt": {
+        "en": "A brokerage that spends heavily on Property Finder asks how those leads reach the right agent. Which answer is accurate?",
+        "ar": "شركة بتصرف كتير على Property Finder بتسأل الليدز دي بتوصل للإيجنت الصح إزاي. أنهي إجابة دقيقة؟"
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "You export from Property Finder daily and import the file. There is no direct link.",
+          "ar": "بتصدّر من Property Finder كل يوم وبترفع الملف. مفيش ربط مباشر."
+        },
+        {
+          "id": "b",
+          "en": "The brokerage connects its Property Finder API credentials, which are stored encrypted, and the leads come into Whispyr. Assignment either follows Whispyr's automatic assignment or honors the listing-agent mapping, so the agent who owns the listing gets the lead. If the credentials stop working, the connection surfaces that and can be reconnected.",
+          "ar": "الشركة بتربط بيانات API بتاعة Property Finder، وبتتخزن مشفّرة، والليدز بتدخل Whispyr. والتوزيع يا بيمشي على توزيع الليدز الأوتوماتيكي بتاع Whispyr يا بيحترم ربط إيجنت الإعلان، فالإيجنت صاحب الإعلان هو اللي بياخد الليد. ولو البيانات بطّلت تشتغل، الاتصال بيبيّن كده وينفع يتعاد ربطه."
+        },
+        {
+          "id": "c",
+          "en": "Whispyr reads your Property Finder listings and guesses the assignee from the text of the inquiry.",
+          "ar": "Whispyr بيقرا إعلاناتك على Property Finder ويخمّن الموزّع إليه من نص الاستفسار."
+        },
+        {
+          "id": "d",
+          "en": "Property Finder leads always land unassigned in the Lead Pool for whoever claims them first.",
+          "ar": "ليدز Property Finder دايمًا بتنزل غير موزّعة في الليدز المتاحة لأول واحد يسحبها."
+        }
+      ],
+      "correct": [
+        "b"
+      ],
+      "explanation": {
+        "en": "The integration is a credentialed connection with encrypted storage, two assignment modes — automatic assignment or listing-agent mapping — an agent mapping manager, and a reconnect path when credentials fail.",
+        "ar": "التكامل ده اتصال ببيانات دخول متخزنة مشفّرة، وفيه وضعين للتوزيع — التوزيع الأوتوماتيكي أو ربط إيجنت الإعلان — وأداة لإدارة ربط الإيجنتس، ومسار إعادة ربط لما البيانات تفشل."
+      }
+    },
+    {
+      "position": 25,
+      "type": "single",
+      "points": 1,
+      "title": {
+        "en": "Adding Our Own Projects To The Catalog",
+        "ar": "إضافة مشاريعنا للكتالوج"
+      },
+      "prompt": {
+        "en": "An owner has three projects the Whispyr catalog does not carry and asks what adding them as custom projects actually gets him.",
+        "ar": "صاحب شركة عنده تلات مشاريع كتالوج Whispyr مفيهوش، وبيسأل إضافتهم كمشاريع مخصصة هتجيب له إيه فعلًا."
+      },
+      "options": [
+        {
+          "id": "a",
+          "en": "Custom projects and developers are admin-tier managed records for off-catalog inventory: identity, location, status, and assets, with no selling price and no unit-inventory model. They are visible to the organization on the Market page, but they sit outside the global catalog, so Whispyr AI does not answer from them.",
+          "ar": "المشاريع والمطورين المخصصين سجلات بيديرها مستوى الأدمن لمخزون بره الكتالوج: هوية وموقع وحالة وصور وملفات، من غير سعر بيع ومن غير مخزون وحدات. بتبان لناس الشركة في صفحة السوق العقاري، بس هي بره الكتالوج العام، فـ Whispyr AI مش بيجاوب منها."
+        },
+        {
+          "id": "b",
+          "en": "The same as catalog projects: full unit inventory, pricing, and Whispyr AI answering from them.",
+          "ar": "نفس مشاريع الكتالوج: مخزون وحدات كامل وأسعار، وWhispyr AI بيجاوب منها."
+        },
+        {
+          "id": "c",
+          "en": "Any agent can add them, and they immediately become visible to every other brokerage.",
+          "ar": "أي إيجنت يقدر يضيفهم، وبيبانوا على طول لكل الشركات التانية."
+        },
+        {
+          "id": "d",
+          "en": "Nothing. Whispyr does not allow custom projects.",
+          "ar": "مفيش حاجة. Whispyr مش بيسمح بمشاريع مخصصة."
+        }
+      ],
+      "correct": [
+        "a"
+      ],
+      "explanation": {
+        "en": "Market Insights is the browsable catalog of developers, projects, and units with tiers and track record, and it is the global data the AI is synced from. Custom records let a brokerage log off-catalog inventory, but they are admin or umbrella-admin managed, carry no pricing or unit inventory, and are deliberately excluded from the global AI scope.",
+        "ar": "السوق العقاري هو الكتالوج اللي تقدر تتصفّحه للمطورين والمشاريع والوحدات مع المستويات والسجل، وهو البيانات العامة اللي الـ AI بيتزامن منها. السجلات المخصصة بتخلي الشركة تسجّل مخزون بره الكتالوج، بس بيديرها الأدمن أو أدمن الأمبريلا، ومفيهاش أسعار ولا مخزون وحدات، ومستبعدة بقصد من نطاق الـ AI العام."
+      }
+    },
+    {
+      "position": 26,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "\"Excel Is Free, Why Would I Pay For This?\"",
+        "ar": "«إكسل ببلاش، أدفع ليه؟»"
+      },
+      "prompt": {
+        "en": "A brokerage owner runs cold calling on free Excel sheets he WhatsApps to his telesales team every morning. He says: \"Excel is free. Convince me your Cold Calls is worth money.\" Write the answer a Whispyr salesperson should give.",
+        "ar": "صاحب شركة شغال الكولد كول بشيتات إكسل مجانية بيبعتها واتساب لتيم التليسيلز كل صباح. بيقول: «إكسل ببلاش. اقنعني إن الكولد كول بتاعكم يستاهل فلوس.» اكتب الإجابة اللي مندوب Whispyr لازم يقولها."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Names the concrete things Excel cannot do. Numbers are uploaded into a pool and de-duplicated by normalized phone number, so the same person is not worked twice. An agent pulls a sheet only after finishing the previous one and within a daily limit, and pulled numbers are reserved, so two agents never call the same person. Managers can assign sheets manually instead, and pools can be scoped down the hierarchy or run as franchise or umbrella pools with configurable pull strategies and sheet size. Every number ends on one of six outcomes, so the day's result is visible instead of lost in a file. \"Call back later\" can optionally set a reminder. Interested normally becomes a real CRM lead assigned to that agent with the call already logged, and can be qualified on the spot — with the honest caveat that if the organization's duplicate rules block creation, the Interested outcome is recorded without creating another lead. Stays honest about what it is not: the agent still dials manually and there is no auto-dialer.\n- 2 points: Covers the pool, sheets, outcomes, and conversion to a lead, but misses the reservation and no-double-calling point, the limits and finish-the-previous-sheet gate, the optional callback reminder, or the duplicate-policy caveat.\n- 1 point: Argues only that \"it is organized,\" or describes it as a shared list of numbers, without a single mechanism Excel lacks.\n- 0 points: Says cold calls do not connect to the CRM, or invents behavior — an auto-dialer, or a promise that Interested always creates a new lead no matter what.",
+        "ar": "معايير التقييم:\n\n- 3 نقاط: بيسمّي الحاجات الملموسة اللي إكسل مش بيعملها. الأرقام بتترفع في مجمّع وبيتشال منها التكرار بالرقم الموحّد، فنفس الشخص ما يتشغّلش عليه مرتين. والإيجنت بيسحب شيت بس بعد ما يخلّص اللي قبله وفي حدود الحد اليومي، والأرقام المسحوبة بتتحجز، فعمر اتنين ما يكلموا نفس الشخص. والمانجر يقدر يوزّع شيتس بإيده كبديل، والمجمّعات تتحدد على مستويات التسلسل الإداري أو تشتغل كمجمّع فرانشايز أو أمبريلا مع استراتيجيات سحب وحجم شيت قابلين للتظبيط. وكل رقم بيخلص على واحدة من ست نتايج، فنتيجة اليوم باينة مش ضايعة في ملف. و«نعاود الاتصال لاحقًا» ممكن تحدد تنبيه اختياريًا. و«مهتم» عادةً بيبقى ليد حقيقي في النظام موزّع للإيجنت ده والمكالمة متسجّلة، وممكن يتأهّل على طول — مع التنبيه الصادق إن قواعد تكرار الليدز لو مانعة الإنشاء، نتيجة «مهتم» بتتسجّل من غير ما يتعمل ليد تاني. وبيفضل صادق في اللي هو مش موجود: الإيجنت لسه بيطلب الرقم بإيده ومفيش طلب أوتوماتيك للأرقام.\n- نقطتان: بيغطّي المجمّع والشيتس والنتايج والتحويل لليد، بس بيفوّت نقطة الحجز وعدم الاتصال المزدوج، أو الحدود وشرط إنهاء الشيت اللي قبله، أو تنبيه المعاودة الاختياري، أو تنبيه سياسة التكرار.\n- نقطة واحدة: بيقول بس إنه «منظّم»، أو بيوصفه كقايمة أرقام مشتركة، من غير أي ميكانيزم واحد إكسل مش عنده.\n- صفر: بيقول إن الكولد كول مش متربط بالنظام، أو بيخترع سلوك — طلب أوتوماتيك للأرقام، أو وعد إن «مهتم» دايمًا بيعمل ليد جديد مهما حصل."
+      }
+    },
+    {
+      "position": 27,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "\"My Friend Got His Number Restricted\"",
+        "ar": "«صاحبي رقمه اتقيّد»"
+      },
+      "prompt": {
+        "en": "An owner says: \"A friend used a bulk WhatsApp tool and his number got restricted. Before I connect my main business number, tell me exactly what Whispyr's WhatsApp is and whether my number is safe.\" Write the honest answer.",
+        "ar": "صاحب شركة بيقول: «صاحبي استخدم أداة إرسال جماعي على واتساب ورقمه اتقيّد. قبل ما أربط رقم الشغل الأساسي بتاعي، قولي بالظبط واتساب Whispyr ده إيه، ورقمي آمن ولا لأ؟» اكتب الإجابة الصادقة."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: States plainly that this is not the official WhatsApp Business API — it is a linked-device session, the same idea as WhatsApp Web — connected either by scanning a QR code or by entering a phone pairing code. Explains that a company number can be connected for the brokerage and each agent can connect their own personal number. Names the upside (keep your own number, no Meta approval, no templates) and the trade-offs (the session can drop and need re-linking, and the brokerage carries the usual WhatsApp account-safety risk). Explains the controls that reduce risk honestly: a daily send window in the organization's timezone, 08:00 to 22:00 by default, standard or cautious batches with delays, optional review-before-send, and AI message variations so a campaign does not look like an identical blast. Ends with the honesty line: these reduce risk, they do not eliminate it, and no tool can guarantee WhatsApp will never limit a number. Refuses to say \"100% safe.\"\n- 2 points: Gets the linked-device / not-official-API part right and mentions company versus personal numbers, but leaves out the pairing-code option, oversells safety, or skips the drop-and-relink and ban-risk honesty.\n- 1 point: Vague or half-right, for example \"you just connect your WhatsApp and it is fine.\"\n- 0 points: Claims it is the official WhatsApp Business API, or promises the number is 100% safe, cannot be restricted, or that delivery is guaranteed.",
+        "ar": "معايير التقييم:\n\n- 3 نقاط: بيقول بوضوح إن ده مش WhatsApp Business API الرسمي — دي جلسة جهاز مرتبط، نفس فكرة واتساب ويب — والربط يا بمسح QR كود يا بإدخال كود ربط بالتليفون. وبيشرح إن فيه رقم للشركة ينفع يتربط وكل إيجنت يقدر يربط رقمه الشخصي. وبيسمّي الميزة (تفضل ماسك رقمك، مفيش موافقة من Meta، مفيش قوالب) والمقابل (الجلسة ممكن تفصل وتحتاج إعادة ربط، والشركة شايلة مخاطرة أمان حساب الواتساب المعتادة). وبيشرح الأدوات اللي بتقلل المخاطرة بصدق: نافذة إرسال يومية بتوقيت الشركة، من 8 الصبح لـ 10 بالليل افتراضيًا، وتأخير عادي أو طويل جدًا على دفعات، ومراجعة قبل الإرسال اختياريًا، وتنويعات رسايل AI عشان الكامبين ما يبانش رسالة واحدة متكررة. وبيقفل بخط الأمانة: دي بتقلل المخاطرة، مش بتلغيها، ومفيش أداة تضمن إن واتساب عمره ما هيقيّد رقم. وبيرفض يقول «آمن 100%».\n- نقطتان: ماسك صح موضوع الجهاز المرتبط ومش الـ API الرسمي، وبيذكر رقم الشركة مقابل الشخصي، بس بيسيب اختيار كود الربط بالتليفون، أو بيبالغ في الأمان، أو بيتخطى صراحة الفصل وإعادة الربط ومخاطرة الحظر.\n- نقطة واحدة: مبهم أو نص صح، مثلًا «إنت بس بتربط الواتساب وخلاص».\n- صفر: بيدّعي إنه WhatsApp Business API الرسمي، أو بيوعد إن الرقم آمن 100%، أو إنه مش ممكن يتقيّد، أو إن التوصيل مضمون."
+      }
+    },
+    {
+      "position": 28,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "The Agent Who Thinks His Work Was Erased",
+        "ar": "الإيجنت اللي فاكر إن شغله اتمسح"
+      },
+      "prompt": {
+        "en": "An agent is furious: a lead he worked for three weeks was handed to a colleague, and on the colleague's screen the lead looks brand new. He is convinced his work was deleted and will be credited to someone else. Write the explanation a Whispyr salesperson should give him and his manager.",
+        "ar": "إيجنت متعصّب: ليد كان شغال عليه تلات أسابيع اتسلّم لزميله، وعلى شاشة الزميل الليد شكله جديد تمامًا. وهو متأكد إن شغله اتمسح وإن حد تاني هياخد عليه الفضل. اكتب الشرح اللي مندوب Whispyr لازم يقوله له وللمانجر بتاعه."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Explains that nothing is deleted — the prior history stays stored and the record still shows who did that work. Explains the default: the receiving agent's timeline starts at the handover point, which is a visibility window, not a deletion or a transfer of credit. Gets the access precision right: unconditional full history belongs to the admin tiers (admin, Whispyr admin, umbrella admin), while directors, managers, and team leaders see history according to the grant windows of their placement in the chain. Adds the never-worked exception: if a lead had never been worked, the clean-slate choice is upgraded to full history so the new agent is not blind. Bonus for noting that on a full-history reassignment the manager can now keep the current status and priority instead of resetting to New Lead and Medium, and that simply moving an agent between teams is a realignment — no new handover, dates preserved.\n- 2 points: Covers preservation and the clean-slate default, but overstates who keeps full history (for example \"all managers see everything\"), or misses the never-worked case or the credit point.\n- 1 point: Answers with a vague \"it depends on permissions\" and no actual behavior.\n- 0 points: Says the history is deleted, or that it is copied over so the new agent becomes the author of the earlier work.",
+        "ar": "معايير التقييم:\n\n- 3 نقاط: بيشرح إن مفيش حاجة بتتمسح — السجل القديم بيفضل متخزن والسجل لسه بيبيّن مين عمل الشغل ده. وبيشرح الافتراضي: سجل الإيجنت المستلم بيبدأ من نقطة التسليم، ودي نافذة رؤية، مش مسح ولا نقل فضل. وبيمسك دقة الصلاحية: السجل الكامل من غير شروط لمستويات الأدمن (أدمن، أدمن Whispyr، أدمن أمبريلا)، بينما السيلز ديركتور والسيلز مانجر والتيم ليدر بيشوفوا السجل حسب نوافذ الصلاحية بتاعة مكانهم في السلسلة. وبيضيف استثناء «محدش اشتغل عليه»: لو الليد ما اتشتغلش عليه خالص، اختيار البداية النضيفة بيترقّى للسجل الكامل عشان الإيجنت الجديد ما يبداش أعمى. ونقطة إضافية لو ذكر إن في إعادة التوزيع بالسجل الكامل المانجر يقدر دلوقتي يحافظ على الحالة والأولوية الحالية بدل ما يرجّعها لليد جديد ومتوسط، وإن نقل الإيجنت بين التيمز ده إعادة محاذاة — مفيش تسليم جديد والتواريخ بتتحفظ.\n- نقطتان: بيغطّي إن مفيش حاجة بتتمسح والبداية النضيفة الافتراضية، بس بيبالغ في مين بيفضل شايف السجل الكامل (مثلًا «كل المانجرز بيشوفوا كل حاجة»)، أو بيفوّت حالة الليد اللي محدش اشتغل عليه أو نقطة الفضل.\n- نقطة واحدة: بيجاوب بـ«على حسب الصلاحيات» من غير أي سلوك فعلي.\n- صفر: بيقول إن السجل بيتمسح، أو إنه بيتنسخ بحيث الإيجنت الجديد يبقى هو صاحب الشغل القديم."
+      }
+    },
+    {
+      "position": 29,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "The Competitor Who Says Their AI Closes Deals",
+        "ar": "المنافس اللي بيقول إن الـ AI بتاعه بيقفل صفقات"
+      },
+      "prompt": {
+        "en": "A prospect is comparing Whispyr with a CRM whose pitch is \"our AI reads every conversation, scores every lead, and tells your agents what to send.\" He asks what Whispyr's AI does today. Write the answer, and be explicit about what a rep must not promise.",
+        "ar": "عميل محتمل بيقارن Whispyr بنظام تاني عرضه إن «الـ AI بتاعنا بيقرا كل محادثة، ويقيّم كل ليد، ويقول لإيجنتسك يبعتوا إيه». وبيسأل الـ AI بتاع Whispyr بيعمل إيه النهارده. اكتب الإجابة، وكون واضح في اللي المندوب ممنوع يوعد بيه."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Separates what is real from what is not. Real today: Whispyr AI as a market assistant whose tools only retrieve market data — developers, projects, and units from the Whispyr global catalog — and which explicitly does not read leads, CRM or WhatsApp conversations, or team performance, and does not answer from a brokerage's own custom projects; and AI message variations, which reword a campaign message per recipient so it does not look like an identical blast. Explicitly not to be promised: reading individual leads or chats, writing a reply for a specific lead, and lead scoring. Handles AI Property Matching honestly: the backend machinery exists, but it must not be demoed or sold as working today because the deployed lead screen does not submit the criteria or retrieve and render results — present it as coming.\n- 2 points: Describes the market-assistant scope and the campaign variations accurately, but blurs the boundary — for example implying the AI can see lead data — or presents AI Property Matching as a working feature.\n- 1 point: Generic \"we have AI too\" with no specifics.\n- 0 points: Matches the competitor's claim: says the AI reads leads or chats, writes per-lead replies, or scores the pipeline. Also 0 for demoing or promising AI Property Matching as working today.",
+        "ar": "معايير التقييم:\n\n- 3 نقاط: بيفصل الحقيقي من غير الحقيقي. الحقيقي النهارده: Whispyr AI كمساعد سوق أدواته بتجيب بيانات السوق بس — المطورين والمشاريع والوحدات من كتالوج Whispyr العام — وبصراحة مش بيقرا الليدز ولا محادثات النظام أو الواتساب ولا أداء التيم، ومش بيجاوب من المشاريع المخصصة بتاعة الشركة؛ وكمان تنويعات رسايل AI اللي بتعيد صياغة رسالة الكامبين لكل مستلم عشان ما تبانش رسالة واحدة متكررة. واللي ممنوع نوعد بيه صراحة: قراءة ليدز أو شاتات فردية، وكتابة رد لليد معيّن، وتقييم الليدز. وبيتعامل مع مطابقة العقارات AI بأمانة: ماكينة الباك إند موجودة، بس ممنوع تتعرض في ديمو أو تتباع كحاجة شغالة النهارده لأن شاشة الليد المنشورة مش بتبعت المعايير ولا بتجيب وتعرض النتايج — تتعرض كحاجة جاية قريب.\n- نقطتان: بيوصف نطاق مساعد السوق وتنويعات الكامبين بدقة، بس بيلخبط الحدود — مثلًا بيلمّح إن الـ AI يقدر يشوف بيانات الليدز — أو بيعرض مطابقة العقارات AI كخصيصة شغالة.\n- نقطة واحدة: كلام عام «إحنا كمان عندنا AI» من غير تفاصيل.\n- صفر: بيطابق كلام المنافس: بيقول إن الـ AI بيقرا الليدز أو الشاتات، أو بيكتب ردود لكل ليد، أو بيقيّم المسار. وكمان صفر لو عرض أو وعد بمطابقة العقارات AI كحاجة شغالة النهارده."
+      }
+    },
+    {
+      "position": 30,
+      "type": "short",
+      "points": 3,
+      "title": {
+        "en": "How A Lead Actually Reaches An Agent",
+        "ar": "الليد بيوصل للإيجنت إزاي فعلًا"
+      },
+      "prompt": {
+        "en": "A brokerage runs Meta lead ads, pays for Property Finder, and has a telesales team cold calling, and it is migrating years of old data from spreadsheets. The owner asks: \"Walk me through how a lead actually gets into your system and onto the right agent's screen.\" Write the answer.",
+        "ar": "شركة شغالة Lead Ads على Meta، وبتدفع في Property Finder، وعندها تيم تليسيلز بيعمل كولد كول، وبترحّل داتا سنين من شيتات إكسل. صاحب الشركة بيسأل: «مشّيني خطوة بخطوة: الليد بيدخل نظامكم إزاي وبيوصل لشاشة الإيجنت الصح إزاي؟» اكتب الإجابة."
+      },
+      "rubric": {
+        "en": "Scoring rubric:\n\n- 3 points: Walks the real intake paths. Meta lead ads: the brokerage connects its own Meta app credentials and Pages, accepts the agreement, and the app must be Live; a live webhook is enqueued as soon as it arrives, with an hourly reconciliation as the backstop — and no promise of a seconds-level SLA. Property Finder: connect the API credentials, stored encrypted; assignment either follows Whispyr's automatic assignment or honors the listing-agent mapping, and a failed credential surfaces so it can be reconnected. Cold calls: Interested converts the number into an assigned CRM lead with the call logged, with the honest caveat that duplicate rules can block creation and record Interested without a new lead. WhatsApp campaigns: a first reply to a company campaign can create and assign a lead. Migration and manual entry: imports can read the assignee from each row by name, email, or display code, auto-match people, force resolution of ambiguous values, or deliberately import unassigned, and migrated prior work comes in as evidence the lead was already worked. Closes the loop with recovery: rotation and the Lead Pool exist so a lead that stalls with an inactive agent goes back into circulation instead of dying.\n- 2 points: Covers two or three intake paths accurately and mentions assignment, but misses the recovery loop, the migration assignee handling, or the honesty caveats (no seconds SLA, duplicate rules at conversion).\n- 1 point: Says \"leads come from Facebook and cold calls and get assigned,\" with no mechanism.\n- 0 points: Invents an intake path (for example scraping portals, or Meta pushing leads with no setup), promises a seconds-level Meta SLA, or claims every cold-call Interested always creates a new lead.",
+        "ar": "معايير التقييم:\n\n- 3 نقاط: بيمشي على مسارات الدخول الحقيقية. Lead Ads على Meta: الشركة بتربط بيانات تطبيق Meta بتاعها وPages بتاعتها، وبتوافق على الاتفاقية، والتطبيق لازم يكون Live؛ والـ webhook المباشر بيتحط في الطابور أول ما يوصل، ومعاه مطابقة كل ساعة كشبكة أمان — ومن غير أي وعد بضمان مستوى الثواني. Property Finder: بتربط بيانات الـ API وبتتخزن مشفّرة؛ والتوزيع يا بيمشي على توزيع الليدز الأوتوماتيكي يا بيحترم ربط إيجنت الإعلان، ولو البيانات فشلت الاتصال بيبيّن كده وينفع يتعاد ربطه. الكولد كول: «مهتم» بيحوّل الرقم لليد في النظام موزّع والمكالمة متسجّلة، مع التنبيه الصادق إن قواعد التكرار ممكن تمنع الإنشاء وتسجّل «مهتم» من غير ليد جديد. كامبينز الواتساب: أول رد على كامبين شركة ممكن يعمل ليد ويوزّعه. الترحيل والإدخال اليدوي: الاستيراد يقدر يقرا الموزّع إليه من كل صف بالاسم أو الإيميل أو كود العرض، ويطابق الناس أوتوماتيك، ويفرض حل القيم الملخبطة، أو يستورد غير موزّع بقصد، والشغل القديم اللي بيترحّل بيدخل كدليل إن الليد اتشتغل عليه قبل كده. وبيقفل الدايرة بالاسترجاع: تدوير الليدز والليدز المتاحة موجودين عشان الليد اللي بيقف مع إيجنت غير نشط يرجع للدورة بدل ما يموت.\n- نقطتان: بيغطّي مسارين أو تلاتة بدقة ويذكر التوزيع، بس بيفوّت دايرة الاسترجاع، أو التعامل مع الموزّع إليه في الترحيل، أو تنبيهات الأمانة (مفيش ضمان ثواني، وقواعد التكرار وقت التحويل).\n- نقطة واحدة: بيقول «الليدز بتجي من فيسبوك والكولد كول وبتتوزّع»، من غير أي ميكانيزم.\n- صفر: بيخترع مسار دخول (مثلًا سحب من المواقع، أو Meta بتبعت الليدز من غير أي إعداد)، أو بيوعد بضمان مستوى ثواني لـ Meta، أو بيدّعي إن كل «مهتم» في الكولد كول دايمًا بيعمل ليد جديد."
+      }
+    }
+  ]
+}

@@ -3,8 +3,8 @@
 // upserts them, D1 is the source of truth and questions are edited in-panel.
 // See design.md §8.
 
-import realEstateMarket from "./seed/real-estate-market-quiz.json";
-import whispyrSystem from "./seed/whispyr-system-quiz.json";
+import realEstateMarket from "./seed/real-estate-market-quiz-2026-08.json";
+import whispyrSystem from "./seed/whispyr-system-quiz-2026-08.json";
 
 export type Lang = "en" | "ar";
 export interface Bilingual {
