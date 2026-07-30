@@ -8,6 +8,7 @@ import {
   commitIngressForwardAcceptance,
   EMERGENCY_FORWARD_LEASE_SECONDS,
   EMERGENCY_FORWARD_MAX_ATTACHMENT_BYTES,
+  EMERGENCY_FORWARD_PARKING_RETRY_SECONDS,
   EMERGENCY_FORWARD_RECONCILIATION_CURSOR_KEY,
   EMERGENCY_FORWARD_RETRY_SECONDS,
   emergencyForwardMarkerKey,
@@ -1441,6 +1442,83 @@ test("reconciler re-enqueues a stranded marker after Queue loss", async () => {
   assert.deepEqual(f.queues, [
     { schemaVersion: 1, pointer, generation: 2 },
   ]);
+});
+
+test("marker reconciliation settles a terminal receipt whose mailbox row is live", async () => {
+  const receiptKey = `receipts/${pointer.ingressId}.json`;
+  const markerKey = emergencyForwardMarkerKey(pointer.rawKey);
+
+  // Suppression wrote the terminal receipt but lost the marker delete, which is
+  // the one shape that can still hand a settled forward back to the Queue.
+  const delivered = fixture({ truths: ["stored"] });
+  await beginEmergencyForward(
+    delivered.env,
+    pointer,
+    "MIME_PARSE_FAILED",
+    delivered.runtime,
+  );
+  delivered.queues.length = 0;
+  delivered.values.set(receiptKey, receiptBody("stored"));
+  delivered.metadata.set(receiptKey, { state: "stored" });
+
+  await reconcileEmergencyForwardMarkers(delivered.env, {
+    now: () => new Date("2026-07-17T10:50:00.000Z"),
+  });
+
+  assert.deepEqual(delivered.queues, []);
+  assert.equal(delivered.values.has(markerKey), false);
+  assert.equal(
+    JSON.parse(delivered.values.get(receiptKey) ?? "null").state,
+    "stored",
+  );
+
+  const undelivered = fixture({ truths: ["active"] });
+  await beginEmergencyForward(
+    undelivered.env,
+    pointer,
+    "MIME_PARSE_FAILED",
+    undelivered.runtime,
+  );
+  undelivered.queues.length = 0;
+  undelivered.values.set(receiptKey, receiptBody("stored"));
+  undelivered.metadata.set(receiptKey, { state: "stored" });
+
+  await reconcileEmergencyForwardMarkers(undelivered.env, {
+    now: () => new Date("2026-07-17T10:50:00.000Z"),
+  });
+
+  assert.equal(undelivered.queues.length, 1);
+  assert.equal(undelivered.values.has(markerKey), true);
+});
+
+test("the parking lane redelivers on its own cadence, not the primary lane's", async () => {
+  const lanes: Array<{ retryDelaySeconds: number; expected: number }> = [
+    {
+      retryDelaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS,
+      expected: EMERGENCY_FORWARD_RETRY_SECONDS,
+    },
+    {
+      retryDelaySeconds: EMERGENCY_FORWARD_PARKING_RETRY_SECONDS,
+      expected: EMERGENCY_FORWARD_PARKING_RETRY_SECONDS,
+    },
+  ];
+  assert.notEqual(
+    EMERGENCY_FORWARD_PARKING_RETRY_SECONDS,
+    EMERGENCY_FORWARD_RETRY_SECONDS,
+  );
+  for (const lane of lanes) {
+    const f = fixture({ sendThrows: true });
+    await beginEmergencyForward(f.env, pointer, "MIME_PARSE_FAILED", f.runtime);
+    await processEmergencyForwardBatch({ messages: [f.message] }, f.env, {
+      ...f.runtime,
+      retryDelaySeconds: lane.retryDelaySeconds,
+    });
+    assert.deepEqual(
+      f.retries,
+      [{ delaySeconds: lane.expected }],
+      String(lane.retryDelaySeconds),
+    );
+  }
 });
 
 test("a long Queue outage creates only one live generation and stale backlog cannot duplicate delivery", async () => {

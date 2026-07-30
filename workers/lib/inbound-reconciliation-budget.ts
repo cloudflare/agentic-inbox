@@ -49,9 +49,11 @@ export const RECENT_RAW_LANE_OVERHEAD_SERVICE_SUBREQUESTS =
 // corrupt-marker + exact forward-eligible-quarantine branch may read marker,
 // receipt, and raw, CAS-repair/reread both sidecars, best-effort audit both
 // repairs, CAS-claim/reread a generation, enqueue, and retain cleanup authority.
+// Two Mailbox RPCs precede any receipt repair so a forward the consumer already
+// settled against a live mailbox row is never resurrected.
 export const EMERGENCY_FORWARD_RECONCILIATION_BATCH_SIZE = 8;
 export const EMERGENCY_FORWARD_LANE_OVERHEAD_SERVICE_SUBREQUESTS = 4;
-export const MAX_EMERGENCY_FORWARD_SERVICE_SUBREQUESTS_PER_ITEM = 13;
+export const MAX_EMERGENCY_FORWARD_SERVICE_SUBREQUESTS_PER_ITEM = 15;
 
 // Each lane spends one read, one list, and one cursor write outside its item
 // loop. The per-item ceilings mirror the actual worst-case call graphs so an

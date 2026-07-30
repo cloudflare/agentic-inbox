@@ -158,9 +158,6 @@ type ReconciliationEnvironment = {
       getInboundDeletionAuthority?(
         authority: InboundArchivePointer & { rawSha256: string },
       ): Promise<{ generation: number; deletedAt: string } | null>;
-      getInboundProjectionAuthority?(
-        authority: InboundArchivePointer & { rawSha256: string },
-      ): Promise<{ generation: number } | null>;
       getInboundTerminalFailure?(ingressId: string): Promise<{
         queueRef: string;
         attempts: number;
@@ -346,33 +343,31 @@ async function hasExactInboundDeletionAuthority(
   );
 }
 
-async function hasExactInboundProjectionAuthority(
+// The single delivery truth every recovery path shares with the emergency
+// consumer (finalMailboxTruth in lib/emergency-forward.ts): a live mailbox row
+// for the ingress id means the recipient already holds the mail. Demanding an
+// exact archive-authority match on top of it made drifted-but-delivered mail
+// look undelivered, so reconciliation kept resurrecting forwards the consumer
+// had just suppressed.
+async function hasLiveInboundProjection(
   mailbox: ReturnType<ReconciliationEnvironment["MAILBOX"]["get"]>,
-  pointer: InboundArchivePointer,
+  ingressId: string,
   runtime: ReconciliationRuntime,
   label: string,
 ): Promise<boolean> {
-  if (
-    pointer.rawSha256 === undefined ||
-    !mailbox.getInboundProjectionAuthority
-  ) {
-    return false;
-  }
-  const value = await boundedInfrastructureWork(
-    mailbox.getInboundProjectionAuthority({
-      ...projectInboundArchivePointer(pointer),
-      rawSha256: pointer.rawSha256,
-    }),
-    runtime,
-    label,
-  );
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      Object.keys(value).length === 1 &&
-      value.generation === 1,
-  );
+  return mailbox.hasEmail
+    ? await boundedInfrastructureWork(
+        mailbox.hasEmail(ingressId),
+        runtime,
+        label,
+      )
+    : Boolean(
+        await boundedInfrastructureWork(
+          mailbox.getEmail(ingressId),
+          runtime,
+          label,
+        ),
+      );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1267,25 +1262,12 @@ async function reconcileArchive(
         "missing receipt deletion truth",
       );
       if (!deleted) {
-        projectionExists = mailbox.hasEmail
-          ? await boundedInfrastructureWork(
-              mailbox.hasEmail(pointer.ingressId),
-              runtime,
-              "missing receipt projection truth",
-            )
-          : Boolean(await boundedInfrastructureWork(
-              mailbox.getEmail(pointer.ingressId),
-              runtime,
-              "missing receipt projection truth",
-            ));
-        projectionExists =
-          projectionExists &&
-          (await hasExactInboundProjectionAuthority(
-            mailbox,
-            pointer,
-            runtime,
-            "missing receipt projection archive authority",
-          ));
+        projectionExists = await hasLiveInboundProjection(
+          mailbox,
+          pointer.ingressId,
+          runtime,
+          "missing receipt projection truth",
+        );
       }
     } catch {
       // Indeterminate mailbox truth must converge to emergency delivery.
@@ -1502,25 +1484,12 @@ async function reconcileArchive(
     return "terminalized";
   }
   if (receiptNeedsMailboxTruthRepair) {
-    let projectionExists = mailbox.hasEmail
-      ? await boundedInfrastructureWork(
-          mailbox.hasEmail(pointer.ingressId),
-          runtime,
-          "repairable receipt projection truth",
-        )
-      : Boolean(await boundedInfrastructureWork(
-          mailbox.getEmail(pointer.ingressId),
-          runtime,
-          "repairable receipt projection truth",
-        ));
-    projectionExists =
-      projectionExists &&
-      (await hasExactInboundProjectionAuthority(
-        mailbox,
-        pointer,
-        runtime,
-        "repairable receipt projection archive authority",
-      ));
+    const projectionExists = await hasLiveInboundProjection(
+      mailbox,
+      pointer.ingressId,
+      runtime,
+      "repairable receipt projection truth",
+    );
     if (projectionExists) {
       const storedReceipt = await boundedInfrastructureWork(
         env.RAW_MAIL_BUCKET.put(
@@ -1770,25 +1739,12 @@ async function reconcileArchive(
   if (receipt?.state === "stored") {
     let projectionExists = false;
     try {
-      projectionExists = mailbox.hasEmail
-        ? await boundedInfrastructureWork(
-            mailbox.hasEmail(pointer.ingressId),
-            runtime,
-            "stored projection truth",
-          )
-        : Boolean(await boundedInfrastructureWork(
-            mailbox.getEmail(pointer.ingressId),
-            runtime,
-            "stored projection truth",
-          ));
-      projectionExists =
-        projectionExists &&
-        (await hasExactInboundProjectionAuthority(
-          mailbox,
-          pointer,
-          runtime,
-          "stored projection archive authority",
-        ));
+      projectionExists = await hasLiveInboundProjection(
+        mailbox,
+        pointer.ingressId,
+        runtime,
+        "stored projection truth",
+      );
     } catch {
       projectionExists = false;
     }
@@ -2101,30 +2057,13 @@ async function clearTerminalActiveMarker(
       env.MAILBOX.idFromName(value.mailboxId),
     );
     try {
-      const stored = mailbox.hasEmail
-        ? await boundedInfrastructureWork(
-            mailbox.hasEmail(value.ingressId),
-            runtime,
-            "terminal active marker projection authority",
-          )
-        : Boolean(
-            await boundedInfrastructureWork(
-              mailbox.getEmail(value.ingressId),
-              runtime,
-              "terminal active marker projection authority",
-            ),
-          );
-      if (
-        !stored ||
-        !(await hasExactInboundProjectionAuthority(
-          mailbox,
-          value,
-          runtime,
-          "terminal active marker projection archive authority",
-        ))
-      ) {
-        return;
-      }
+      const stored = await hasLiveInboundProjection(
+        mailbox,
+        value.ingressId,
+        runtime,
+        "terminal active marker projection authority",
+      );
+      if (!stored) return;
     } catch {
       return;
     }

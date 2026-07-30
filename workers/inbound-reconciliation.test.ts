@@ -2112,12 +2112,6 @@ async function exactConcurrentWinnerFixture(
               markRead("stored");
               return branch === "repair_state_stored";
             },
-            async getInboundProjectionAuthority() {
-              markRead("projection_authority");
-              return branch === "repair_state_stored"
-                ? { generation: 1 }
-                : null;
-            },
             async getEmail() {
               markRead("get_email");
               return branch === "repair_state_stored" ? {} : null;
@@ -2158,13 +2152,7 @@ for (const branch of [
 ] satisfies ExactWinnerBranch[]) {
   const expectedBranchReads: Record<ExactWinnerBranch, string[]> = {
     repair_state_deleted: ["mailbox_binding", "mailbox_stub", "deleted"],
-    repair_state_stored: [
-      "mailbox_binding",
-      "mailbox_stub",
-      "deleted",
-      "stored",
-      "projection_authority",
-    ],
+    repair_state_stored: ["mailbox_binding", "mailbox_stub", "deleted", "stored"],
     handoff_deleted: ["mailbox_binding", "mailbox_stub", "deleted"],
   };
   test(`reconciliation preserves an exact ${branch} concurrent receipt winner`, async () => {
@@ -3997,6 +3985,132 @@ test("reconciliation retains active recovery and automatically forwards a false 
   assert.equal(JSON.parse(sidecars.get(receiptKey)?.value ?? "null").state, "forward_pending");
   assert.equal(sidecars.has(emergencyMarkerKey), true);
   assert.equal(deleted.includes(inboundMarkerKey), false);
+});
+
+test("a live mailbox row keeps reconciliation from resurrecting a settled forward", async () => {
+  const ingressId = "stored-and-delivered";
+  const rawKey = "raw/2026/07/13/09/00/stored-and-delivered.eml";
+  const rawSha256 = "c".repeat(64);
+  const receiptKey = `receipts/${ingressId}.json`;
+  const inboundMarkerKey =
+    `system/inbound-active/${encodeURIComponent(rawKey)}.json`;
+  const emergencyMarkerKey =
+    `system/emergency-forward/active/${encodeURIComponent(rawKey)}.json`;
+  const sidecars = new Map<string, {
+    value: string;
+    etag: string;
+    customMetadata?: Record<string, string>;
+  }>([
+    [
+      receiptKey,
+      {
+        value: inboundReceiptBody(
+          {
+            ingressId,
+            rawKey,
+            rawSize: 123,
+            rawSha256,
+            archivedAt: "2026-07-13T09:00:00.000Z",
+          },
+          "stored",
+          "2026-07-13T09:01:00.000Z",
+        ),
+        etag: "stored-receipt-etag",
+        customMetadata: { state: "stored" },
+      },
+    ],
+  ]);
+  const emergencyQueue: unknown[] = [];
+  let revision = 0;
+  const env = {
+    DOMAINS: "wiserchat.ai",
+    DB: mailboxDb(),
+    BUCKET: derivedBucketWithoutDelete,
+    RAW_MAIL_BUCKET: {
+      async list(options: { prefix: string }) {
+        return {
+          objects:
+            options.prefix === "system/inbound-active/"
+              ? [{ key: inboundMarkerKey }]
+              : [],
+          truncated: false,
+        };
+      },
+      async head(key: string) {
+        if (key !== rawKey) return null;
+        return {
+          key: rawKey,
+          size: 123,
+          etag: "archive-etag",
+          version: "archive-version",
+          customMetadata: {
+            archivedAt: "2026-07-13T09:00:00.000Z",
+            ingressId,
+            mailboxId: "hello@wiserchat.ai",
+            rawSize: "123",
+            rawSha256,
+            schemaVersion: "1",
+          },
+        };
+      },
+      async get(key: string) {
+        const sidecar = sidecars.get(key);
+        return sidecar
+          ? {
+              key,
+              etag: sidecar.etag,
+              customMetadata: sidecar.customMetadata,
+              async text() { return sidecar.value; },
+            }
+          : null;
+      },
+      async put(
+        key: string,
+        value: string,
+        options?: { customMetadata?: Record<string, string> },
+      ) {
+        revision += 1;
+        sidecars.set(key, {
+          value,
+          etag: `written-${revision}`,
+          customMetadata: options?.customMetadata,
+        });
+        return { etag: `written-${revision}` };
+      },
+      async delete(key: string) { sidecars.delete(key); },
+    },
+    INBOUND_QUEUE: {
+      async send() {
+        assert.fail("delivered mail must not return to projection");
+      },
+    },
+    EMERGENCY_FORWARD_QUEUE: {
+      async send(value: unknown) { emergencyQueue.push(value); },
+    },
+    MAILBOX: {
+      idFromName(mailboxId: string) { return mailboxId; },
+      get() {
+        return {
+          async isEmailDeleted() { return false; },
+          // The drifted-authority shape from the incident: the row is live, but
+          // no exact archive authority backs it.
+          async getEmail() { return { id: ingressId }; },
+        };
+      },
+    },
+  };
+
+  const result = await reconcileInboundArchives(env, {
+    now: () => new Date("2026-07-13T10:00:00.000Z"),
+  });
+
+  assert.equal(result.projectionMissing, 0);
+  assert.deepEqual(emergencyQueue, []);
+  assert.equal(sidecars.has(emergencyMarkerKey), false);
+  assert.equal(
+    JSON.parse(sidecars.get(receiptKey)?.value ?? "null").state,
+    "stored",
+  );
 });
 
 test("stored projection recovery clears its active marker and reaches a fixed point", async () => {

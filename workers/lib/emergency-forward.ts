@@ -39,6 +39,10 @@ export const EMERGENCY_FORWARD_INFRASTRUCTURE_TIMEOUT_MS = 5_000;
 // spends the whole retry budget on attempts that bail on their own live lease.
 export const EMERGENCY_FORWARD_RETRY_SECONDS =
   EMERGENCY_FORWARD_LEASE_SECONDS + 30;
+// An explicit per-message delay overrides the consumer's queue-level
+// retry_delay, so the parking lane has to restate its own hourly cadence or it
+// would burn its whole retry budget at the primary lane's pace.
+export const EMERGENCY_FORWARD_PARKING_RETRY_SECONDS = 3_600;
 // Inbound accepts 25 MiB of raw MIME, and an outbound send to a verified
 // destination is capped at 25 MiB after base64 expands the attachment by a
 // third. 16 MiB of original therefore leaves headroom, and anything larger is
@@ -126,6 +130,7 @@ type EmergencyQueueMessage = Pick<
 
 type EmergencyRuntime = {
   now(): Date;
+  retryDelaySeconds?: number;
   providerLogRef?(messageId: string): Promise<string>;
   bestEffortTimeoutMs?: number;
   infrastructureTimeoutMs?: number;
@@ -1562,7 +1567,10 @@ export async function processEmergencyForwardMessage(
       operation: "emergency_forward",
       status: "retrying",
     });
-    message.retry({ delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS });
+    message.retry({
+      delaySeconds:
+        runtime.retryDelaySeconds ?? EMERGENCY_FORWARD_RETRY_SECONDS,
+    });
   };
   try {
     let receipt = await readEmergencyReceipt(env.RAW_MAIL_BUCKET, pointer);
@@ -1903,7 +1911,8 @@ export async function processEmergencyForwardBatch(
       attempt.close();
       if (!disposition.isSettled()) {
         disposition.retry({
-          delaySeconds: EMERGENCY_FORWARD_RETRY_SECONDS,
+          delaySeconds:
+            runtime.retryDelaySeconds ?? EMERGENCY_FORWARD_RETRY_SECONDS,
         });
       }
     }),
@@ -1919,7 +1928,7 @@ async function reconcileOneEmergencyForwardMarker(
   listedKey: string,
   env: Pick<
     EmergencyEnvironment,
-    "RAW_MAIL_BUCKET" | "EMERGENCY_FORWARD_QUEUE"
+    "BUCKET" | "DB" | "EMERGENCY_FORWARD_QUEUE" | "MAILBOX" | "RAW_MAIL_BUCKET"
   >,
   runtime: Pick<
     EmergencyRuntime,
@@ -2015,6 +2024,13 @@ async function reconcileOneEmergencyForwardMarker(
     isForwardEligibleQuarantine(receipt.value) ||
     receiptNeedsMailboxTruth(receipt.value)
   ) {
+    // Repairing a terminal receipt back to forward_pending would resurrect a
+    // forward the consumer already settled, so mailbox truth decides first.
+    const truth = await finalMailboxTruth(env, pointer, runtime);
+    if (truth !== "active" && truth !== "indeterminate") {
+      await suppressForward(env, pointer, truth, runtime);
+      return { authorityDurable: true, reenqueued: false };
+    }
     receipt =
       (await repairReceiptFromMarker(
         env.RAW_MAIL_BUCKET,
@@ -2044,7 +2060,7 @@ async function reconcileOneEmergencyForwardMarker(
 export async function reconcileEmergencyForwardMarkers(
   env: Pick<
     EmergencyEnvironment,
-    "RAW_MAIL_BUCKET" | "EMERGENCY_FORWARD_QUEUE"
+    "BUCKET" | "DB" | "EMERGENCY_FORWARD_QUEUE" | "MAILBOX" | "RAW_MAIL_BUCKET"
   >,
   runtime: Pick<
     EmergencyRuntime,
