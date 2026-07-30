@@ -187,7 +187,6 @@ async function validatedCachedResponse(
 async function automaticRefreshGate(
 	dependencies: GlobalTodayBriefRuntimeDependencies,
 	input: RunGlobalTodayBriefInput,
-	snapshot: GlobalTodayBriefSnapshot,
 	cacheScope: string,
 ) {
 	if (input.refresh) return false;
@@ -340,7 +339,7 @@ async function runReadySnapshot(
 		if (error instanceof GlobalTodayBriefAccessChangedError) throw error;
 		// Corrupt or unavailable cache entries never become user-facing guidance.
 	}
-	if (await automaticRefreshGate(dependencies, input, snapshot, cacheScope)) {
+	if (await automaticRefreshGate(dependencies, input, cacheScope)) {
 		return automaticGateResponse(dependencies, snapshot);
 	}
 	const claimToken = crypto.randomUUID();
@@ -362,7 +361,7 @@ async function runReadySnapshot(
 	try {
 		const cached = await validatedCachedResponse(dependencies, input, snapshot, cacheScope);
 		if (cached) return cached;
-		if (await automaticRefreshGate(dependencies, input, snapshot, cacheScope)) {
+		if (await automaticRefreshGate(dependencies, input, cacheScope)) {
 			return automaticGateResponse(dependencies, snapshot);
 		}
 		renewal = setInterval(() => {
