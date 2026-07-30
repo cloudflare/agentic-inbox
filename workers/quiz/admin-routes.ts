@@ -12,6 +12,7 @@ import { resolveBrand } from "../routes/brand";
 import { QUESTION_TYPES, QUIZ_STATUSES } from "../db/quiz-schema";
 import type { QuizAnswerRow, QuizQuestionRow, QuizRow } from "../db/quiz-schema";
 import type { SeedOption } from "./seed";
+import { gradeMcqAnswer } from "./grading";
 import { bi, biBlock, optionReadout, quizShell } from "./render";
 import {
 	attemptCounts,
@@ -440,7 +441,15 @@ function renderGradeQuestion(q: QuizQuestionRow, ans: QuizAnswerRow | undefined)
 	} else {
 		const selected = ans ? parseSelected(ans) : [];
 		const ok = ans?.is_correct === 1;
-		const autoChip = ok
+		// Recompute the auto award: awarded_points is the score of record (admin-
+		// overridable), so it can't tell an auto partial from a manual override.
+		const autoAwarded = ans
+			? gradeMcqAnswer({ id: q.id, type: q.type, points: q.points, correct: parseCorrect(q) }, selected).awarded
+			: 0;
+		const partial = !ok && autoAwarded > 0 && autoAwarded < q.points;
+		const autoChip = partial
+			? `<span class="tag ok plain">${bi("Auto: partial", "تلقائي: جزئي")} · ${autoAwarded} / ${q.points}</span>`
+			: ok
 			? `<span class="tag ok plain">${bi("Auto: correct", "تلقائي: صح")}</span>`
 			: `<span class="tag no plain">${bi("Auto: incorrect", "تلقائي: غلط")}</span>`;
 		detail = `<div class="qrow-split"><span class="ans-lbl">${bi("✓ correct · ring = rep's pick", "✓ الصح · الإطار = اختيار المندوب")}</span> ${autoChip}</div>
@@ -593,8 +602,17 @@ function renderMcqGradeRow(
 	opts: { fromAll?: boolean } = {},
 ): string {
 	const fromField = opts.fromAll ? `<input type="hidden" name="from" value="all">` : "";
+	// Same recompute as renderGradeQuestion: the chip reports the auto result, not
+	// the (possibly overridden) stored award shown in awardedChip next to it.
+	const autoAwarded = gradeMcqAnswer(
+		{ id: q.id, type: q.type, points: q.points, correct: parseCorrect(q) },
+		s.selected,
+	).awarded;
+	const partial = s.isCorrect !== 1 && autoAwarded > 0 && autoAwarded < q.points;
 	const auto =
-		s.isCorrect === 1
+		partial
+			? `<span class="tag ok plain">${bi("Auto: partial", "تلقائي: جزئي")} · ${autoAwarded} / ${q.points}</span>`
+			: s.isCorrect === 1
 			? `<span class="tag ok plain">${bi("Auto: correct", "تلقائي: صح")}</span>`
 			: `<span class="tag no plain">${bi("Auto: incorrect", "تلقائي: غلط")}</span>`;
 	const awardedChip = `<span class="tag ${s.awarded == null ? "wait" : "ok"} plain awarded-chip">${fmtAward(s.awarded)} / ${q.points}</span>`;

@@ -276,14 +276,16 @@ function renderReviewRow(q: QuizQuestionRow, ans: QuizAnswerRow | undefined): st
 	const isCorrect = ans?.is_correct === 1;
 	const blank = selected.length === 0;
 
-	// The admin may override an MCQ award (accept a wrong answer, or dock partial
-	// credit). When the awarded points differ from the auto-grade, surface it so the
-	// rep's row matches their total. `is_correct` stays the factual auto result.
+	// A non-exact MCQ can now earn automatic partial credit; manual full marks stays
+	// "Accepted". `is_correct` remains the factual auto result in either case.
 	const awarded = ans?.awarded_points;
 	const auto = isCorrect ? q.points : 0;
+	const partial = !isCorrect && awarded !== null && awarded !== undefined && awarded > 0 && awarded < q.points;
 	const overridden = awarded !== null && awarded !== undefined && awarded !== auto;
 	const overrideChip =
-		overridden && awarded! > 0
+		partial
+			? `<span class="tag ok">${bi("Partial", "جزئي")} · ${awarded} / ${q.points}</span>`
+			: overridden && awarded! > 0
 			? `<span class="tag ok">${!isCorrect ? `${bi("Accepted", "مقبولة")} · ` : ""}${awarded} / ${q.points}</span>`
 			: overridden
 				? `<span class="tag no">${awarded} / ${q.points}</span>`
@@ -293,7 +295,7 @@ function renderReviewRow(q: QuizQuestionRow, ans: QuizAnswerRow | undefined): st
 	// Each option on its own row with the rep's pick + the correct answer marked —
 	// readable even when options are full sentences (unlike a comma-joined line).
 	return `<div class="review-row ${isCorrect ? "correct" : "wrong"}">${head}
-    <div class="qrow-split"><span class="ans-lbl">${bi("✓ correct · your pick highlighted", "✓ الصح · اختيارك مظلّل")}</span> <span class="editbtns">${isCorrect ? `<span class="tag ok">${bi("Correct", "صح")}</span>` : `<span class="tag no">${bi("Incorrect", "غلط")}</span>`}${overrideChip}</span></div>
+	    <div class="qrow-split"><span class="ans-lbl">${bi("✓ correct · your pick highlighted", "✓ الصح · اختيارك مظلّل")}</span> <span class="editbtns">${isCorrect ? `<span class="tag ok">${bi("Correct", "صح")}</span>` : partial ? "" : `<span class="tag no">${bi("Incorrect", "غلط")}</span>`}${overrideChip}</span></div>
     ${optionReadout(options, correct, selected, { en: "your pick", ar: "اختيارك" })}
     ${blank ? `<div class="ans-line"><span class="muted">${bi("You left this blank.", "سِبتها فاضية.")}</span></div>` : ""}
     ${q.explanation_en || q.explanation_ar ? `<div class="why"><b>${bi("Why", "ليه")}:</b> ${bi(q.explanation_en, q.explanation_ar)}</div>` : ""}

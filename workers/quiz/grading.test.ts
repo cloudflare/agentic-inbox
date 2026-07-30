@@ -22,12 +22,20 @@ assert.deepEqual(gradeMcqAnswer(single, ["a"]), { awarded: 0, isCorrect: false }
 assert.deepEqual(gradeMcqAnswer(single, []), { awarded: 0, isCorrect: false }, "single blank");
 assert.deepEqual(gradeMcqAnswer(single, ["a", "b"]), { awarded: 0, isCorrect: false }, "single extra pick");
 
-// ── multi-select: points ONLY on exact set match ──
+// ── multi-select: symmetric partial credit, exact match stays correct ──
 assert.deepEqual(gradeMcqAnswer(multi, ["a", "c", "e"]), { awarded: 1, isCorrect: true }, "multi exact");
 assert.deepEqual(gradeMcqAnswer(multi, ["e", "a", "c"]), { awarded: 1, isCorrect: true }, "multi order-insensitive");
-assert.deepEqual(gradeMcqAnswer(multi, ["a", "c"]), { awarded: 0, isCorrect: false }, "multi partial → 0");
-assert.deepEqual(gradeMcqAnswer(multi, ["a", "c", "e", "d"]), { awarded: 0, isCorrect: false }, "multi superset → 0");
+assert.deepEqual(gradeMcqAnswer(multi, ["a", "c"]), { awarded: 0.67, isCorrect: false }, "multi partial → 0.67");
+assert.deepEqual(gradeMcqAnswer(multi, ["a", "c", "e", "d"]), { awarded: 0.67, isCorrect: false }, "multi superset → 0.67");
 assert.deepEqual(gradeMcqAnswer(multi, ["a", "a", "c", "e"]), { awarded: 1, isCorrect: true }, "multi dup-insensitive");
+assert.deepEqual(gradeMcqAnswer(multi, ["a", "a", "c"]), { awarded: 0.67, isCorrect: false }, "partial multi dedups selections");
+
+const fourCorrect: GradableQuestion = { id: "q4", type: "multi", points: 1, correct: ["a", "b", "c", "d"] };
+assert.deepEqual(gradeMcqAnswer(fourCorrect, ["a", "b", "c"]), { awarded: 0.75, isCorrect: false }, "four-correct partial");
+assert.deepEqual(gradeMcqAnswer(fourCorrect, ["a", "b", "c", "d", "e"]), { awarded: 0.75, isCorrect: false }, "four-correct plus one wrong");
+assert.deepEqual(gradeMcqAnswer(fourCorrect, ["a", "b", "e", "f"]), { awarded: 0, isCorrect: false }, "right and wrong cancel");
+assert.deepEqual(gradeMcqAnswer(fourCorrect, ["e", "f", "g"]), { awarded: 0, isCorrect: false }, "wrong-heavy clamps at zero");
+assert.deepEqual(gradeMcqAnswer({ id: "q5", type: "multi", points: 1, correct: [] }, ["a"]), { awarded: 0, isCorrect: false }, "empty answer key is ungraded");
 
 // ── short answers are never auto-graded ──
 const g = gradeSubmission([single, multi, short], { q1: ["b"], q2: ["a"], q3: [] });
@@ -36,7 +44,7 @@ assert.equal(shortRow.awarded, null, "short awarded is null");
 assert.equal(shortRow.isCorrect, null, "short isCorrect is null");
 
 // ── aggregate maxes computed from the quiz, not hardcoded ──
-assert.equal(g.mcqScore, 1, "mcqScore = single correct only");
+assert.equal(g.mcqScore, 1.33, "mcqScore = single correct plus partial multi");
 assert.equal(g.mcqMax, 2, "mcqMax = 1 + 1");
 assert.equal(g.shortMax, 3, "shortMax = 3");
 assert.equal(g.totalMax, 5, "totalMax = mcqMax + shortMax");
