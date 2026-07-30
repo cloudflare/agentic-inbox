@@ -3,9 +3,11 @@ import { z } from "zod";
 import type { SessionClaims } from "../lib/auth.ts";
 import {
 	createGlobalTodayBriefRuntime,
+	globalTodayBriefFailureCode,
 	GlobalTodayBriefAccessChangedError,
 	runGlobalTodayBrief,
 } from "../lib/global-today-brief-runtime.ts";
+import type { GlobalTodayBriefResponse } from "../../shared/global-today-brief.ts";
 import type { TodayBriefDayBoundary } from "../lib/today-brief-timezone.ts";
 import { resolveTodayBriefDay } from "../lib/today-brief-timezone.ts";
 import type { Env } from "../types.ts";
@@ -147,11 +149,11 @@ export function createGlobalTodayBriefRoutes(
 			if (error instanceof GlobalTodayBriefAccessChangedError) {
 				return c.json({ error: "Mailbox access changed" }, 403);
 			}
-			console.error("[global-today-brief] generation failed", {
-				actorUserId: session.sub,
-				errorName: error instanceof Error ? error.name : "UnknownError",
-			});
-			return c.json({ error: "The AI brief is temporarily unavailable. Today remains fully usable." }, 502);
+			const errorCode = globalTodayBriefFailureCode(error);
+			console.error("[global-today-brief] generation failed", { errorCode });
+			// Today stays usable without its brief, so an unusable brief is a
+			// degraded state rather than a failed request.
+			return c.json({ state: "brief_unavailable", reason: errorCode } satisfies GlobalTodayBriefResponse);
 		}
 	});
 	return app;

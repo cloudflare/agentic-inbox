@@ -83,8 +83,11 @@ test("global Today brief accepts only exact bounded automatic or Refresh bodies"
 
 test("global Today brief failures remain card-local and redact infrastructure details", async () => {
 	const response = await app({ session, fail: true }).root.request(request(JSON.stringify({ timeZone: "UTC" })));
-	assert.equal(response.status, 502);
-	assert.equal(JSON.stringify(await response.json()).includes("private infrastructure detail"), false);
+	assert.equal(response.status, 200);
+	const body = await response.json() as { state: string; reason: string };
+	assert.equal(body.state, "brief_unavailable");
+	assert.match(body.reason, /^[a-z0-9_:]+$/);
+	assert.equal(JSON.stringify(body).includes("private infrastructure detail"), false);
 });
 
 test("revocation after runtime work returns forbidden so the client purges all mail state", async () => {

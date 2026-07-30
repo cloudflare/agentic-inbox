@@ -77,6 +77,13 @@ const responseSchema = z.union([
 	z.object({ state: z.literal("preparing"), ...transient }).strict(),
 	z.object({ state: z.literal("stale"), ...transient }).strict(),
 	z.object({ state: z.literal("budget_paused"), reason: z.string().min(1).max(100), ...transient }).strict(),
+	// Counts are absent when the brief failed before a snapshot was read.
+	z.object({
+		state: z.literal("brief_unavailable"),
+		reason: z.string().min(1).max(100),
+		counts: counts.optional(),
+		omittedCount: z.number().int().nonnegative().optional(),
+	}).strict(),
 ]);
 
 export function parseGlobalTodayBriefResponse(value: unknown): GlobalTodayBriefResponse {

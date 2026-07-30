@@ -80,4 +80,12 @@ export type GlobalTodayBriefResponse =
 	| { state: "overview_incomplete" }
 	| { state: "preparing"; counts: GlobalTodayBriefCounts; omittedCount: number }
 	| { state: "stale"; counts: GlobalTodayBriefCounts; omittedCount: number }
-	| { state: "budget_paused"; reason: string; counts: GlobalTodayBriefCounts; omittedCount: number };
+	| { state: "budget_paused"; reason: string; counts: GlobalTodayBriefCounts; omittedCount: number }
+	// Generation failed. Today still renders its deterministic content, so counts
+	// are carried whenever a snapshot was read before the failure.
+	| {
+			state: "brief_unavailable";
+			reason: string;
+			counts?: GlobalTodayBriefCounts;
+			omittedCount?: number;
+	  };

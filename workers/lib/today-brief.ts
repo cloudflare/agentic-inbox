@@ -196,10 +196,33 @@ const outputSchema = z
 	.object({ items: z.array(focusItemSchema).max(TODAY_BRIEF_LIMITS.focusItems) })
 	.strict();
 
+/**
+ * Machine subcode per distinct validator rule. The ledger persists it alongside
+ * the failure so a rejected brief names the rule it broke instead of collapsing
+ * every rejection into one flat code.
+ */
+export type TodayBriefValidationSubcode =
+	| "oversized_output"
+	| "malformed_json"
+	| "invalid_structure"
+	| "incomplete_coverage"
+	| "unknown_candidate"
+	| "duplicate_candidate"
+	| "invalid_rank"
+	| "duplicate_citation"
+	| "foreign_citation"
+	| "unsupported_overdue_reminder"
+	| "unsupported_due_today"
+	| "unsupported_unread_state"
+	| "omitted_candidate";
+
 export class TodayBriefValidationError extends Error {
-	constructor(message: string) {
+	readonly subcode: TodayBriefValidationSubcode;
+
+	constructor(message: string, subcode: TodayBriefValidationSubcode) {
 		super(message);
 		this.name = "TodayBriefValidationError";
+		this.subcode = subcode;
 	}
 }
 
@@ -227,17 +250,17 @@ export function parseTodayBriefOutput(
 	options: { requireUnreadSourceCitation?: boolean } = {},
 ): TodayBriefGeneratedResult {
 	if (byteLength(raw) > TODAY_BRIEF_LIMITS.modelOutputBytes) {
-		throw new TodayBriefValidationError("Today brief model output is oversized");
+		throw new TodayBriefValidationError("Today brief model output is oversized", "oversized_output");
 	}
 	let decoded: unknown;
 	try {
 		decoded = JSON.parse(raw);
 	} catch {
-		throw new TodayBriefValidationError("Today brief model output is malformed JSON");
+		throw new TodayBriefValidationError("Today brief model output is malformed JSON", "malformed_json");
 	}
 	const parsed = outputSchema.safeParse(decoded);
 	if (!parsed.success) {
-		throw new TodayBriefValidationError("Today brief model output has an invalid structure");
+		throw new TodayBriefValidationError("Today brief model output has an invalid structure", "invalid_structure");
 	}
 	const expectedCount = Math.min(
 		TODAY_BRIEF_LIMITS.focusItems,
@@ -246,6 +269,7 @@ export function parseTodayBriefOutput(
 	if (parsed.data.items.length !== expectedCount) {
 		throw new TodayBriefValidationError(
 			"Today brief model output has incomplete candidate coverage",
+			"incomplete_coverage",
 		);
 	}
 	const candidatesById = new Map(
@@ -256,13 +280,13 @@ export function parseTodayBriefOutput(
 	const items = parsed.data.items.map((item) => {
 		const candidate = candidatesById.get(item.candidateId);
 		if (!candidate) {
-			throw new TodayBriefValidationError("Today brief model output used an unknown candidate ID");
+			throw new TodayBriefValidationError("Today brief model output used an unknown candidate ID", "unknown_candidate");
 		}
 		const allowedMessageIds = new Set(
 			candidate.messages.map((message) => message.id),
 		);
 		if (seenCandidates.has(item.candidateId)) {
-			throw new TodayBriefValidationError("Today brief model output duplicated a candidate ID");
+			throw new TodayBriefValidationError("Today brief model output duplicated a candidate ID", "duplicate_candidate");
 		}
 		seenCandidates.add(item.candidateId);
 		if (
@@ -270,15 +294,16 @@ export function parseTodayBriefOutput(
 			item.rank > expectedCount ||
 			seenRanks.has(item.rank)
 		) {
-			throw new TodayBriefValidationError("Today brief model output has invalid ranks");
+			throw new TodayBriefValidationError("Today brief model output has invalid ranks", "invalid_rank");
 		}
 		seenRanks.add(item.rank);
 		if (new Set(item.messageIds).size !== item.messageIds.length) {
-			throw new TodayBriefValidationError("Today brief model output duplicated a citation");
+			throw new TodayBriefValidationError("Today brief model output duplicated a citation", "duplicate_citation");
 		}
 		if (item.messageIds.some((messageId) => !allowedMessageIds.has(messageId))) {
 			throw new TodayBriefValidationError(
 				"Today brief model output used a cross-candidate or unknown citation",
+				"foreign_citation",
 			);
 		}
 		if (
@@ -287,6 +312,7 @@ export function parseTodayBriefOutput(
 		) {
 			throw new TodayBriefValidationError(
 				"Today brief model output contradicted authoritative reminder state",
+				"unsupported_overdue_reminder",
 			);
 		}
 		if (
@@ -295,6 +321,7 @@ export function parseTodayBriefOutput(
 		) {
 			throw new TodayBriefValidationError(
 				"Today brief model output contradicted authoritative reminder state",
+				"unsupported_due_today",
 			);
 		}
 		if (
@@ -313,6 +340,7 @@ export function parseTodayBriefOutput(
 			) {
 				throw new TodayBriefValidationError(
 					"Today brief model output contradicted authoritative unread state",
+					"unsupported_unread_state",
 				);
 			}
 		}
@@ -330,6 +358,7 @@ export function parseTodayBriefOutput(
 			if (!seenCandidates.has(candidate.id)) {
 				throw new TodayBriefValidationError(
 					"Today brief model output omitted a required candidate ID",
+					"omitted_candidate",
 				);
 			}
 		}
