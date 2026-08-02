@@ -25,9 +25,9 @@ JWT_SECRET=your-long-random-jwt-secret
 # Email allowed to self-provision the first ADMIN account on first login.
 ADMIN_BOOTSTRAP_EMAIL=replace-with-the-brand-admin-address
 
-# Operator-managed JSON map from portal addresses to approved external recovery
-# addresses. Keep this separate per brand.
-ACCOUNT_RECOVERY_DIRECTORY={"member@example.com":"member@recovery.example"}
+# Operator-managed JSON map to approved external recovery addresses. The exact
+# "*" key is the default; exact portal-address keys override it per brand.
+ACCOUNT_RECOVERY_DIRECTORY={"*":"owner@recovery.example"}
 
 # Web Push VAPID keypair (WISER-240). Generate once with:
 #   npx web-push generate-vapid-keys

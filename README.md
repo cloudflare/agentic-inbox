@@ -178,10 +178,11 @@ Each brand is a named Wrangler environment in `wrangler.jsonc` (`env.whispyr`, â
    npx wrangler secret put VAPID_PRIVATE_KEY --env whispyr
    ```
 
-   `ACCOUNT_RECOVERY_DIRECTORY` is a platform-operator managed JSON object that
-   maps each normalized portal email to the user's external recovery email. For
-   example: `{"member@whispyrcrm.com":"member@personal.example"}`. Application
-   administrators cannot enter or change these addresses. New users remain pending
+   `ACCOUNT_RECOVERY_DIRECTORY` is a platform-operator managed JSON object. The
+   exact key `"*"` supplies the default external recovery email when no normalized
+   portal-email key matches; an exact entry overrides the default. For example:
+   `{"*":"owner@personal.example"}`. Application administrators cannot enter or
+   change these addresses. New users remain pending
    until they consume the emailed setup link; claimed users request recovery from
    the sign-in page and receive a generic response that does not reveal account
    existence.

@@ -191,10 +191,12 @@ npx wrangler d1 execute DB --env "$CF_ENV" --remote \
 chmod 600 "$LEGACY_RECOVERY_EXPORT"
 ```
 
-Reconcile the export against the approved `ACCOUNT_RECOVERY_DIRECTORY`. The
-normalized portal-address set and every destination must match exactly. Missing,
-extra, malformed, duplicate-after-normalization, or different values stop the
-rollout. Keep the export private through the rollback observation window.
+Reconcile the export against the approved `ACCOUNT_RECOVERY_DIRECTORY`. Every
+normalized portal address must resolve to the approved destination, using its
+exact entry before the `"*"` default. Unresolved addresses, extra exact entries,
+malformed values, duplicate-after-normalization entries, or different resolved
+values stop the rollout. Keep the export private through the rollback observation
+window.
 
 ### 3. Run the separately approved legacy scrub
 
@@ -1452,8 +1454,10 @@ blocked.
 For a first Worker deploy, use the private envelope creator and a real Bash trap.
 The creator reads inherited environment values, never secret argv or stdin
 redirection, and JSON-encodes every value. This is required for
-`ACCOUNT_RECOVERY_DIRECTORY`, whose exact value is itself JSON and must become an
-escaped outer JSON string. The deployment driver accepts only an owned regular
+`ACCOUNT_RECOVERY_DIRECTORY`, whose exact value is itself a JSON object. The exact
+key `"*"` supplies the default destination when no portal-address key matches, and
+an exact entry overrides it. The object must become an escaped outer JSON string.
+The deployment driver accepts only an owned regular
 non-symlink single-link file with mode 0600, exact schema version 1, the selected
 brand, and exactly the nine declared non-empty string secrets.
 

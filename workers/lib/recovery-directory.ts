@@ -76,7 +76,7 @@ export function recoveryAddressFor(
   }
   const normalized = new Map<string, string>();
   for (const [portal, external] of entries) {
-    const normalizedKey = normalizeMailAddress(portal);
+    const normalizedKey = portal === "*" ? portal : normalizeMailAddress(portal);
     const normalizedExternal =
       typeof external === "string" ? normalizeMailAddress(external) : null;
     if (
@@ -95,7 +95,7 @@ export function recoveryAddressFor(
     normalized.set(normalizedKey, normalizedExternal);
   }
 
-  const address = normalized.get(normalizedPortal);
+  const address = normalized.get(normalizedPortal) ?? normalized.get("*");
   if (!address) throw new RecoveryDirectoryError();
   return address;
 }

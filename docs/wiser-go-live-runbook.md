@@ -285,7 +285,7 @@ VAPID_PUBLIC_KEY
 VAPID_PRIVATE_KEY
 ```
 
-Use `ADMIN_BOOTSTRAP_EMAIL=hesham@wiserchat.ai`. Generate `JWT_SECRET` with at least 48 random base64 bytes. Generate separate high-entropy `SES_EVENT_WEBHOOK_SECRET` and `CREDENTIAL_RECOVERY_PAYLOAD_KEY_V1` values. The V1 payload key encrypts durable recovery jobs and creates opaque correlation refs. It must remain separate from `JWT_SECRET` and must not be rotated in place or deleted while any version-1 ciphertext exists. A future rotation needs a new versioned key binding and an explicit decrypt/re-encrypt rollout. Store the approved JSON mapping from portal addresses to external recovery addresses in `ACCOUNT_RECOVERY_DIRECTORY`. Generate one VAPID keypair for Wiser push.
+Use `ADMIN_BOOTSTRAP_EMAIL=hesham@wiserchat.ai`. Generate `JWT_SECRET` with at least 48 random base64 bytes. Generate separate high-entropy `SES_EVENT_WEBHOOK_SECRET` and `CREDENTIAL_RECOVERY_PAYLOAD_KEY_V1` values. The V1 payload key encrypts durable recovery jobs and creates opaque correlation refs. It must remain separate from `JWT_SECRET` and must not be rotated in place or deleted while any version-1 ciphertext exists. A future rotation needs a new versioned key binding and an explicit decrypt/re-encrypt rollout. Store `{"*":"heshamelmahdi@gmail.com"}` in `ACCOUNT_RECOVERY_DIRECTORY`; the exact `"*"` key covers every portal address without an exact override. Generate one VAPID keypair for Wiser push.
 
 ### First Deploy And Secrets
 
@@ -394,7 +394,7 @@ snapshots it, then gives Wrangler only a derived 0400 secret map in a private
 0700 temporary directory that is removed on success or failure. Do not commit
 the envelope, paste it into tickets, or store it in the repo. `.secrets*` is
 ignored as an extra local guard, but `/tmp` is preferred. Paste
-`ACCOUNT_RECOVERY_DIRECTORY` as its exact compact single-line JSON mapping
+`ACCOUNT_RECOVERY_DIRECTORY` as the exact compact single-line JSON object above
 without outer quotes or manual escaping. The creator JSON-encodes that mapping
 as an outer envelope string and prints only the unpredictable path.
 Run the block as a Bash process, never source it into an interactive shell. The

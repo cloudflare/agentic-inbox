@@ -286,7 +286,7 @@ adminApp.get("/users", async (c) => {
         <div><label>Display name</label><input name="name" type="text" placeholder="Kareem Hatem"></div>
       </div>
       <div class="row">
-		<div><label>Role</label><select name="role">${USER_ROLES.map((r) => `<option value="${r}">${r}</option>`).join("")}</select><small>The platform recovery directory must contain this portal email.</small></div>
+		<div><label>Role</label><select name="role">${USER_ROLES.map((r) => `<option value="${r}">${r}</option>`).join("")}</select><small>The platform recovery directory must cover this portal email.</small></div>
       </div>
       <button type="submit">Create user, mailbox &amp; send invitation</button>
     </form>
