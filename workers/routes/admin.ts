@@ -42,6 +42,7 @@ import { drainCredentialRecoveryDeliveries } from "../lib/credential-recovery-de
 import {
   maskedRecoveryAddress,
   recoveryAddressFor,
+  RecoveryDirectoryError,
 } from "../lib/recovery-directory.ts";
 import { accountLifecycle } from "../lib/account-lifecycle-runtime.ts";
 import { isSemanticSearchEnabled } from "../lib/features.ts";
@@ -369,11 +370,15 @@ adminApp.post("/users", async (c) => {
   try {
     // Fail before provisioning an account the invitation could never reach.
     recoveryAddressFor(c.env.ACCOUNT_RECOVERY_DIRECTORY, email, c.env.DOMAINS);
-  } catch {
-    return c.redirect(
-      `/admin/users?err=${encodeURIComponent("The platform recovery directory has no valid entry for this account.")}`,
-      302,
-    );
+  } catch (error) {
+    // A broken directory blocks every account; an unmapped one blocks only this
+    // address. The administrator escalates the first and retries the second.
+    const message =
+      error instanceof RecoveryDirectoryError &&
+      error.code === "INVALID_CONFIG"
+        ? "The platform recovery directory is misconfigured. The platform operator must repair it."
+        : "The platform recovery directory does not cover this portal email.";
+    return c.redirect(`/admin/users?err=${encodeURIComponent(message)}`, 302);
   }
 
   const { hash, salt } = await hashPassword(
