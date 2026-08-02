@@ -366,13 +366,9 @@ adminApp.post("/users", async (c) => {
     );
   }
   const name = String(form.name || "").trim() || email.split("@")[0];
-  let recoveryEmail: string;
   try {
-    recoveryEmail = recoveryAddressFor(
-      c.env.ACCOUNT_RECOVERY_DIRECTORY,
-      email,
-      c.env.DOMAINS,
-    );
+    // Fail before provisioning an account the invitation could never reach.
+    recoveryAddressFor(c.env.ACCOUNT_RECOVERY_DIRECTORY, email, c.env.DOMAINS);
   } catch {
     return c.redirect(
       `/admin/users?err=${encodeURIComponent("The platform recovery directory has no valid entry for this account.")}`,
