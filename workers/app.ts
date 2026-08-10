@@ -64,14 +64,26 @@ app.use("*", async (c, next) => {
 		return c.text("Missing required CF Access JWT", 403);
 	}
 
+	let expectedIssuer = "(invalid TEAM_DOMAIN)";
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
+		expectedIssuer = issuer;
 		const JWKS = createRemoteJWKSet(certsUrl);
 		await jwtVerify(token, JWKS, {
 			issuer,
 			audience: POLICY_AUD,
 		});
-	} catch {
+	} catch (e) {
+		// Without this log a malformed TEAM_DOMAIN (e.g. missing "https://") makes
+		// new URL() throw and surfaces as "expired token", sending you debugging the
+		// wrong thing for hours. Log WHAT failed and what it validated against.
+		// The token itself is never logged.
+		console.error(
+			"Access JWT rejected:", (e as Error).message,
+			"| expected issuer:", expectedIssuer,
+			"| expected aud:", POLICY_AUD ? `${POLICY_AUD.slice(0, 12)}…` : "(empty)",
+			"| TEAM_DOMAIN:", TEAM_DOMAIN || "(empty)",
+		);
 		return c.text("Invalid or expired Access token", 403);
 	}
 
