@@ -791,22 +791,31 @@ export class MailboxDO extends DurableObject<Env> {
 	 * Returns null if under limit, or an error message string if exceeded.
 	 */
 	async checkSendRateLimit(): Promise<string | null> {
+		// Dates are stored with toISOString() ("2026-08-08T20:41:19.952Z") while
+		// datetime('now') returns "2026-08-08 21:14:29" — a space instead of "T".
+		// SQLite compares these as TEXT and 'T'(84) > ' '(32), so every row from
+		// today always counted as "within the last hour": the hourly cap silently
+		// behaved as a daily one. Compare ISO against ISO, computed in JS.
+		const sinceHour = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 		const hourRow = [...this.ctx.storage.sql.exec(
 			`SELECT COUNT(*) as cnt FROM emails
 			 WHERE folder_id = ?1
-			   AND date >= datetime('now', '-1 hour')`,
+			   AND date >= ?2`,
 			Folders.SENT,
+			sinceHour,
 		)][0] as { cnt: number } | undefined;
 
 		if ((hourRow?.cnt ?? 0) >= 20) {
 			return "Rate limit exceeded: max 20 emails per hour per mailbox";
 		}
 
+		const sinceDay = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 		const dayRow = [...this.ctx.storage.sql.exec(
 			`SELECT COUNT(*) as cnt FROM emails
 			 WHERE folder_id = ?1
-			   AND date >= datetime('now', '-1 day')`,
+			   AND date >= ?2`,
 			Folders.SENT,
+			sinceDay,
 		)][0] as { cnt: number } | undefined;
 
 		if ((dayRow?.cnt ?? 0) >= 100) {
