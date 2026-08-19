@@ -560,6 +560,35 @@ export class MailboxDO extends DurableObject<Env> {
 		return emailAttachments;
 	}
 
+	/**
+	 * Every attachment row in this mailbox. Attachment blobs are keyed
+	 * `attachments/{email_id}/{id}/{filename}` — by email, not by mailbox — so
+	 * they cannot be enumerated from R2 alone. Callers read this before destroy().
+	 */
+	async listAllAttachments() {
+		return this.db
+			.select({
+				email_id: schema.attachments.email_id,
+				id: schema.attachments.id,
+				filename: schema.attachments.filename,
+			})
+			.from(schema.attachments)
+			.all();
+	}
+
+	/**
+	 * Wipe this mailbox's private SQLite database (SQL tables and key-value
+	 * alike). The constructor re-applies migrations, so a mailbox recreated under
+	 * the same name comes back empty instead of resurrecting the old one's mail.
+	 */
+	async destroy() {
+		await this.ctx.storage.deleteAll();
+		// deleteAll() drops the schema and the migrations bookkeeping with it, but
+		// this object stays alive with its constructor already run — so re-apply
+		// migrations here, or the next request finds tables that no longer exist.
+		applyMigrations(this.ctx.storage.sql, mailboxMigrations, this.ctx.storage);
+	}
+
 	async getAttachment(id: string) {
 		return (
 			this.db

@@ -136,7 +136,28 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
 	const mailboxId = c.req.param("mailboxId")!;
 	const key = `mailboxes/${mailboxId}.json`;
 	if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
-	await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
+
+	// The marker is deleted LAST on purpose. If any step below fails the mailbox
+	// still lists and the delete stays retryable; removing the marker first would
+	// strand the Durable Object and its blobs where nothing can reach them again.
+	const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+
+	// Read the attachment rows while the database is still alive — their R2 keys
+	// are prefixed by email id, so R2 cannot enumerate them per mailbox.
+	const attachments = (await (stub as any).listAllAttachments()) as {
+		email_id: string;
+		id: string;
+		filename: string;
+	}[];
+	const blobKeys = attachments.map((att) => `attachments/${att.email_id}/${att.id}/${att.filename}`);
+	for (let i = 0; i < blobKeys.length; i += 1000) {
+		await c.env.BUCKET.delete(blobKeys.slice(i, i + 1000)); // R2 deletes cap at 1000 keys/call
+	}
+
+	await (stub as any).destroy();
+	await (c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)) as any).destroy();
+
+	await c.env.BUCKET.delete(key);
 	return c.body(null, 204);
 });
 
