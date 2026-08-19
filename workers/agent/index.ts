@@ -273,6 +273,15 @@ function createEmailTools(env: Env, mailboxId: string) {
 // SEND_EMAIL binding shape and the AIChatAgent constraint.  The actual env
 // is fully typed inside the tools via the closure.
 export class EmailAgent extends AIChatAgent<any> {
+	/**
+	 * Drop persisted chat history for this mailbox. Uses the SDK's own
+	 * persistence API rather than storage.deleteAll() so the agent's internal
+	 * tables stay intact and the object remains usable if the name is reused.
+	 */
+	async destroy() {
+		await this.persistMessages([]);
+	}
+
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
 		const mailboxId = this.name;
