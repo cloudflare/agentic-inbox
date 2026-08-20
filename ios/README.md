@@ -1,0 +1,75 @@
+# Agentic Inbox — iOS (MVP)
+
+Native SwiftUI client for the Cloudflare [Agentic Inbox](../../README.md) backend.
+
+Designed for people coming from **web / Ionic / Capacitor**: SwiftUI views ≈ React components, `@Observable` stores ≈ Zustand/context, `async/await` + `URLSession` ≈ `fetch`.
+
+## What MVP includes
+
+- **Sign in with Apple** → backend exchanges the Apple identity token for a mobile session JWT (`Authorization: Bearer …`)
+- **Dev login** (DEBUG builds only) against `/api/v1/auth/dev` while running the Worker locally
+- **Notion-inspired shell**: top folder pills (Inbox / Sent / Drafts / Archive / Trash / AI), floating Search + Ask AI bar
+- **Email list + detail** (read-only), styled like Notion search rows
+- **Search screen** with highlighted snippets
+- **Multi-conversation AI chat** via WebSocket `/agents/email-agent/{mailbox}::{conversationId}`
+
+## Phase 2 (not in this app yet)
+
+- Compose / send / reply / forward
+- Attachments viewing / download polish
+- Rich HTML rendering
+- Push notifications
+
+## Open in Xcode (Mac required)
+
+1. Install Xcode 15+ (iOS 17 SDK).
+2. Open `AgenticInbox.xcodeproj`.
+3. Set your **Team** under Signing & Capabilities.
+4. Confirm bundle ID `com.cloudflare.AgenticInbox` (or change it — then update Worker secret `APPLE_CLIENT_ID` to match).
+5. Capability **Sign in with Apple** is declared in `AgenticInbox.entitlements`.
+6. On the sign-in screen, set **API base URL** to your Worker (simulator → `http://127.0.0.1:5173` when `pnpm dev` is running on the Mac).
+
+### Optional: XcodeGen
+
+If you prefer regenerating the project from `project.yml`:
+
+```bash
+brew install xcodegen
+cd ios/AgenticInbox
+xcodegen generate
+open AgenticInbox.xcodeproj
+```
+
+## Backend secrets for mobile
+
+In Cloudflare Worker secrets (and `.dev.vars` locally):
+
+| Secret | Purpose |
+|--------|---------|
+| `APPLE_CLIENT_ID` | iOS bundle ID (Apple token `aud`) |
+| `MOBILE_JWT_SECRET` | HS256 secret for mobile session JWTs |
+
+Web continues to use Cloudflare Access (`POLICY_AUD` / `TEAM_DOMAIN`). Production accepts **either** Access JWT **or** mobile Bearer token.
+
+## Mental model (web → native)
+
+| Web / Ionic | iOS |
+|-------------|-----|
+| React route | SwiftUI `View` |
+| Zustand store | `@Observable` class + `.environment` |
+| `fetch` / React Query | `APIClient` + `.task { await … }` |
+| Agents SDK `useAgentChat` | `AgentChatClient` (WebSocket `cf_agent_*`) |
+| Capacitor Preferences | Keychain (`KeychainStore`) |
+| Modal sheet | `.sheet` |
+
+## Folder map
+
+```
+AgenticInbox/
+  AgenticInboxApp.swift      # @main
+  Config/AppConfig.swift     # API base URL, bundle ID
+  Models/                    # Codable types matching backend JSON
+  Services/                  # API, auth, app state, agent WS
+  Views/                     # Auth, Home shell, Email, Search, Chat
+  Theme/                     # Notion-like light palette
+```
