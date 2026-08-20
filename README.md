@@ -53,9 +53,13 @@ https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 ## Getting Started
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
+
+### Native iOS client (MVP)
+
+A SwiftUI app lives in [`ios/`](./ios/README.md). It reuses this Worker API, adds Sign in with Apple (mobile JWT), multi-conversation agent chat, and a Notion-inspired mobile shell. Open `ios/AgenticInbox/AgenticInbox.xcodeproj` on a Mac.
 
 ### Configuration
 

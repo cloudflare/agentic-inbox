@@ -30,6 +30,7 @@ import {
 	toolDiscardDraft,
 } from "../lib/tools";
 import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "../../shared/folders";
+import { mailboxIdFromAgentName } from "../../shared/agent-conversations";
 import type { Env } from "../types";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
@@ -275,7 +276,8 @@ function createEmailTools(env: Env, mailboxId: string) {
 export class EmailAgent extends AIChatAgent<any> {
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
-		const mailboxId = this.name;
+		// Support legacy `mailboxId` and multi-chat `mailboxId::conversationId` names.
+		const mailboxId = mailboxIdFromAgentName(this.name);
 		const workersai = createWorkersAI({ binding: env.AI });
 		const tools = createEmailTools(env, mailboxId);
 		const systemPrompt = await getSystemPrompt(env, mailboxId);

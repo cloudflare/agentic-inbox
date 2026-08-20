@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { Email, Folder, Mailbox } from "~/types";
+import type { AgentConversation, Email, Folder, Mailbox } from "~/types";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -160,6 +160,51 @@ const api = {
 	// Search
 	searchEmails: (mailboxId: string, params: Record<string, string>) =>
 		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${mailboxId}/search`, { params }),
+
+	// Agent conversations (multi-chat)
+	listAgentConversations: (mailboxId: string) =>
+		get<AgentConversation[]>(
+			`/api/v1/mailboxes/${mailboxId}/agent/conversations`,
+		),
+	createAgentConversation: (mailboxId: string, title?: string) =>
+		post<AgentConversation>(
+			`/api/v1/mailboxes/${mailboxId}/agent/conversations`,
+			title ? { title } : {},
+		),
+	updateAgentConversation: (
+		mailboxId: string,
+		conversationId: string,
+		data: { title?: string; lastMessagePreview?: string | null },
+	) =>
+		request<AgentConversation>(
+			`/api/v1/mailboxes/${mailboxId}/agent/conversations/${conversationId}`,
+			{
+				method: "PATCH",
+				body: JSON.stringify(data),
+			},
+		),
+	deleteAgentConversation: (mailboxId: string, conversationId: string) =>
+		del<void>(
+			`/api/v1/mailboxes/${mailboxId}/agent/conversations/${conversationId}`,
+		),
+
+	// Mobile auth
+	authApple: (identityToken: string, fullName?: { givenName?: string; familyName?: string }) =>
+		post<{
+			token: string;
+			expiresAt: string;
+			user: {
+				id: string;
+				email: string | null;
+				fullName: { givenName?: string; familyName?: string } | null;
+			};
+		}>("/api/v1/auth/apple", { identityToken, fullName }),
+	authDev: (email?: string) =>
+		post<{
+			token: string;
+			expiresAt: string;
+			user: { id: string; email: string | null; fullName: null };
+		}>("/api/v1/auth/dev", { email }),
 };
 
 export default api;

@@ -64,3 +64,11 @@ export interface Folder {
 	name: string;
 	unreadCount: number;
 }
+
+export interface AgentConversation {
+	id: string;
+	title: string;
+	createdAt: string;
+	updatedAt: string;
+	lastMessagePreview?: string | null;
+}

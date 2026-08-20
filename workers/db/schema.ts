@@ -42,3 +42,12 @@ export const attachments = sqliteTable("attachments", {
 	content_id: text("content_id"),
 	disposition: text("disposition"),
 });
+
+/** Registry of AI chat conversations for a mailbox (messages live in EmailAgent DOs). */
+export const agentConversations = sqliteTable("agent_conversations", {
+	id: text("id").primaryKey(),
+	title: text("title").notNull(),
+	created_at: text("created_at").notNull(),
+	updated_at: text("updated_at").notNull(),
+	last_message_preview: text("last_message_preview"),
+});

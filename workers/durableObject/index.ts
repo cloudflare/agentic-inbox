@@ -631,6 +631,120 @@ export class MailboxDO extends DurableObject<Env> {
 		return true;
 	}
 
+	// ── Agent conversations (registry only; messages live in EmailAgent) ──
+
+	async listAgentConversations() {
+		return this.db
+			.select({
+				id: schema.agentConversations.id,
+				title: schema.agentConversations.title,
+				createdAt: schema.agentConversations.created_at,
+				updatedAt: schema.agentConversations.updated_at,
+				lastMessagePreview: schema.agentConversations.last_message_preview,
+			})
+			.from(schema.agentConversations)
+			.orderBy(desc(schema.agentConversations.updated_at))
+			.all();
+	}
+
+	async createAgentConversation(options: {
+		id?: string;
+		title?: string;
+	} = {}) {
+		const now = new Date().toISOString();
+		const id = options.id || crypto.randomUUID();
+		const title = (options.title || "New chat").trim() || "New chat";
+
+		const result = this.db
+			.insert(schema.agentConversations)
+			.values({
+				id,
+				title,
+				created_at: now,
+				updated_at: now,
+				last_message_preview: null,
+			})
+			.returning({
+				id: schema.agentConversations.id,
+				title: schema.agentConversations.title,
+				createdAt: schema.agentConversations.created_at,
+				updatedAt: schema.agentConversations.updated_at,
+				lastMessagePreview: schema.agentConversations.last_message_preview,
+			})
+			.get();
+
+		return result;
+	}
+
+	async getAgentConversation(id: string) {
+		return this.db
+			.select({
+				id: schema.agentConversations.id,
+				title: schema.agentConversations.title,
+				createdAt: schema.agentConversations.created_at,
+				updatedAt: schema.agentConversations.updated_at,
+				lastMessagePreview: schema.agentConversations.last_message_preview,
+			})
+			.from(schema.agentConversations)
+			.where(eq(schema.agentConversations.id, id))
+			.get();
+	}
+
+	async updateAgentConversation(
+		id: string,
+		updates: { title?: string; lastMessagePreview?: string | null },
+	) {
+		const existing = await this.getAgentConversation(id);
+		if (!existing) return null;
+
+		const now = new Date().toISOString();
+		const result = this.db
+			.update(schema.agentConversations)
+			.set({
+				title: updates.title?.trim() || existing.title,
+				updated_at: now,
+				last_message_preview:
+					updates.lastMessagePreview !== undefined
+						? updates.lastMessagePreview
+						: existing.lastMessagePreview,
+			})
+			.where(eq(schema.agentConversations.id, id))
+			.returning({
+				id: schema.agentConversations.id,
+				title: schema.agentConversations.title,
+				createdAt: schema.agentConversations.created_at,
+				updatedAt: schema.agentConversations.updated_at,
+				lastMessagePreview: schema.agentConversations.last_message_preview,
+			})
+			.get();
+
+		return result;
+	}
+
+	async deleteAgentConversation(id: string) {
+		const existing = await this.getAgentConversation(id);
+		if (!existing) return false;
+
+		this.db
+			.delete(schema.agentConversations)
+			.where(eq(schema.agentConversations.id, id))
+			.run();
+
+		return true;
+	}
+
+	/**
+	 * Ensure the reserved auto-draft conversation exists for this mailbox.
+	 */
+	async ensureAutoAgentConversation() {
+		const existing = await this.getAgentConversation("auto");
+		if (existing) return existing;
+		return this.createAgentConversation({
+			id: "auto",
+			title: "Auto drafts",
+		});
+	}
+
 	async moveEmail(id: string, folderId: string) {
 		const folder = this.db
 			.select({ id: schema.folders.id })
