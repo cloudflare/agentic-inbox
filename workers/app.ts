@@ -26,10 +26,7 @@ declare module "react-router" {
 	}
 }
 
-const requestHandler = createRequestHandler(
-	() => import("virtual:react-router/server-build"),
-	import.meta.env.MODE,
-);
+const requestHandler = createRequestHandler(() => import("virtual:react-router/server-build"), import.meta.env.MODE);
 
 function getAccessUrls(teamDomain: string) {
 	const certsPath = "/cdn-cgi/access/certs";
@@ -73,7 +70,6 @@ app.use("/api/*", async (c, next) => {
 		const mailboxId = decodeURIComponent(remainder.split("/")[0] || "");
 		if (mailboxId && !canAccessMailbox(user, mailboxId)) return c.json({ error: "You do not have permission to access this mailbox" }, 403);
 	}
-	c.set("authUser", user);
 	return next();
 });
 
