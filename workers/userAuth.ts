@@ -1,7 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./types";
 
-const PBKDF2_ITERATIONS = 120_000;
+// Cloudflare Workers Web Crypto rejects PBKDF2 iteration counts above 100,000.
+// Keep this at the supported ceiling so password hashing works in production.
+const PBKDF2_ITERATIONS = 100_000;
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 interface UserRecord { email: string; name: string; role: "admin" | "employee"; status: "pending" | "active" | "disabled"; password_hash: string; created_at: string; }
 function bytesToBase64(bytes: Uint8Array): string { let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary); }
