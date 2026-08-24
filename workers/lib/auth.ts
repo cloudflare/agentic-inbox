@@ -63,11 +63,25 @@ export function isAdmin(user: AuthUser): boolean {
 
 export async function seedAdmin(env: Env): Promise<void> {
 	if (!env.ADMIN_PASSWORD) return;
-	const email = (env.ADMIN_EMAIL || "admin@astratradehk.com").toLowerCase();
+	const email = (env.ADMIN_EMAIL || "admin@astratradehk.com").trim().toLowerCase();
 	const stub = env.USER_AUTH.get(env.USER_AUTH.idFromName("global"));
 	await stub.fetch("https://user-auth/seed-admin", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ email, password: env.ADMIN_PASSWORD }),
 	});
+
+	// Keep the administrator usable even on a fresh deployment where no mailbox exists yet.
+	const key = `mailboxes/${email}.json`;
+	if (!(await env.BUCKET.head(key))) {
+		const settings = {
+			fromName: "Administrator",
+			forwarding: { enabled: false, email: "" },
+			signature: { enabled: false, text: "" },
+			autoReply: { enabled: false, subject: "", message: "" },
+		};
+		await env.BUCKET.put(key, JSON.stringify(settings));
+		const mailbox = env.MAILBOX.get(env.MAILBOX.idFromName(email));
+		await mailbox.getFolders();
+	}
 }
