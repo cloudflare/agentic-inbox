@@ -10,6 +10,7 @@ export interface DeliveredEmail {
   body: string;
   date: string;
   messageId?: string | null;
+  alreadyForwarded?: boolean;
 }
 
 type NotificationSettings = {
@@ -132,10 +133,7 @@ export async function runPostDelivery(
   ) {
     const target = forwarding.email.trim().toLowerCase();
     const recipientAddresses = extractAddresses(email.recipient);
-    const originalMessageId = email.messageId?.trim();
-    const alreadyForwarded = !originalMessageId
-      ? false
-      : originalMessageId.toLowerCase().startsWith("forwarded:");
+    const alreadyForwarded = email.alreadyForwarded === true;
 
     // Never forward to the mailbox itself, never forward when the configured
     // destination is already one of the original recipients, and never create
