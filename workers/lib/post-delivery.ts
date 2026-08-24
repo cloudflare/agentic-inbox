@@ -73,9 +73,37 @@ async function notifyTelegram(settings: NotificationSettings["telegram"], email:
   const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(settings.botToken)}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: settings.chatId, text: telegramText(email), disable_web_page_preview: true }),
+    body: JSON.stringify({
+      chat_id: settings.chatId,
+      text: telegramText(email),
+      disable_web_page_preview: true,
+    }),
   });
   if (!response.ok) throw new Error(`Telegram notification failed: HTTP ${response.status}`);
+}
+
+/** Load per-mailbox notification settings without exposing secrets to callers. */
+export async function getPostDeliverySettings(env: Env, mailboxId: string): Promise<NotificationSettings> {
+  const object = await env.BUCKET.get(`mailboxes/${mailboxId.toLowerCase()}.json`);
+  if (!object) return {};
+  const value = await object.json<NotificationSettings & { forwarding?: Record<string, unknown> }>();
+  return {
+    forwarding: value.forwarding
+      ? {
+          enabled: value.forwarding.enabled === true,
+          email: typeof value.forwarding.email === "string" ? value.forwarding.email : "",
+          includeInternal: value.forwarding.includeInternal !== false,
+        }
+      : undefined,
+    telegram: value.telegram
+      ? {
+          enabled: value.telegram.enabled === true,
+          botToken: typeof value.telegram.botToken === "string" ? value.telegram.botToken : "",
+          chatId: typeof value.telegram.chatId === "string" ? value.telegram.chatId : "",
+          includeInternal: value.telegram.includeInternal !== false,
+        }
+      : undefined,
+  };
 }
 
 /**
@@ -83,8 +111,7 @@ async function notifyTelegram(settings: NotificationSettings["telegram"], email:
  * deliberately isolated from mailbox delivery so a broken Telegram bot or
  * forwarding destination can never make an email disappear.
  *
- * The includeInternal flags are important: internal mail follows the same
- * post-delivery pipeline as external mail instead of being silently skipped.
+ * Internal mail intentionally uses the same pipeline as external mail.
  */
 export async function runPostDelivery(
   env: Env,
@@ -96,8 +123,6 @@ export async function runPostDelivery(
   const forwarding = settings.forwarding;
   const telegram = settings.telegram;
 
-  if (internal && forwarding?.includeInternal === false && telegram?.includeInternal === false) return;
-
   const tasks: Promise<unknown>[] = [];
 
   if (
@@ -106,7 +131,21 @@ export async function runPostDelivery(
     (!internal || forwarding.includeInternal !== false)
   ) {
     const target = forwarding.email.trim().toLowerCase();
-    if (target && target !== email.mailboxId.toLowerCase() && !extractAddresses(email.recipient).includes(target)) {
+    const recipientAddresses = extractAddresses(email.recipient);
+    const originalMessageId = email.messageId?.trim();
+    const alreadyForwarded = !originalMessageId
+      ? false
+      : originalMessageId.toLowerCase().startsWith("forwarded:");
+
+    // Never forward to the mailbox itself, never forward when the configured
+    // destination is already one of the original recipients, and never create
+    // a simple forwarding loop.
+    if (
+      target &&
+      target !== email.mailboxId.toLowerCase() &&
+      !recipientAddresses.includes(target) &&
+      !alreadyForwarded
+    ) {
       tasks.push(
         sendEmail(env.EMAIL, {
           to: target,
@@ -127,11 +166,15 @@ export async function runPostDelivery(
   }
 
   if (tasks.length === 0) return;
+
   executionCtx.waitUntil(
     Promise.allSettled(tasks).then((results) => {
       for (const result of results) {
         if (result.status === "rejected") {
-          console.error("Post-delivery notification failed:", result.reason instanceof Error ? result.reason.message : result.reason);
+          console.error(
+            "Post-delivery notification failed:",
+            result.reason instanceof Error ? result.reason.message : result.reason,
+          );
         }
       }
     }),
