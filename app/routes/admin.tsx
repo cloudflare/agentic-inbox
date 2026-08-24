@@ -1,5 +1,5 @@
 import { Button, Input } from "@cloudflare/kumo";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { adminApi, type AdminUser } from "~/services/admin";
 
 export function meta() {
@@ -13,6 +13,8 @@ export default function AdminRoute() {
 	const [resetEmail, setResetEmail] = useState<string | null>(null);
 	const [newPassword, setNewPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const [backgroundBusy, setBackgroundBusy] = useState(false);
+	const fileRef = useRef<HTMLInputElement>(null);
 
 	const load = async () => {
 		try {
@@ -40,14 +42,39 @@ export default function AdminRoute() {
 		try { await adminApi.resetPassword(resetEmail, newPassword); setResetEmail(null); setNewPassword(""); } catch (err) { setError(err instanceof Error ? err.message : "Password reset failed"); } finally { setBusy(null); }
 	};
 
+	const uploadBackground = async (file: File) => {
+		setBackgroundBusy(true);
+		setError(null);
+		try {
+			await adminApi.uploadLoginBackground(file);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Unable to upload background");
+		} finally {
+			setBackgroundBusy(false);
+			if (fileRef.current) fileRef.current.value = "";
+		}
+	};
+
+	const removeBackground = async () => {
+		setBackgroundBusy(true);
+		setError(null);
+		try {
+			await adminApi.removeLoginBackground();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Unable to remove background");
+		} finally { setBackgroundBusy(false); }
+	};
+
 	return (
 		<div className="min-h-screen bg-kumo-recessed p-6 md:p-10">
-			<div className="mx-auto max-w-5xl">
-				<div className="mb-8 flex items-center justify-between">
+			<div className="mx-auto max-w-5xl space-y-8">
+				<div className="flex items-center justify-between">
 					<div><h1 className="text-2xl font-bold">Employee Management</h1><p className="mt-1 text-sm text-kumo-subtle">Approve accounts and manage mailbox access.</p></div>
 					<Button variant="secondary" onClick={() => void load()}>Refresh</Button>
 				</div>
-				{error && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+				{error && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
 				<div className="overflow-hidden rounded-xl border border-kumo-line bg-kumo-base">
 					{loading ? <div className="p-8 text-center text-sm text-kumo-subtle">Loading…</div> : users.map((user, index) => (
 						<div key={user.email} className={`flex flex-col gap-4 p-5 md:flex-row md:items-center ${index ? "border-t border-kumo-line" : ""}`}>
@@ -60,6 +87,18 @@ export default function AdminRoute() {
 							</div>
 						</div>
 					))}
+				</div>
+
+				<div className="rounded-xl border border-kumo-line bg-kumo-base p-6">
+					<div className="mb-4">
+						<h2 className="text-lg font-semibold">Login background</h2>
+						<p className="mt-1 text-sm text-kumo-subtle">Upload a JPG, PNG, WebP or other image up to 5 MB. It will be shown behind the employee login screen.</p>
+					</div>
+					<div className="flex flex-wrap gap-3">
+						<input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadBackground(file); }} />
+						<Button variant="primary" loading={backgroundBusy} onClick={() => fileRef.current?.click()}>Choose background image</Button>
+						<Button variant="secondary" loading={backgroundBusy} onClick={() => void removeBackground()}>Remove background</Button>
+					</div>
 				</div>
 			</div>
 
