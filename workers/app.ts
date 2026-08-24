@@ -6,7 +6,8 @@ import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
-import { app as apiApp, receiveEmail } from "./index";
+import { app as apiApp } from "./index";
+import { receiveEmailWithNotifications } from "./receive-with-notifications";
 import { EmailMCP } from "./mcp";
 import type { Env } from "./types";
 import { getSessionUser, sessionCookie, expiredSessionCookie, canAccessMailbox, seedAdmin, type AuthUser } from "./lib/auth";
@@ -240,7 +241,7 @@ export default {
 	fetch: app.fetch,
 	async email(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
 		try {
-			await receiveEmail(event, env, ctx);
+			await receiveEmailWithNotifications(event, env, ctx);
 		} catch (e) {
 			console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack);
 			throw e;
