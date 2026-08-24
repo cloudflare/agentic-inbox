@@ -20,6 +20,8 @@ export interface StoredAttachment {
 
 /**
  * Store base64-encoded attachments to R2 and return metadata for the DO.
+ * A MIME part with Content-ID is an inline resource even when the sender
+ * omitted Content-Disposition:inline (a common pattern in HTML emails).
  */
 export async function storeAttachments(
 	bucket: Env["BUCKET"],
@@ -37,7 +39,6 @@ export async function storeAttachments(
 	const results: StoredAttachment[] = [];
 	for (const att of attachments) {
 		const attachmentId = crypto.randomUUID();
-		// Sanitize filename to prevent path traversal in R2 keys
 		const safeFilename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
 		const key = `attachments/${emailId}/${attachmentId}/${safeFilename}`;
 		const binaryStr = atob(att.content);
@@ -50,7 +51,7 @@ export async function storeAttachments(
 			mimetype: att.type,
 			size: bytes.byteLength,
 			content_id: att.contentId || null,
-			disposition: att.disposition,
+			disposition: att.contentId ? "inline" : att.disposition,
 		});
 	}
 	return results;
