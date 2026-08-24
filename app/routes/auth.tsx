@@ -32,6 +32,7 @@ export default function AuthRoute() {
 				await register(name, email, password);
 				setMessage("Registration submitted. An administrator must approve your account before you can sign in.");
 				setName("");
+				setEmail("");
 				setPassword("");
 				setConfirm("");
 			} else {
@@ -47,12 +48,14 @@ export default function AuthRoute() {
 
 	return (
 		<div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-kumo-recessed">
+			<div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/api/v1/auth/login-background')" }} />
+			<div className="absolute inset-0 bg-black/35" />
 			<div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.18),transparent_35%),radial-gradient(circle_at_80%_80%,rgba(14,165,233,0.16),transparent_35%)]" />
-			<div className="relative w-full max-w-md rounded-2xl border border-kumo-line bg-kumo-base/95 shadow-2xl p-8 backdrop-blur">
+			<div className="relative w-full max-w-md rounded-2xl border border-white/20 bg-white/90 shadow-2xl p-8 backdrop-blur-xl">
 				<div className="text-center mb-8">
-					<div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-kumo-fill text-xl font-bold">✉</div>
-					<h1 className="text-2xl font-bold text-kumo-default">Agentic Inbox</h1>
-					<p className="mt-1 text-sm text-kumo-subtle">{isRegister ? "Create your company mailbox account" : "Sign in to your company mailbox"}</p>
+					<div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-black/10 text-xl font-bold">✉</div>
+					<h1 className="text-2xl font-bold text-gray-900">Agentic Inbox</h1>
+					<p className="mt-1 text-sm text-gray-600">{isRegister ? "Create your company mailbox account" : "Sign in to your company mailbox"}</p>
 				</div>
 
 				<form onSubmit={submit} className="space-y-4">
@@ -67,11 +70,11 @@ export default function AuthRoute() {
 					</Button>
 				</form>
 
-				<div className="mt-6 text-center text-sm text-kumo-subtle">
+				<div className="mt-6 text-center text-sm text-gray-600">
 					{isRegister ? (
-						<>Already have an account? <RouterLink to="/login" className="font-medium text-kumo-default underline">Sign in</RouterLink></>
+						<>Already have an account? <RouterLink to="/login" className="font-medium text-gray-900 underline">Sign in</RouterLink></>
 					) : (
-						<>Need an account? <RouterLink to="/register" className="font-medium text-kumo-default underline">Employee registration</RouterLink></>
+						<>Need an account? <RouterLink to="/register" className="font-medium text-gray-900 underline">Employee registration</RouterLink></>
 					)}
 				</div>
 			</div>
