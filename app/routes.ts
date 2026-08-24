@@ -7,7 +7,7 @@ import { index, type RouteConfig, route } from "@react-router/dev/routes";
 export default [
 	index("routes/home.tsx"),
 	route("login", "routes/auth.tsx"),
-	route("register", "routes/auth.tsx"),
+	route("register", "routes/register.tsx"),
 	route("admin", "routes/admin.tsx"),
 	route("mailbox/:mailboxId", "routes/mailbox.tsx", [
 		index("routes/mailbox-index.tsx"),
