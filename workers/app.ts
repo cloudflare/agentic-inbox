@@ -27,6 +27,7 @@ declare module "react-router" {
 }
 
 const requestHandler = createRequestHandler(() => import("virtual:react-router/server-build"), import.meta.env.MODE);
+const LOGIN_BACKGROUND_KEY = "system/login-background";
 
 function getAccessUrls(teamDomain: string) {
 	const certsPath = "/cdn-cgi/access/certs";
@@ -90,6 +91,15 @@ async function requireAdmin(c: any): Promise<AuthUser | Response> {
 	if (user.role !== "admin") return c.json({ error: "Administrator permission required" }, 403);
 	return user;
 }
+
+app.get("/api/v1/auth/login-background", async (c) => {
+	const object = await c.env.BUCKET.get(LOGIN_BACKGROUND_KEY);
+	if (!object) return c.body(null, 404);
+	const headers = new Headers();
+	object.writeHttpMetadata(headers);
+	headers.set("Cache-Control", "public, max-age=300");
+	return new Response(object.body, { headers });
+});
 
 app.post("/api/v1/auth/register", async (c) => {
 	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
@@ -183,6 +193,25 @@ app.post("/api/v1/admin/reset-password", async (c) => {
 	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
 	const response = await stub.fetch("https://user-auth/admin/reset-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
 	return new Response(response.body, response);
+});
+
+app.post("/api/v1/admin/login-background", async (c) => {
+	const admin = await requireAdmin(c);
+	if (admin instanceof Response) return admin;
+	const form = await c.req.raw.formData().catch(() => null);
+	const file = form?.get("file");
+	if (!(file instanceof File)) return c.json({ error: "Image file is required" }, 400);
+	if (!file.type.startsWith("image/")) return c.json({ error: "Only image files are allowed" }, 400);
+	if (file.size > 5 * 1024 * 1024) return c.json({ error: "Image must be 5 MB or smaller" }, 400);
+	await c.env.BUCKET.put(LOGIN_BACKGROUND_KEY, file.stream(), { httpMetadata: { contentType: file.type } });
+	return c.json({ ok: true });
+});
+
+app.delete("/api/v1/admin/login-background", async (c) => {
+	const admin = await requireAdmin(c);
+	if (admin instanceof Response) return admin;
+	await c.env.BUCKET.delete(LOGIN_BACKGROUND_KEY);
+	return c.json({ ok: true });
 });
 
 app.get("/api/v1/mailboxes", async (c) => {
