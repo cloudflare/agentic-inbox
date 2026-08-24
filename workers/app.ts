@@ -69,6 +69,23 @@ app.use("/api/*", async (c, next) => {
 	return next();
 });
 
+// The Agents API is reachable outside the React UI, so require an application session here too.
+app.use("/agents/*", async (c, next) => {
+	const user = await getSessionUser(c.env, c.req.raw);
+	if (!user) return c.json({ error: "Authentication required" }, 401);
+	return next();
+});
+
+// MCP currently has no request-scoped mailbox identity inside McpAgent. Until its tools
+// can consume the authenticated user safely, keep this integration admin-only rather than
+// risk exposing another mailbox through an MCP tool argument.
+app.use("/mcp*", async (c, next) => {
+	const user = await getSessionUser(c.env, c.req.raw);
+	if (!user) return c.json({ error: "Authentication required" }, 401);
+	if (user.role !== "admin") return c.json({ error: "MCP access is currently restricted to administrators" }, 403);
+	return next();
+});
+
 async function requireAdmin(c: any): Promise<AuthUser | Response> {
 	const user = await getSessionUser(c.env, c.req.raw);
 	if (!user) return c.json({ error: "Authentication required" }, 401);
