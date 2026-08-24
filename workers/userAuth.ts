@@ -92,11 +92,16 @@ export class UserAuthDO extends DurableObject<Env> {
 			const email = normalizeEmail(String(body.email ?? ""));
 			const password = String(body.password ?? "");
 			if (!email || password.length < 8) return Response.json({ error: "Invalid admin credentials" }, { status: 400 });
-			const existing = this.ctx.storage.sql.exec("SELECT email FROM users WHERE email = ?", email).toArray();
-			if (existing.length === 0) {
+			const existing = this.ctx.storage.sql.exec("SELECT * FROM users WHERE email = ?", email).toArray()[0] as UserRecord | undefined;
+			if (!existing) {
 				const passwordHash = await hashPassword(password);
 				this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, "Administrator", "admin", "active", passwordHash, new Date().toISOString());
-			} else this.ctx.storage.sql.exec("UPDATE users SET role='admin', status='active' WHERE email = ?", email);
+			} else if (existing.role !== "admin") {
+				const passwordHash = await hashPassword(password);
+				this.ctx.storage.sql.exec("UPDATE users SET name='Administrator', role='admin', status='active', password_hash=? WHERE email = ?", passwordHash, email);
+			} else {
+				this.ctx.storage.sql.exec("UPDATE users SET status='active' WHERE email = ?", email);
+			}
 			return Response.json({ ok: true });
 		}
 
