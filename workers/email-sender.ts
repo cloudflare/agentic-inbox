@@ -3,12 +3,12 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 /**
- * Email sending via Cloudflare Email Service binding.
+ * Email sending via the Resend Email API.
  *
- * Uses the `send_email` Worker binding (`env.EMAIL.send()`) to send emails.
- *
- * See: https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
+ * Uses the `RESEND_API_KEY` Worker secret to send emails through Resend.
  */
+
+import { env } from "cloudflare:workers";
 
 export interface SendEmailParams {
 	to: string | string[];
@@ -29,44 +29,73 @@ export interface SendEmailParams {
 	headers?: Record<string, string>;
 }
 
+function formatAddress(address: string | { email: string; name: string }): string {
+	if (typeof address === "string") return address;
+	return `${address.name} <${address.email}>`;
+}
+
 /**
- * Send an email using the Cloudflare Email Service binding.
+ * Send an email using the Resend Email API.
  *
- * @param binding  - The `EMAIL` SendEmail binding from env
- * @param params   - Email parameters (to, from, subject, body, etc.)
- * @returns The send result with messageId
- * @throws On validation or delivery errors (error has `.code` property)
+ * The first parameter is kept for compatibility with the existing callers;
+ * outbound delivery now uses the `RESEND_API_KEY` Worker secret instead of
+ * the Cloudflare Email Service binding.
  */
 export async function sendEmail(
-	binding: SendEmail,
+	_binding: SendEmail,
 	params: SendEmailParams,
 ): Promise<{ messageId: string }> {
-	const message: Record<string, unknown> = {
+	const apiKey = (env as unknown as { RESEND_API_KEY?: string }).RESEND_API_KEY;
+	if (!apiKey) {
+		throw new Error("RESEND_API_KEY is not configured");
+	}
+
+	const payload: Record<string, unknown> = {
 		to: params.to,
-		from: params.from,
+		from: formatAddress(params.from),
 		subject: params.subject,
 	};
 
-	if (params.html) message.html = params.html;
-	if (params.text) message.text = params.text;
-	if (params.cc) message.cc = params.cc;
-	if (params.bcc) message.bcc = params.bcc;
-	if (params.replyTo) message.replyTo = params.replyTo;
+	if (params.html !== undefined) payload.html = params.html;
+	if (params.text !== undefined) payload.text = params.text;
+	if (params.cc) payload.cc = params.cc;
+	if (params.bcc) payload.bcc = params.bcc;
+	if (params.replyTo) payload.reply_to = formatAddress(params.replyTo);
 
 	if (params.headers && Object.keys(params.headers).length > 0) {
-		message.headers = params.headers;
+		payload.headers = params.headers;
 	}
 
 	if (params.attachments && params.attachments.length > 0) {
-		message.attachments = params.attachments.map((att) => ({
+		payload.attachments = params.attachments.map((att) => ({
 			content: att.content,
 			filename: att.filename,
-			type: att.type,
-			disposition: att.disposition,
 			...(att.contentId ? { contentId: att.contentId } : {}),
 		}));
 	}
 
-	const result = await binding.send(message as any);
-	return { messageId: result.messageId };
+	const response = await fetch("https://api.resend.com/emails", {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${apiKey}`,
+			"Content-Type": "application/json",
+			"User-Agent": "agentic-inbox/1.0",
+		},
+		body: JSON.stringify(payload),
+	});
+
+	const result = (await response.json().catch(() => ({}))) as {
+		id?: string;
+		message?: string;
+	};
+
+	if (!response.ok) {
+		throw new Error(result.message || `Resend API request failed: ${response.status}`);
+	}
+
+	if (!result.id) {
+		throw new Error("Resend API returned no message ID");
+	}
+
+	return { messageId: result.id };
 }
