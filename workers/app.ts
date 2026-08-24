@@ -108,8 +108,10 @@ app.post("/api/v1/auth/register", async (c) => {
 	const password = String(body?.password ?? "");
 	const domains = (c.env.DOMAINS || "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
 	const domain = email.split("@")[1] || "";
+	const adminEmail = (c.env.ADMIN_EMAIL || "admin@astratradehk.com").trim().toLowerCase();
 	if (!email || !name || password.length < 8) return c.json({ error: "Name, company email and an 8+ character password are required" }, 400);
 	if (!domains.some((d) => domain === d)) return c.json({ error: "Registration is restricted to the company email domain" }, 403);
+	if (email === adminEmail) return c.json({ error: "This address is reserved for the administrator" }, 403);
 	await seedAdmin(c.env);
 	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
 	const response = await stub.fetch("https://user-auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, name, password }) });
