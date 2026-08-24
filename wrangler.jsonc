@@ -3,69 +3,32 @@
 	"name": "agentic-inbox",
 	"compatibility_date": "2025-11-28",
 	"main": "./workers/app.ts",
-	"observability": {
-		"enabled": true
-	},
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
+	"observability": { "enabled": true },
+	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
-		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
-		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
-		// The worker now fails closed outside local development if Access is not configured.
 		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": []
+		"EMAIL_ADDRESSES": [],
+		"ADMIN_EMAIL": "admin@astratradehk.com"
 	},
-	"send_email": [
-		{
-			"name": "EMAIL",
-			"remote": true
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "BUCKET",
-			"bucket_name": "agentic-inbox",
-			"preview_bucket_name": "agentic-inbox"
-		}
-	],
-	"ai": {
-		"binding": "AI"
-	},
+	"send_email": [{ "name": "EMAIL", "remote": true }],
+	"r2_buckets": [{
+		"binding": "BUCKET",
+		"bucket_name": "agentic-inbox",
+		"preview_bucket_name": "agentic-inbox"
+	}],
+	"ai": { "binding": "AI" },
 	"durable_objects": {
 		"bindings": [
-			{
-				"name": "MAILBOX",
-				"class_name": "MailboxDO"
-			},
-			{
-				"name": "EMAIL_AGENT",
-				"class_name": "EmailAgent"
-			},
-			{
-				"name": "EMAIL_MCP",
-				"class_name": "EmailMCP"
-			}
+			{ "name": "MAILBOX", "class_name": "MailboxDO" },
+			{ "name": "EMAIL_AGENT", "class_name": "EmailAgent" },
+			{ "name": "EMAIL_MCP", "class_name": "EmailMCP" },
+			{ "name": "USER_AUTH", "class_name": "UserAuthDO" }
 		]
 	},
 	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": [
-				"MailboxDO"
-			]
-		},
-		{
-			"tag": "v2",
-			"new_sqlite_classes": [
-				"EmailAgent"
-			]
-		},
-		{
-			"tag": "v3",
-			"new_sqlite_classes": [
-				"EmailMCP"
-			]
-		}
+		{ "tag": "v1", "new_sqlite_classes": ["MailboxDO"] },
+		{ "tag": "v2", "new_sqlite_classes": ["EmailAgent"] },
+		{ "tag": "v3", "new_sqlite_classes": ["EmailMCP"] },
+		{ "tag": "v4", "new_sqlite_classes": ["UserAuthDO"] }
 	]
 }
