@@ -30,10 +30,10 @@ function extractMessageId(value: string | undefined | null): string | null {
 	return match ? match[1] : value.trim().split(/\s+/)[0] || null;
 }
 
-function findMailbox(parsed: PostalMime.ParsedMail, env: Env): string | undefined {
+function findMailbox(parsed: any, env: Env): string | undefined {
 	const allowed = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
 	const recipients = (parsed.to || [])
-		.map((entry) => entry.address?.toLowerCase())
+		.map((entry: any) => entry.address?.toLowerCase())
 		.filter(Boolean) as string[];
 	if (allowed.length > 0) return recipients.find((address) => allowed.includes(address));
 	return recipients[0];
@@ -59,9 +59,6 @@ export async function receiveEmailWithNotifications(
 		return;
 	}
 
-	// Let the original implementation decide whether this is a valid mailbox
-	// and persist the message. No notification is attempted for a missing
-	// mailbox, which matches the original receiver's ignore behavior.
 	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
 		await receiveEmail({ raw: new Response(raw).body!, rawSize: raw.byteLength }, env, ctx);
 		return;
@@ -71,7 +68,7 @@ export async function receiveEmailWithNotifications(
 
 	const sender = (parsed.from?.address || "").toLowerCase();
 	const recipients = (parsed.to || [])
-		.map((entry) => entry.address?.toLowerCase())
+		.map((entry: any) => entry.address?.toLowerCase())
 		.filter(Boolean)
 		.join(", ");
 	const originalMessageId = extractMessageId(parsed.messageId);
