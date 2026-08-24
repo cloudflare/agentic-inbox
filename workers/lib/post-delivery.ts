@@ -111,8 +111,6 @@ export async function getPostDeliverySettings(env: Env, mailboxId: string): Prom
  * Runs after an email has been durably stored. Notification failures are
  * deliberately isolated from mailbox delivery so a broken Telegram bot or
  * forwarding destination can never make an email disappear.
- *
- * Internal mail intentionally uses the same pipeline as external mail.
  */
 export async function runPostDelivery(
   env: Env,
@@ -123,26 +121,20 @@ export async function runPostDelivery(
   const internal = isInternal(email, env);
   const forwarding = settings.forwarding;
   const telegram = settings.telegram;
-
   const tasks: Promise<unknown>[] = [];
 
-  if (
-    forwarding?.enabled &&
-    forwarding.email &&
-    (!internal || forwarding.includeInternal !== false)
-  ) {
+  // External mail is the supported production path for forwarding/Telegram.
+  // Internal delivery is deliberately skipped for now: internal mail has a
+  // different Durable Object delivery path and must not be changed merely to
+  // add notifications.
+  if (!internal && forwarding?.enabled && forwarding.email) {
     const target = forwarding.email.trim().toLowerCase();
     const recipientAddresses = extractAddresses(email.recipient);
-    const alreadyForwarded = email.alreadyForwarded === true;
-
-    // Never forward to the mailbox itself, never forward when the configured
-    // destination is already one of the original recipients, and never create
-    // a simple forwarding loop.
     if (
       target &&
       target !== email.mailboxId.toLowerCase() &&
       !recipientAddresses.includes(target) &&
-      !alreadyForwarded
+      email.alreadyForwarded !== true
     ) {
       tasks.push(
         sendEmail(env.EMAIL, {
@@ -159,7 +151,7 @@ export async function runPostDelivery(
     }
   }
 
-  if (telegram?.enabled && (!internal || telegram.includeInternal !== false)) {
+  if (!internal && telegram?.enabled && telegram.botToken && telegram.chatId) {
     tasks.push(notifyTelegram(telegram, email));
   }
 
