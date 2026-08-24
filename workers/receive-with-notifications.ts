@@ -39,6 +39,13 @@ function findMailbox(parsed: any, env: Env): string | undefined {
 	return recipients[0];
 }
 
+function hasForwardingMarker(parsed: any): boolean {
+	return (parsed.headers || []).some((header: any) =>
+		String(header.key || "").toLowerCase() === "x-agentic-inbox-forwarded" &&
+		String(header.value || "").trim() === "1"
+	);
+}
+
 /**
  * Reads the inbound stream once, feeds the original receiver unchanged, and
  * then runs the optional forwarding/Telegram pipeline after durable storage.
@@ -81,6 +88,7 @@ export async function receiveEmailWithNotifications(
 		body: parsed.html || parsed.text || "",
 		date: new Date().toISOString(),
 		messageId: originalMessageId,
+		alreadyForwarded: hasForwardingMarker(parsed),
 	};
 
 	const settings = await getPostDeliverySettings(env, mailboxId);
