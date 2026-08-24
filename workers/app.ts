@@ -9,10 +9,12 @@ import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
 import type { Env } from "./types";
+import { getSessionUser, sessionCookie, expiredSessionCookie, canAccessMailbox, seedAdmin, type AuthUser } from "./lib/auth";
 
 export { MailboxDO } from "./durableObject";
 export { EmailAgent } from "./agent";
 export { EmailMCP } from "./mcp";
+export { UserAuthDO } from "./userAuth";
 
 declare module "react-router" {
 	export interface AppLoadContext {
@@ -39,88 +41,146 @@ function getAccessUrls(teamDomain: string) {
 	return { issuer, certsUrl };
 }
 
-// Main app that wraps the API and adds React Router fallback
 const app = new Hono<{ Bindings: Env }>();
 
-// Cloudflare Access JWT validation middleware (production only)
+// Cloudflare Access remains the outer security layer. The application
+// authentication below adds the mailbox-level identity and authorization model.
 app.use("*", async (c, next) => {
-	// Skip validation in development
-	if (import.meta.env.DEV) {
-		return next();
-	}
-
+	if (import.meta.env.DEV) return next();
 	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
-
-	// Fail closed in production if Access is not configured.
 	if (!POLICY_AUD || !TEAM_DOMAIN) {
-		return c.text(
-			"Cloudflare Access must be configured in production. Set POLICY_AUD and TEAM_DOMAIN.",
-			500,
-		);
+		return c.text("Cloudflare Access must be configured in production. Set POLICY_AUD and TEAM_DOMAIN.", 500);
 	}
-
 	const token = c.req.header("cf-access-jwt-assertion");
-	if (!token) {
-		return c.text("Missing required CF Access JWT", 403);
-	}
-
+	if (!token) return c.text("Missing required CF Access JWT", 403);
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
 		const JWKS = createRemoteJWKSet(certsUrl);
-		await jwtVerify(token, JWKS, {
-			issuer,
-			audience: POLICY_AUD,
-		});
+		await jwtVerify(token, JWKS, { issuer, audience: POLICY_AUD });
 	} catch {
 		return c.text("Invalid or expired Access token", 403);
 	}
-
-	// Authorization model note: once a teammate passes the shared Cloudflare
-	// Access policy, they can access all mailboxes in this app by design.
 	return next();
 });
 
-// MCP server endpoint — used by AI coding tools (ProtoAgent, Claude Code, Cursor, etc.)
-// Must be before API routes and React Router catch-all
-const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
-app.all("/mcp", async (c) => {
-	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
-});
-app.all("/mcp/*", async (c) => {
-	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
+// Application authentication and authorization. Auth endpoints are public to the
+// application layer; all other API endpoints require a valid application session.
+app.use("/api/*", async (c, next) => {
+	if (c.req.path.startsWith("/api/v1/auth/")) return next();
+	const user = await getSessionUser(c.env, c.req.raw);
+	if (!user) return c.json({ error: "Authentication required" }, 401);
+
+	const path = c.req.path;
+	const mailboxPrefix = "/api/v1/mailboxes/";
+	if (path.startsWith(mailboxPrefix)) {
+		const remainder = path.slice(mailboxPrefix.length);
+		const mailboxId = decodeURIComponent(remainder.split("/")[0] || "");
+		if (mailboxId && !canAccessMailbox(user, mailboxId)) {
+			return c.json({ error: "You do not have permission to access this mailbox" }, 403);
+		}
+		if (c.req.method !== "GET" && path === "/api/v1/mailboxes" && user.role !== "admin") {
+			return c.json({ error: "Administrator permission required" }, 403);
+		}
+	}
+	c.set("authUser", user);
+	return next();
 });
 
-// Mount the API routes
+// Auth API. The user database and sessions live in an isolated SQLite-backed DO.
+app.post("/api/v1/auth/register", async (c) => {
+	const body = await c.req.json().catch(() => null);
+	const email = String(body?.email ?? "").trim().toLowerCase();
+	const name = String(body?.name ?? "").trim();
+	const password = String(body?.password ?? "");
+	const domains = (c.env.DOMAINS || "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+	const domain = email.split("@")[1] || "";
+	if (!email || !name || password.length < 8) return c.json({ error: "Name, company email and an 8+ character password are required" }, 400);
+	if (!domains.some((d) => domain === d)) return c.json({ error: "Registration is restricted to the company email domain" }, 403);
+	await seedAdmin(c.env);
+	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
+	const response = await stub.fetch("https://user-auth/register", {
+		method: "POST", headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ email, name, password }),
+	});
+	return new Response(response.body, response);
+});
+
+app.post("/api/v1/auth/login", async (c) => {
+	const body = await c.req.json().catch(() => null);
+	const email = String(body?.email ?? "").trim().toLowerCase();
+	const password = String(body?.password ?? "");
+	await seedAdmin(c.env);
+	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
+	const response = await stub.fetch("https://user-auth/login", {
+		method: "POST", headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ email, password }),
+	});
+	if (!response.ok) return new Response(response.body, response);
+	const data = await response.json() as { token: string; user: AuthUser };
+	return new Response(JSON.stringify({ user: data.user }), {
+		status: 200,
+		headers: { "Content-Type": "application/json", "Set-Cookie": sessionCookie(data.token) },
+	});
+});
+
+app.get("/api/v1/auth/me", async (c) => {
+	const user = await getSessionUser(c.env, c.req.raw);
+	if (!user) return c.json({ error: "Not authenticated" }, 401);
+	return c.json({ user });
+});
+
+app.post("/api/v1/auth/logout", async (c) => {
+	const cookie = c.req.header("Cookie") || "";
+	const token = cookie.split(";").map((p) => p.trim()).find((p) => p.startsWith("agentic_session="))?.split("=").slice(1).join("=");
+	if (token) {
+		const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
+		await stub.fetch("https://user-auth/logout", {
+			method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+		});
+	}
+	return new Response(JSON.stringify({ ok: true }), {
+		status: 200,
+		headers: { "Content-Type": "application/json", "Set-Cookie": expiredSessionCookie() },
+	});
+});
+
+// Filter the mailbox directory itself. Employees only see their own mailbox;
+// admins see all existing mailboxes.
+app.get("/api/v1/mailboxes", async (c, next) => {
+	const user = await getSessionUser(c.env, c.req.raw);
+	if (!user) return c.json({ error: "Authentication required" }, 401);
+	if (user.role === "admin") return next();
+	const response = await next();
+	if (response.status >= 400) return response;
+	const data = await response.json() as Array<{ id: string; email: string; name: string }>;
+	const filtered = data.filter((mailbox) => mailbox.email.toLowerCase() === user.email.toLowerCase());
+	return c.json(filtered);
+});
+
+// MCP server endpoint — used by AI coding tools (ProtoAgent, Claude Code, Cursor, etc.)
+const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
+app.all("/mcp", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext));
+app.all("/mcp/*", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext));
+
 app.route("/", apiApp);
 
-// Agent WebSocket routing - must be before React Router catch-all
 app.all("/agents/*", async (c) => {
 	const response = await routeAgentRequest(c.req.raw, c.env);
 	if (response) return response;
 	return c.text("Agent not found", 404);
 });
 
-// React Router catch-all: serves the SPA for all non-API routes
-app.all("*", (c) => {
-	return requestHandler(c.req.raw, {
-		cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext },
-	});
-});
+app.all("*", (c) => requestHandler(c.req.raw, {
+	cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext },
+}));
 
-// Export the Hono app as the default export with an email handler
 export default {
 	fetch: app.fetch,
-	async email(
-		event: { raw: ReadableStream; rawSize: number },
-		env: Env,
-		ctx: ExecutionContext,
-	) {
+	async email(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
 		try {
 			await receiveEmail(event, env, ctx);
 		} catch (e) {
 			console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack);
-			// Re-throw so Cloudflare's email routing can retry delivery or bounce the message.
-			// Swallowing the error would silently drop the email.
 			throw e;
 		}
 	},
