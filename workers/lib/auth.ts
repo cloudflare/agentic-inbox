@@ -43,10 +43,18 @@ export function canAccessMailbox(user: AuthUser, mailboxId: string): boolean { r
 export function isAdmin(user: AuthUser): boolean { return user.role === "admin"; }
 
 export async function seedAdmin(env: Env): Promise<void> {
-	if (!env.ADMIN_PASSWORD) return;
+	if (!env.ADMIN_PASSWORD) throw new Error("ADMIN_PASSWORD is not configured");
 	const email = (env.ADMIN_EMAIL || "admin@astratradehk.com").trim().toLowerCase();
 	const stub = env.USER_AUTH.get(env.USER_AUTH.idFromName("global"));
-	await stub.fetch("https://user-auth/seed-admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password: env.ADMIN_PASSWORD }) });
+	const response = await stub.fetch("https://user-auth/seed-admin", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ email, password: env.ADMIN_PASSWORD }),
+	});
+	if (!response.ok) {
+		const detail = await response.text().catch(() => "");
+		throw new Error(`Admin initialization failed (${response.status})${detail ? `: ${detail}` : ""}`);
+	}
 	const key = `mailboxes/${email}.json`;
 	if (!(await env.BUCKET.head(key))) {
 		const settings = { fromName: "Administrator", forwarding: { enabled: false, email: "" }, signature: { enabled: false, text: "" }, autoReply: { enabled: false, subject: "", message: "" } };
