@@ -20,8 +20,9 @@ export interface StoredAttachment {
 
 /**
  * Store base64-encoded attachments to R2 and return metadata for the DO.
- * A MIME part with Content-ID is an inline resource even when the sender
- * omitted Content-Disposition:inline (a common pattern in HTML emails).
+ * Content-ID alone does not mean a file is an inline resource: some senders
+ * add Content-ID to ordinary attachments. PostalMime's `related` flag is the
+ * reliable signal for HTML-related inline parts.
  */
 export async function storeAttachments(
 	bucket: Env["BUCKET"],
@@ -51,7 +52,7 @@ export async function storeAttachments(
 			mimetype: att.type,
 			size: bytes.byteLength,
 			content_id: att.contentId || null,
-			disposition: att.contentId ? "inline" : att.disposition,
+			disposition: att.disposition || "attachment",
 		});
 	}
 	return results;
