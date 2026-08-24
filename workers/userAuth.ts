@@ -13,8 +13,8 @@ interface UserRecord {
 	name: string;
 	role: "admin" | "employee";
 	status: "pending" | "active" | "disabled";
-	passwordHash: string;
-	createdAt: string;
+	password_hash: string;
+	created_at: string;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -50,11 +50,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 function normalizeEmail(email: string): string { return email.trim().toLowerCase(); }
-
-function publicUser(row: any) {
-	return { email: row.email, name: row.name, role: row.role, status: row.status, createdAt: row.created_at };
-}
-
+function publicUser(row: any) { return { email: row.email, name: row.name, role: row.role, status: row.status, createdAt: row.created_at }; }
 function randomToken(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(32));
 	return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -84,9 +80,7 @@ export class UserAuthDO extends DurableObject<Env> {
 		this.initialized = true;
 	}
 
-	private cleanupSessions() {
-		this.ctx.storage.sql.exec("DELETE FROM sessions WHERE expires_at <= ?", Math.floor(Date.now() / 1000));
-	}
+	private cleanupSessions() { this.ctx.storage.sql.exec("DELETE FROM sessions WHERE expires_at <= ?", Math.floor(Date.now() / 1000)); }
 
 	async fetch(request: Request): Promise<Response> {
 		this.init();
@@ -102,9 +96,7 @@ export class UserAuthDO extends DurableObject<Env> {
 			if (existing.length === 0) {
 				const passwordHash = await hashPassword(password);
 				this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, "Administrator", "admin", "active", passwordHash, new Date().toISOString());
-			} else {
-				this.ctx.storage.sql.exec("UPDATE users SET role='admin', status='active' WHERE email = ?", email);
-			}
+			} else this.ctx.storage.sql.exec("UPDATE users SET role='admin', status='active' WHERE email = ?", email);
 			return Response.json({ ok: true });
 		}
 
@@ -114,8 +106,7 @@ export class UserAuthDO extends DurableObject<Env> {
 			const password = String(body.password ?? "");
 			if (!email || !name || password.length < 8) return Response.json({ error: "Name, email and an 8+ character password are required" }, { status: 400 });
 			if (!email.includes("@")) return Response.json({ error: "Invalid email address" }, { status: 400 });
-			const existing = this.ctx.storage.sql.exec("SELECT email FROM users WHERE email = ?", email).toArray();
-			if (existing.length > 0) return Response.json({ error: "An account with this email already exists" }, { status: 409 });
+			if (this.ctx.storage.sql.exec("SELECT email FROM users WHERE email = ?", email).toArray().length > 0) return Response.json({ error: "An account with this email already exists" }, { status: 409 });
 			const passwordHash = await hashPassword(password);
 			this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, name, "employee", "pending", passwordHash, new Date().toISOString());
 			return Response.json({ status: "pending" }, { status: 201 });
@@ -125,7 +116,7 @@ export class UserAuthDO extends DurableObject<Env> {
 			const email = normalizeEmail(String(body.email ?? ""));
 			const password = String(body.password ?? "");
 			const row = this.ctx.storage.sql.exec("SELECT * FROM users WHERE email = ?", email).toArray()[0] as UserRecord | undefined;
-			if (!row || !(await verifyPassword(password, row.passwordHash))) return Response.json({ error: "Invalid email or password" }, { status: 401 });
+			if (!row || !(await verifyPassword(password, row.password_hash))) return Response.json({ error: "Invalid email or password" }, { status: 401 });
 			if (row.status !== "active") return Response.json({ error: row.status === "pending" ? "Your account is awaiting administrator approval" : "Your account is disabled" }, { status: 403 });
 			const token = randomToken();
 			const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
@@ -150,14 +141,12 @@ export class UserAuthDO extends DurableObject<Env> {
 			const users = this.ctx.storage.sql.exec("SELECT email,name,role,status,created_at FROM users ORDER BY created_at ASC").toArray();
 			return Response.json({ users: users.map(publicUser) });
 		}
-
 		if (url.pathname === "/admin/approve" && request.method === "POST") {
 			const email = normalizeEmail(String(body.email ?? ""));
 			this.ctx.storage.sql.exec("UPDATE users SET status='active' WHERE email=? AND role='employee'", email);
 			const row = this.ctx.storage.sql.exec("SELECT email,name,role,status,created_at FROM users WHERE email=?", email).toArray()[0];
 			return row ? Response.json({ user: publicUser(row) }) : Response.json({ error: "User not found" }, { status: 404 });
 		}
-
 		if (url.pathname === "/admin/status" && request.method === "POST") {
 			const email = normalizeEmail(String(body.email ?? ""));
 			const status = String(body.status ?? "");
@@ -165,7 +154,6 @@ export class UserAuthDO extends DurableObject<Env> {
 			this.ctx.storage.sql.exec("UPDATE users SET status=? WHERE email=? AND role='employee'", status, email);
 			return Response.json({ ok: true });
 		}
-
 		if (url.pathname === "/admin/reset-password" && request.method === "POST") {
 			const email = normalizeEmail(String(body.email ?? ""));
 			const password = String(body.password ?? "");
