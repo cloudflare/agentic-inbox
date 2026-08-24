@@ -31,11 +31,7 @@ function base64ToBytes(value: string): Uint8Array {
 async function hashPassword(password: string, salt?: Uint8Array): Promise<string> {
 	const actualSalt = salt ?? crypto.getRandomValues(new Uint8Array(16));
 	const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-	const bits = await crypto.subtle.deriveBits(
-		{ name: "PBKDF2", salt: actualSalt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-		key,
-		256,
-	);
+	const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: actualSalt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, key, 256);
 	return `${bytesToBase64(actualSalt)}:${bytesToBase64(new Uint8Array(bits))}`;
 }
 
@@ -53,8 +49,15 @@ function timingSafeEqual(a: string, b: string): boolean {
 	return result === 0;
 }
 
-function normalizeEmail(email: string): string {
-	return email.trim().toLowerCase();
+function normalizeEmail(email: string): string { return email.trim().toLowerCase(); }
+
+function publicUser(row: any) {
+	return { email: row.email, name: row.name, role: row.role, status: row.status, createdAt: row.created_at };
+}
+
+function randomToken(): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(32));
+	return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export class UserAuthDO extends DurableObject<Env> {
@@ -98,10 +101,7 @@ export class UserAuthDO extends DurableObject<Env> {
 			const existing = this.ctx.storage.sql.exec("SELECT email FROM users WHERE email = ?", email).toArray();
 			if (existing.length === 0) {
 				const passwordHash = await hashPassword(password);
-				this.ctx.storage.sql.exec(
-					"INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)",
-					email, "Administrator", "admin", "active", passwordHash, new Date().toISOString(),
-				);
+				this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, "Administrator", "admin", "active", passwordHash, new Date().toISOString());
 			} else {
 				this.ctx.storage.sql.exec("UPDATE users SET role='admin', status='active' WHERE email = ?", email);
 			}
@@ -117,10 +117,7 @@ export class UserAuthDO extends DurableObject<Env> {
 			const existing = this.ctx.storage.sql.exec("SELECT email FROM users WHERE email = ?", email).toArray();
 			if (existing.length > 0) return Response.json({ error: "An account with this email already exists" }, { status: 409 });
 			const passwordHash = await hashPassword(password);
-			this.ctx.storage.sql.exec(
-				"INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)",
-				email, name, "employee", "pending", passwordHash, new Date().toISOString(),
-			);
+			this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, name, "employee", "pending", passwordHash, new Date().toISOString());
 			return Response.json({ status: "pending" }, { status: 201 });
 		}
 
@@ -130,7 +127,7 @@ export class UserAuthDO extends DurableObject<Env> {
 			const row = this.ctx.storage.sql.exec("SELECT * FROM users WHERE email = ?", email).toArray()[0] as UserRecord | undefined;
 			if (!row || !(await verifyPassword(password, row.passwordHash))) return Response.json({ error: "Invalid email or password" }, { status: 401 });
 			if (row.status !== "active") return Response.json({ error: row.status === "pending" ? "Your account is awaiting administrator approval" : "Your account is disabled" }, { status: 403 });
-			const token = bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replace(/[^A-Za-z0-9_-]/g, "");
+			const token = randomToken();
 			const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
 			this.ctx.storage.sql.exec("INSERT INTO sessions (token,email,expires_at) VALUES (?,?,?)", token, email, expiresAt);
 			return Response.json({ token, user: { email: row.email, name: row.name, role: row.role } });
@@ -138,10 +135,7 @@ export class UserAuthDO extends DurableObject<Env> {
 
 		if (url.pathname === "/session" && request.method === "POST") {
 			const token = String(body.token ?? "");
-			const row = this.ctx.storage.sql.exec(
-				"SELECT u.email,u.name,u.role,u.status,s.expires_at FROM sessions s JOIN users u ON u.email=s.email WHERE s.token=?",
-				token,
-			).toArray()[0] as (UserRecord & { expires_at: number }) | undefined;
+			const row = this.ctx.storage.sql.exec("SELECT u.email,u.name,u.role,u.status,s.expires_at FROM sessions s JOIN users u ON u.email=s.email WHERE s.token=?", token).toArray()[0] as (UserRecord & { expires_at: number }) | undefined;
 			if (!row || row.expires_at <= Math.floor(Date.now() / 1000) || row.status !== "active") return Response.json({ error: "Invalid session" }, { status: 401 });
 			return Response.json({ user: { email: row.email, name: row.name, role: row.role } });
 		}
@@ -149,6 +143,36 @@ export class UserAuthDO extends DurableObject<Env> {
 		if (url.pathname === "/logout" && request.method === "POST") {
 			const token = String(body.token ?? "");
 			this.ctx.storage.sql.exec("DELETE FROM sessions WHERE token = ?", token);
+			return Response.json({ ok: true });
+		}
+
+		if (url.pathname === "/admin/users" && request.method === "GET") {
+			const users = this.ctx.storage.sql.exec("SELECT email,name,role,status,created_at FROM users ORDER BY created_at ASC").toArray();
+			return Response.json({ users: users.map(publicUser) });
+		}
+
+		if (url.pathname === "/admin/approve" && request.method === "POST") {
+			const email = normalizeEmail(String(body.email ?? ""));
+			this.ctx.storage.sql.exec("UPDATE users SET status='active' WHERE email=? AND role='employee'", email);
+			const row = this.ctx.storage.sql.exec("SELECT email,name,role,status,created_at FROM users WHERE email=?", email).toArray()[0];
+			return row ? Response.json({ user: publicUser(row) }) : Response.json({ error: "User not found" }, { status: 404 });
+		}
+
+		if (url.pathname === "/admin/status" && request.method === "POST") {
+			const email = normalizeEmail(String(body.email ?? ""));
+			const status = String(body.status ?? "");
+			if (!["active", "disabled", "pending"].includes(status)) return Response.json({ error: "Invalid status" }, { status: 400 });
+			this.ctx.storage.sql.exec("UPDATE users SET status=? WHERE email=? AND role='employee'", status, email);
+			return Response.json({ ok: true });
+		}
+
+		if (url.pathname === "/admin/reset-password" && request.method === "POST") {
+			const email = normalizeEmail(String(body.email ?? ""));
+			const password = String(body.password ?? "");
+			if (password.length < 8) return Response.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+			const passwordHash = await hashPassword(password);
+			this.ctx.storage.sql.exec("UPDATE users SET password_hash=? WHERE email=? AND role='employee'", passwordHash, email);
+			this.ctx.storage.sql.exec("DELETE FROM sessions WHERE email=?", email);
 			return Response.json({ ok: true });
 		}
 
