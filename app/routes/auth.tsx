@@ -1,6 +1,6 @@
 import { Button, Input } from "@cloudflare/kumo";
 import { useState } from "react";
-import { Link as RouterLink, useLocation, useNavigate } from "react-router";
+import { Link as RouterLink, useLocation } from "react-router";
 import { login, register } from "~/services/auth";
 
 export function meta() {
@@ -9,7 +9,6 @@ export function meta() {
 
 export default function AuthRoute() {
 	const location = useLocation();
-	const navigate = useNavigate();
 	const isRegister = location.pathname === "/register";
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
