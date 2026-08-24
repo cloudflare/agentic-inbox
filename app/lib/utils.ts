@@ -102,9 +102,12 @@ export function rewriteInlineImages(
 	return result;
 }
 
-/** Content-ID attachments are inline even when the MIME sender omitted Content-Disposition:inline. */
+/**
+ * Content-ID is not by itself enough to classify an attachment as inline.
+ * Ordinary files can carry a Content-ID too; disposition is authoritative.
+ */
 export function getNonInlineAttachments(attachments?: Attachment[]): Attachment[] {
-	return attachments?.filter((attachment) => attachment.disposition !== "inline" && !attachment.content_id) ?? [];
+	return attachments?.filter((attachment) => attachment.disposition !== "inline") ?? [];
 }
 
 export function getAttachmentUrl(mailboxId: string, emailId: string, attachmentId: string): string {
