@@ -38,8 +38,6 @@ function getAccessUrls(teamDomain: string) {
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Cloudflare Access remains the outer security layer. The application
-// authentication below adds the mailbox-level identity and authorization model.
 app.use("*", async (c, next) => {
 	if (import.meta.env.DEV) return next();
 	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
@@ -56,8 +54,6 @@ app.use("*", async (c, next) => {
 	return next();
 });
 
-// Application authentication and authorization. Auth endpoints are public to the
-// application layer; all other API endpoints require a valid application session.
 app.use("/api/*", async (c, next) => {
 	if (c.req.path.startsWith("/api/v1/auth/")) return next();
 	const user = await getSessionUser(c.env, c.req.raw);
@@ -73,7 +69,13 @@ app.use("/api/*", async (c, next) => {
 	return next();
 });
 
-// Auth API. The user database and sessions live in an isolated SQLite-backed DO.
+async function requireAdmin(c: any): Promise<AuthUser | Response> {
+	const user = await getSessionUser(c.env, c.req.raw);
+	if (!user) return c.json({ error: "Authentication required" }, 401);
+	if (user.role !== "admin") return c.json({ error: "Administrator permission required" }, 403);
+	return user;
+}
+
 app.post("/api/v1/auth/register", async (c) => {
 	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
 	const email = String(body?.email ?? "").trim().toLowerCase();
@@ -117,7 +119,57 @@ app.post("/api/v1/auth/logout", async (c) => {
 	return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json", "Set-Cookie": expiredSessionCookie() } });
 });
 
-// Mailbox directory is handled here so employees never receive the full list.
+app.get("/api/v1/admin/users", async (c) => {
+	const admin = await requireAdmin(c);
+	if (admin instanceof Response) return admin;
+	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
+	const response = await stub.fetch("https://user-auth/admin/users");
+	return new Response(response.body, response);
+});
+
+app.post("/api/v1/admin/approve", async (c) => {
+	const admin = await requireAdmin(c);
+	if (admin instanceof Response) return admin;
+	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+	const email = String(body?.email ?? "").trim().toLowerCase();
+	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
+	const response = await stub.fetch("https://user-auth/admin/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+	if (!response.ok) return new Response(response.body, response);
+	const data = await response.json() as { user?: { email: string; name: string } };
+	if (data.user) {
+		const key = `mailboxes/${data.user.email}.json`;
+		if (!(await c.env.BUCKET.head(key))) {
+			const settings = { fromName: data.user.name, forwarding: { enabled: false, email: "" }, signature: { enabled: false, text: "" }, autoReply: { enabled: false, subject: "", message: "" } };
+			await c.env.BUCKET.put(key, JSON.stringify(settings));
+			const mailbox = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(data.user.email));
+			await mailbox.getFolders();
+		}
+	}
+	return c.json(data);
+});
+
+app.post("/api/v1/admin/status", async (c) => {
+	const admin = await requireAdmin(c);
+	if (admin instanceof Response) return admin;
+	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+	const email = String(body?.email ?? "").trim().toLowerCase();
+	const status = String(body?.status ?? "");
+	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
+	const response = await stub.fetch("https://user-auth/admin/status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, status }) });
+	return new Response(response.body, response);
+});
+
+app.post("/api/v1/admin/reset-password", async (c) => {
+	const admin = await requireAdmin(c);
+	if (admin instanceof Response) return admin;
+	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+	const email = String(body?.email ?? "").trim().toLowerCase();
+	const password = String(body?.password ?? "");
+	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
+	const response = await stub.fetch("https://user-auth/admin/reset-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+	return new Response(response.body, response);
+});
+
 app.get("/api/v1/mailboxes", async (c) => {
 	const user = await getSessionUser(c.env, c.req.raw);
 	if (!user) return c.json({ error: "Authentication required" }, 401);
@@ -126,19 +178,16 @@ app.get("/api/v1/mailboxes", async (c) => {
 	return c.json(visible.map((m) => ({ ...m, name: m.id })));
 });
 
-// MCP server endpoint — used by AI coding tools (ProtoAgent, Claude Code, Cursor, etc.)
 const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
 app.all("/mcp", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext));
 app.all("/mcp/*", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext));
 
 app.route("/", apiApp);
-
 app.all("/agents/*", async (c) => {
 	const response = await routeAgentRequest(c.req.raw, c.env);
 	if (response) return response;
 	return c.text("Agent not found", 404);
 });
-
 app.all("*", (c) => requestHandler(c.req.raw, { cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext } }));
 
 export default {
