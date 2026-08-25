@@ -4,32 +4,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-22",
   "compatibility_flags": ["nodejs_compat"],
-  "d1_databases": [
-    {
-      "binding": "SOURCE_DB",
-      "database_name": "REPLACE_WITH_OLD_CLOUDMAIL_D1_NAME",
-      "database_id": "REPLACE_WITH_OLD_CLOUDMAIL_D1_ID"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "SOURCE_R2",
-      "bucket_name": "REPLACE_WITH_OLD_CLOUDMAIL_R2_BUCKET"
-    },
-    {
-      "binding": "TARGET_R2",
-      "bucket_name": "agentic-inbox"
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "TARGET_MAILBOX",
-        "class_name": "MailboxDO",
-        "script_name": "agentic-inbox"
-      }
-    ]
-  },
   "vars": {
     "TARGET_WORKER_NAME": "agentic-inbox"
   }
