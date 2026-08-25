@@ -72,7 +72,7 @@ final class AgentChatClient: NSObject, ObservableObject {
         messages.append(ChatMessage(id: userId, role: "user", text: trimmed))
 
         // Include full history the way useAgentChat does
-        var history: [[String: Any]] = messages.map { msg in
+        let history: [[String: Any]] = messages.map { msg in
             [
                 "id": msg.id,
                 "role": msg.role,
