@@ -3,10 +3,16 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Banner, Button, Input } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
+import { FileIcon, FloppyDiskIcon, PaperclipIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
+
+function formatSize(bytes: number) {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -27,6 +33,9 @@ export default function ComposePanel() {
 		setSubject,
 		body,
 		setBody,
+		attachments,
+		addAttachments,
+		removeAttachment,
 		error,
 		isSavingDraft,
 		isSending,
@@ -91,89 +100,71 @@ export default function ComposePanel() {
 
 						{showCcBcc && (
 							<div className="flex items-center gap-2">
-								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
-									CC
-								</label>
+								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">CC</label>
 								<div className="flex-1">
-									<Input
-										type="text"
-										size="sm"
-										value={cc}
-										onChange={(e) => setCc(e.target.value)}
-										placeholder="Separate multiple addresses with commas"
-									/>
+									<Input type="text" size="sm" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Separate multiple addresses with commas" />
 								</div>
 							</div>
 						)}
 
 						{showCcBcc && (
 							<div className="flex items-center gap-2">
-								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
-									BCC
-								</label>
+								<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">BCC</label>
 								<div className="flex-1">
-									<Input
-										type="text"
-										size="sm"
-										value={bcc}
-										onChange={(e) => setBcc(e.target.value)}
-										placeholder="Separate multiple addresses with commas"
-									/>
+									<Input type="text" size="sm" value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Separate multiple addresses with commas" />
 								</div>
 							</div>
 						)}
 
 						<div className="flex items-center gap-2">
-							<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">
-								Subject
-							</label>
+							<label className="text-sm font-medium text-kumo-subtle w-14 shrink-0">Subject</label>
 							<div className="flex-1">
-								<Input
-									type="text"
-									placeholder="Email subject"
-									size="sm"
-									value={subject}
-									onChange={(e) => setSubject(e.target.value)}
-									required
-								/>
+								<Input type="text" placeholder="Email subject" size="sm" value={subject} onChange={(e) => setSubject(e.target.value)} required />
 							</div>
 						</div>
 					</div>
 
 					<div className="border border-kumo-line rounded-md overflow-hidden bg-kumo-base">
-						<RichTextEditor
-							value={body}
-							onChange={setBody}
-						/>
+						<RichTextEditor value={body} onChange={setBody} />
+					</div>
+
+					<div className="space-y-2">
+						<label className="inline-flex items-center gap-2 cursor-pointer text-sm text-kumo-default rounded-md border border-kumo-line px-3 py-2 hover:bg-kumo-tint">
+							<PaperclipIcon size={16} />
+							<span>Attach files</span>
+							<input
+								type="file"
+								multiple
+								className="hidden"
+								onChange={(e) => { void addAttachments(e.target.files); e.currentTarget.value = ""; }}
+								disabled={isSending}
+							/>
+						</label>
+						{attachments.length > 0 && (
+							<div className="space-y-1.5">
+								{attachments.map((attachment, index) => (
+									<div key={`${attachment.filename}-${index}`} className="flex items-center gap-2 rounded-md border border-kumo-line px-3 py-2 text-sm">
+										<FileIcon size={16} className="text-kumo-subtle shrink-0" />
+										<span className="truncate flex-1">{attachment.filename}</span>
+										<span className="text-kumo-subtle shrink-0">{formatSize(attachment.size)}</span>
+										<button type="button" title="Remove attachment" onClick={() => removeAttachment(index)} disabled={isSending} className="p-1 rounded hover:bg-kumo-tint">
+											<XIcon size={14} />
+										</button>
+									</div>
+								))}
+							</div>
+						)}
 					</div>
 				</div>
 
-				{/* Footer actions */}
 				<div className="mt-auto px-4 py-3 border-t border-kumo-line bg-kumo-fill/30 shrink-0 md:px-6">
 					<div className="flex items-center justify-between">
-						<Button type="button" variant="ghost" size="sm" onClick={closeCompose} disabled={isSending}>
-							Discard
-						</Button>
+						<Button type="button" variant="ghost" size="sm" onClick={closeCompose} disabled={isSending}>Discard</Button>
 						<div className="flex items-center gap-2">
-							<Button
-								type="button"
-								variant="secondary"
-								size="sm"
-								loading={isSavingDraft}
-								disabled={isSending}
-								icon={<FloppyDiskIcon size={14} />}
-								onClick={handleSaveDraft}
-							>
+							<Button type="button" variant="secondary" size="sm" loading={isSavingDraft} disabled={isSending} icon={<FloppyDiskIcon size={14} />} onClick={handleSaveDraft}>
 								{isSavingDraft ? "Saving..." : "Save as Draft"}
 							</Button>
-							<Button
-								type="submit"
-								variant="primary"
-								size="sm"
-								loading={isSending}
-								disabled={isSavingDraft || isSending}
-								icon={<PaperPlaneTiltIcon size={14} />}
-							>
+							<Button type="submit" variant="primary" size="sm" loading={isSending} disabled={isSavingDraft || isSending} icon={<PaperPlaneTiltIcon size={14} />}>
 								{isSending ? "Sending..." : "Send"}
 							</Button>
 						</div>
