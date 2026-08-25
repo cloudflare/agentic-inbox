@@ -27,23 +27,44 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 	});
 }
 
+async function fetchImageAsDataUrl(url: string): Promise<string | null> {
+	try {
+		const response = await fetch(url, { credentials: "include" });
+		if (!response.ok) return null;
+		return await blobToDataUrl(await response.blob());
+	} catch {
+		return null;
+	}
+}
+
 /**
- * The email viewer is intentionally rendered in an opaque sandboxed iframe.
- * Such an iframe cannot send the mailbox session cookie with an API image
- * request. Fetch inline images in the authenticated parent page first, then
- * embed the bytes as data URLs inside the sandbox.
+ * The iframe is sandboxed and therefore cannot rely on mailbox session
+ * cookies for attachment URLs. Convert both CID references and the API URLs
+ * produced by the legacy rewriteInlineImages helper into data URLs while
+ * still running the requests in the authenticated parent page.
  */
-async function rewriteCidImages(
+async function rewriteInlineImagesForIframe(
 	body: string,
 	mailboxId?: string,
 	emailId?: string,
 	attachments?: Attachment[],
 ): Promise<string> {
-	if (!body || !mailboxId || !emailId || !attachments?.length) return body;
-
+	if (!body) return body;
 	let result = body;
-	const used = new Set<string>();
 
+	// First handle the API URLs already produced by rewriteInlineImages().
+	// This is important because the message-view components historically pass
+	// a rewritten body to EmailIframe without the mailbox/attachment props.
+	const apiImageRe = /(?:src|background)=["'](\/api\/v1\/mailboxes\/[^"']+\/emails\/[^"']+\/attachments\/[^"']+)["']/gi;
+	const apiUrls = [...result.matchAll(apiImageRe)].map((m) => m[1]);
+	for (const url of [...new Set(apiUrls)]) {
+		const dataUrl = await fetchImageAsDataUrl(url);
+		if (dataUrl) result = result.split(url).join(dataUrl);
+	}
+
+	if (!mailboxId || !emailId || !attachments?.length) return result;
+
+	const used = new Set<string>();
 	for (const att of attachments) {
 		if (!att.content_id) continue;
 		const cid = att.content_id.replace(/^<|>$/g, "").trim();
@@ -51,49 +72,22 @@ async function rewriteCidImages(
 		const escapedCid = cid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		const re = new RegExp(`cid:\\s*<?${escapedCid}>?`, "gi");
 		if (!re.test(result)) continue;
-
-		try {
-			const response = await fetch(attachmentUrl(mailboxId, emailId, att.id), {
-				credentials: "include",
-			});
-			if (!response.ok) continue;
-			const dataUrl = await blobToDataUrl(await response.blob());
+		const dataUrl = await fetchImageAsDataUrl(attachmentUrl(mailboxId, emailId, att.id));
+		if (dataUrl) {
 			result = result.replace(re, dataUrl);
 			used.add(att.id);
-		} catch {
-			// Keep the CID untouched if the authenticated fetch fails.
 		}
 	}
 
-	// Gmail sometimes has the filename in alt while the stored Content-ID is
-	// not preserved exactly. Cover that common form as well.
 	for (const att of attachments) {
 		if (used.has(att.id) || att.disposition !== "inline" || !att.filename) continue;
 		const escapedName = att.filename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		const re = new RegExp(`(<img\\b[^>]*\\balt=["'])${escapedName}(["'][^>]*\\bsrc=["'])cid:[^"']+(["'])`, "gi");
 		if (!re.test(result)) continue;
-		try {
-			const response = await fetch(attachmentUrl(mailboxId, emailId, att.id), { credentials: "include" });
-			if (!response.ok) continue;
-			const dataUrl = await blobToDataUrl(await response.blob());
+		const dataUrl = await fetchImageAsDataUrl(attachmentUrl(mailboxId, emailId, att.id));
+		if (dataUrl) {
 			result = result.replace(re, `$1${att.filename}$2${dataUrl}$3`);
 			used.add(att.id);
-		} catch {
-			// Keep the original CID.
-		}
-	}
-
-	// Last-resort mapping for malformed messages where CID metadata differs.
-	const inlineImages = attachments.filter((att) => !used.has(att.id) && att.disposition === "inline" && att.mimetype?.startsWith("image/"));
-	const unresolved = [...result.matchAll(/cid:\s*<?[^>\s"']+>?/gi)];
-	for (let i = 0; i < unresolved.length && i < inlineImages.length; i++) {
-		try {
-			const response = await fetch(attachmentUrl(mailboxId, emailId, inlineImages[i].id), { credentials: "include" });
-			if (!response.ok) continue;
-			const dataUrl = await blobToDataUrl(await response.blob());
-			result = result.replace(unresolved[i][0], dataUrl);
-		} catch {
-			// Leave unresolved CID untouched rather than guessing.
 		}
 	}
 
@@ -119,7 +113,7 @@ export default function EmailIframe({ body, mailboxId, emailId, attachments, aut
 		let cancelled = false;
 
 		(async () => {
-			const rewrittenBody = await rewriteCidImages(body, mailboxId, emailId, attachments);
+			const rewrittenBody = await rewriteInlineImagesForIframe(body, mailboxId, emailId, attachments);
 			if (cancelled || !iframeRef.current) return;
 			const cleanBody = DOMPurify.sanitize(rewrittenBody, {
 				USE_PROFILES: { html: true },
