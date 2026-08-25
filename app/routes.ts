@@ -9,6 +9,7 @@ export default [
 	route("login", "routes/auth.tsx"),
 	route("register", "routes/register.tsx"),
 	route("admin", "routes/admin.tsx"),
+	route("branding", "routes/branding.ts"),
 	route("mailbox/:mailboxId", "routes/mailbox.tsx", [
 		index("routes/mailbox-index.tsx"),
 		route("emails/:folder", "routes/email-list.tsx"),
