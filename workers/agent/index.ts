@@ -41,7 +41,7 @@ function createEmailTools(env: Env, mailboxId: string) {
     get_thread: defineTool({ description: "Get all emails in a conversation thread.", parameters: z.object({ threadId: z.string() }), execute: async ({ threadId }) => toolGetThread(env, mailboxId, threadId) }),
     search_emails: defineTool({ description: "Search for emails matching a query.", parameters: z.object({ query: z.string(), folder: z.string().optional() }), execute: async ({ query, folder }) => toolSearchEmails(env, mailboxId, { query, folder }) }),
     draft_email: defineTool({ description: "Draft a new email and save it to Drafts. Does not send.", parameters: z.object({ to: z.string().email(), subject: z.string(), body: z.string() }), execute: async ({ to, subject, body }) => toolDraftEmail(env, mailboxId, { to, subject, body, isPlainText: true }) }),
-    draft_reply: defineTool({ description: "Draft a reply to an existing email and save it to Drafts. Does not send.", parameters: z.object({ originalEmailId: z.string(), to: z.string().email(), subject: z.string(), body: z.string() }), execute: async ({ originalEmailId, to, subject, body }) => toolDraftReply(env, mailboxId, { originalEmailId, to, subject, body, isPlainText: true, runVerifyDraft: true }) }),
+    draft_reply: defineTool({ description: "Draft a reply to an existing email and save it to Drafts. Does not send.", parameters: z.object({ originalEmailId: z.string(), to: z.string().email(), subject: z.string(), body: z.string() }), execute: async ({ originalEmailId, to, subject, body }) => toolDraftReply(env, mailboxId, { originalEmailId, to, subject, body, isPlainText: true, runVerifyDraft: false }) }),
     mark_email_read: defineTool({ description: "Mark an email as read or unread.", parameters: z.object({ emailId: z.string(), read: z.boolean() }), execute: async ({ emailId, read }) => toolMarkEmailRead(env, mailboxId, emailId, read) }),
     move_email: defineTool({ description: "Move an email to a different folder.", parameters: z.object({ emailId: z.string(), folderId: z.string().describe(MOVE_FOLDER_TOOL_DESCRIPTION) }), execute: async ({ emailId, folderId }) => toolMoveEmail(env, mailboxId, emailId, folderId) }),
     discard_draft: defineTool({ description: "Delete a draft email.", parameters: z.object({ draftId: z.string() }), execute: async ({ draftId }) => toolDiscardDraft(env, mailboxId, draftId) }),
@@ -64,7 +64,7 @@ export class EmailAgent extends AIChatAgent<any> {
         system: systemPrompt,
         messages: await convertToModelMessages(this.messages),
         tools,
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(3),
         onFinish,
         onError: ({ error }) => {
           console.error("[AI] STREAM ERROR", {
@@ -128,7 +128,7 @@ export class EmailAgent extends AIChatAgent<any> {
     autoPrompt += `\n\nBased on the email content and thread context above, draft a reply using draft_reply. If you need more context, use get_thread with thread ID "${emailData.threadId}".`;
     const messages = [{ role: "user" as const, content: autoPrompt, parts: [{ type: "text" as const, text: autoPrompt }], createdAt: new Date() }];
     try {
-      const result = await generateText({ model: workersai("@cf/zai-org/glm-4.7-flash"), system: systemPrompt, messages: await convertToModelMessages(messages), tools, stopWhen: stepCountIs(5) });
+      const result = await generateText({ model: workersai("@cf/zai-org/glm-4.7-flash"), system: systemPrompt, messages: await convertToModelMessages(messages), tools, stopWhen: stepCountIs(3) });
       const draftToolCalled = result.steps.some(step => step.toolCalls.some(tc => tc.toolName === "draft_reply" || tc.toolName === "draft_email"));
       if (!draftToolCalled && result.text.trim()) {
         const sanitizedText = await verifyDraft(env.AI, result.text.trim());
