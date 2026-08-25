@@ -163,7 +163,7 @@ app.all("*", (c) => requestHandler(c.req.raw, { cloudflare: { env: c.env, ctx: c
 
 export default {
 	fetch: app.fetch,
-	async email(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
+	async email(event: { raw: ReadableStream; rawSize: number; forward: (target: string) => Promise<void> }, env: Env, ctx: ExecutionContext) {
 		try { await receiveEmailWithNotifications(event, env, ctx); } catch (e) { console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack); throw e; }
 	},
 };
