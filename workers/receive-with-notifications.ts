@@ -49,12 +49,11 @@ function hasForwardingMarker(parsed: any): boolean {
 /**
  * Reads the inbound stream once, feeds the original receiver unchanged, and
  * then runs the optional forwarding/Telegram pipeline after durable storage.
- * This deliberately keeps receiveEmail as the source of truth for mailbox
- * persistence while making both internal and external inbound mail observable
- * to the same post-delivery service.
+ * The original Cloudflare EmailMessage is also supplied so forwarding can
+ * use EmailMessage.forward() and preserve the original RFC message.
  */
 export async function receiveEmailWithNotifications(
-	event: { raw: ReadableStream; rawSize: number },
+	event: { raw: ReadableStream; rawSize: number; forward?: (target: string) => Promise<void> },
 	env: Env,
 	ctx: ExecutionContext,
 ) {
@@ -92,5 +91,5 @@ export async function receiveEmailWithNotifications(
 	};
 
 	const settings = await getPostDeliverySettings(env, mailboxId);
-	runPostDelivery(env, ctx, delivered, settings);
+	runPostDelivery(env, ctx, delivered, settings, event.forward);
 }
