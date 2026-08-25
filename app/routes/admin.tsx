@@ -2,9 +2,7 @@ import { Button, Input } from "@cloudflare/kumo";
 import { useEffect, useRef, useState } from "react";
 import { adminApi, type AdminUser } from "~/services/admin";
 
-export function meta() {
-	return [{ title: "Agentic Inbox — Admin" }];
-}
+export function meta() { return [{ title: "Astra Trade Mail — Admin" }]; }
 
 export default function AdminRoute() {
 	const [users, setUsers] = useState<AdminUser[]>([]);
@@ -12,68 +10,54 @@ export default function AdminRoute() {
 	const [busy, setBusy] = useState<string | null>(null);
 	const [resetEmail, setResetEmail] = useState<string | null>(null);
 	const [newPassword, setNewPassword] = useState("");
+	const [legacyEmail, setLegacyEmail] = useState("");
+	const [legacyName, setLegacyName] = useState("");
+	const [legacyPassword, setLegacyPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const [notice, setNotice] = useState<string | null>(null);
 	const [backgroundBusy, setBackgroundBusy] = useState(false);
 	const fileRef = useRef<HTMLInputElement>(null);
 
 	const load = async () => {
-		try {
-			setUsers((await adminApi.listUsers()).users);
-			setError(null);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unable to load users");
-		} finally { setLoading(false); }
+		try { setUsers((await adminApi.listUsers()).users); setError(null); } catch (err) { setError(err instanceof Error ? err.message : "Unable to load users"); }
+		finally { setLoading(false); }
 	};
 	useEffect(() => { void load(); }, []);
 
-	const approve = async (email: string) => {
-		setBusy(email);
-		try { await adminApi.approve(email); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Approval failed"); } finally { setBusy(null); }
-	};
-
-	const toggle = async (user: AdminUser) => {
-		setBusy(user.email);
-		try { await adminApi.setStatus(user.email, user.status === "disabled" ? "active" : "disabled"); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Status update failed"); } finally { setBusy(null); }
-	};
-
-	const resetPassword = async () => {
-		if (!resetEmail || newPassword.length < 8) return;
-		setBusy(resetEmail);
-		try { await adminApi.resetPassword(resetEmail, newPassword); setResetEmail(null); setNewPassword(""); } catch (err) { setError(err instanceof Error ? err.message : "Password reset failed"); } finally { setBusy(null); }
-	};
-
-	const uploadBackground = async (file: File) => {
-		setBackgroundBusy(true);
-		setError(null);
+	const approve = async (email: string) => { setBusy(email); try { await adminApi.approve(email); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Approval failed"); } finally { setBusy(null); } };
+	const toggle = async (user: AdminUser) => { setBusy(user.email); try { await adminApi.setStatus(user.email, user.status === "disabled" ? "active" : "disabled"); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Status update failed"); } finally { setBusy(null); } };
+	const resetPassword = async () => { if (!resetEmail || newPassword.length < 8) return; setBusy(resetEmail); try { await adminApi.resetPassword(resetEmail, newPassword); setResetEmail(null); setNewPassword(""); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Password reset failed"); } finally { setBusy(null); } };
+	const initializeMailbox = async () => {
+		const email = legacyEmail.trim().toLowerCase();
+		if (!email || legacyPassword.length < 8) return;
+		setBusy("legacy"); setError(null); setNotice(null);
 		try {
-			await adminApi.uploadLoginBackground(file);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unable to upload background");
-		} finally {
-			setBackgroundBusy(false);
-			if (fileRef.current) fileRef.current.value = "";
-		}
+			await adminApi.resetPassword(email, legacyPassword, legacyName.trim() || email.split("@")[0]);
+			setNotice(`${email} can now sign in with the password you just set.`);
+			setLegacyEmail(""); setLegacyName(""); setLegacyPassword(""); await load();
+		} catch (err) { setError(err instanceof Error ? err.message : "Unable to initialize mailbox login"); }
+		finally { setBusy(null); }
 	};
-
-	const removeBackground = async () => {
-		setBackgroundBusy(true);
-		setError(null);
-		try {
-			await adminApi.removeLoginBackground();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unable to remove background");
-		} finally { setBackgroundBusy(false); }
-	};
+	const uploadBackground = async (file: File) => { setBackgroundBusy(true); setError(null); try { await adminApi.uploadLoginBackground(file); setNotice("Login background updated."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to upload background"); } finally { setBackgroundBusy(false); if (fileRef.current) fileRef.current.value = ""; } };
+	const removeBackground = async () => { setBackgroundBusy(true); setError(null); try { await adminApi.removeLoginBackground(); setNotice("Login background removed."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to remove background"); } finally { setBackgroundBusy(false); } };
 
 	return (
 		<div className="min-h-screen bg-kumo-recessed p-6 md:p-10">
 			<div className="mx-auto max-w-5xl space-y-8">
-				<div className="flex items-center justify-between">
-					<div><h1 className="text-2xl font-bold">Employee Management</h1><p className="mt-1 text-sm text-kumo-subtle">Approve accounts and manage mailbox access.</p></div>
-					<Button variant="secondary" onClick={() => void load()}>Refresh</Button>
-				</div>
-
+				<div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Employee Management</h1><p className="mt-1 text-sm text-kumo-subtle">Approve accounts and manage mailbox access.</p></div><Button variant="secondary" onClick={() => void load()}>Refresh</Button></div>
 				{error && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+				{notice && <div className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{notice}</div>}
+
+				<div className="rounded-xl border border-kumo-line bg-kumo-base p-6">
+					<h2 className="text-lg font-semibold">Initialize an existing mailbox</h2>
+					<p className="mt-1 text-sm text-kumo-subtle">For mailboxes that were created before employee login accounts existed. Set a password here; the mailbox itself is not changed.</p>
+					<div className="mt-5 grid gap-4 md:grid-cols-3">
+						<Input label="Mailbox email" type="email" value={legacyEmail} onChange={(e) => setLegacyEmail(e.target.value)} placeholder="gavin@astratradehk.com" />
+						<Input label="Name (optional)" value={legacyName} onChange={(e) => setLegacyName(e.target.value)} placeholder="Gavin" />
+						<Input label="Login password" type="password" minLength={8} value={legacyPassword} onChange={(e) => setLegacyPassword(e.target.value)} placeholder="At least 8 characters" />
+					</div>
+					<div className="mt-4"><Button variant="primary" loading={busy === "legacy"} disabled={!legacyEmail.trim() || legacyPassword.length < 8} onClick={() => void initializeMailbox()}>Set login password</Button></div>
+				</div>
 
 				<div className="overflow-hidden rounded-xl border border-kumo-line bg-kumo-base">
 					{loading ? <div className="p-8 text-center text-sm text-kumo-subtle">Loading…</div> : users.map((user, index) => (
@@ -90,26 +74,12 @@ export default function AdminRoute() {
 				</div>
 
 				<div className="rounded-xl border border-kumo-line bg-kumo-base p-6">
-					<div className="mb-4">
-						<h2 className="text-lg font-semibold">Login background</h2>
-						<p className="mt-1 text-sm text-kumo-subtle">Upload a JPG, PNG, WebP or other image up to 5 MB. It will be shown behind the employee login screen.</p>
-					</div>
-					<div className="flex flex-wrap gap-3">
-						<input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadBackground(file); }} />
-						<Button variant="primary" loading={backgroundBusy} onClick={() => fileRef.current?.click()}>Choose background image</Button>
-						<Button variant="secondary" loading={backgroundBusy} onClick={() => void removeBackground()}>Remove background</Button>
-					</div>
+					<div className="mb-4"><h2 className="text-lg font-semibold">Login background</h2><p className="mt-1 text-sm text-kumo-subtle">Upload a JPG, PNG, WebP or other image up to 5 MB. It will be shown behind the employee login screen.</p></div>
+					<div className="flex flex-wrap gap-3"><input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadBackground(file); }} /><Button variant="primary" loading={backgroundBusy} onClick={() => fileRef.current?.click()}>Choose background image</Button><Button variant="secondary" loading={backgroundBusy} onClick={() => void removeBackground()}>Remove background</Button></div>
 				</div>
 			</div>
 
-			{resetEmail && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
-				<div className="w-full max-w-md rounded-xl bg-kumo-base p-6 shadow-2xl">
-					<h2 className="text-lg font-semibold">Reset password</h2>
-					<p className="mt-1 text-sm text-kumo-subtle">{resetEmail}</p>
-					<div className="mt-5"><Input label="New password" type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></div>
-					<div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setResetEmail(null)}>Cancel</Button><Button variant="primary" loading={busy === resetEmail} disabled={newPassword.length < 8} onClick={() => void resetPassword()}>Save</Button></div>
-				</div>
-			</div>}
+			{resetEmail && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"><div className="w-full max-w-md rounded-xl bg-kumo-base p-6 shadow-2xl"><h2 className="text-lg font-semibold">Reset password</h2><p className="mt-1 text-sm text-kumo-subtle">{resetEmail}</p><div className="mt-5"><Input label="New password" type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></div><div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setResetEmail(null)}>Cancel</Button><Button variant="primary" loading={busy === resetEmail} disabled={newPassword.length < 8} onClick={() => void resetPassword()}>Save</Button></div></div></div>}
 		</div>
 	);
 }
