@@ -78,7 +78,7 @@ function buildForwardBody(
 	const safeSubject = escapeHtml(original.subject);
 	const safeBody = escapeHtml(stripHtml(original.body || "")).replace(/\n/g, "<br>");
 
-	return `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>[...]
+	return `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatComposeDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
 }
 
 function buildReplyAllFields(
@@ -235,7 +235,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const addAttachments = async (files: FileList | null) => {
 		if (!files?.length) return;
 		try {
-			let total = attachments.reduce((sum, a) => a.size, 0);
+			let total = attachments.reduce((sum, a) => sum + a.size, 0);
 			const next: ComposeAttachment[] = [];
 			for (const file of Array.from(files)) {
 				if (file.size > MAX_ATTACHMENT_SIZE) {
