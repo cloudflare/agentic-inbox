@@ -23,20 +23,34 @@ The migration is **resumable**. Each request processes a small batch and uses th
 
 The tool never sends an email.
 
-## Cloudflare resources
+## Important: no company resources are stored in GitHub
 
-Edit `wrangler.jsonc` before deployment:
+`wrangler.jsonc` intentionally contains **no D1 IDs, D1 names, R2 bucket names, or company-specific resource identifiers**.
 
-1. `REPLACE_WITH_OLD_CLOUDMAIL_D1_NAME` — old Cloudmail D1 database name
-2. `REPLACE_WITH_OLD_CLOUDMAIL_D1_ID` — old Cloudmail D1 database ID
-3. `REPLACE_WITH_OLD_CLOUDMAIL_R2_BUCKET` — old Cloudmail R2 bucket name
+When deploying through the Cloudflare dashboard, create the following bindings in the Worker:
 
-The target resources are already configured:
+### D1 binding
 
-- target R2: `agentic-inbox`
-- target Durable Object namespace: `MailboxDO` from Worker `agentic-inbox`
+- Variable name: `SOURCE_DB`
+- Resource: select the old Cloudmail D1 database for the domain you are migrating
 
-The target Durable Object is accessed through Cloudflare's cross-Worker RPC binding, so the migration worker does **not** need to expose an import API in Agentic Inbox.
+### R2 binding — source
+
+- Variable name: `SOURCE_R2`
+- Resource: select the old Cloudmail attachment R2 bucket
+
+### R2 binding — target
+
+- Variable name: `TARGET_R2`
+- Resource: select the Agentic Inbox R2 bucket for the target system
+
+### Durable Object binding — target
+
+- Variable name: `TARGET_MAILBOX`
+- Durable Object class: `MailboxDO`
+- Script/Worker: select the target Agentic Inbox Worker (normally `agentic-inbox`)
+
+This makes the migration tool reusable for different domains and different Cloudmail installations without changing GitHub code.
 
 ## Secret
 
@@ -44,14 +58,14 @@ Create one Worker secret:
 
 - `MIGRATION_TOKEN` — a long random password used by the migration page
 
-Do not put this value into GitHub or `wrangler.jsonc`.
+Do **not** put this value into GitHub or `wrangler.jsonc`.
 
 ## Deploy from this repository
 
 When using Cloudflare Workers Builds / Git integration:
 
 - Repository: `guiming99/agentic-inbox`
-- Branch: `migration/cloudmail-to-agentic`
+- Branch: `main`
 - Root directory: `migration-tool`
 - Build command: `npm install`
 - Deploy command: `npx wrangler deploy`
@@ -69,16 +83,18 @@ After deployment, open the Worker URL shown by Cloudflare. The migration page is
 ## Safe operating order
 
 1. Deploy the migration worker.
-2. Open `/` and enter the `MIGRATION_TOKEN`.
-3. Click **Refresh mailboxes**.
-4. Run **Dry run** first.
-5. Verify the mailbox list and counts/processing behavior.
-6. Run the real migration.
-7. Leave the old Cloudmail system untouched until the migration has been checked in Agentic Inbox.
-8. If necessary, run the migration again; existing deterministic IDs are skipped.
+2. Configure `SOURCE_DB`, `SOURCE_R2`, `TARGET_R2`, and `TARGET_MAILBOX` in Cloudflare.
+3. Set the `MIGRATION_TOKEN` secret.
+4. Open `/` and enter the token.
+5. Click **Refresh mailboxes**.
+6. Run **Dry run** first.
+7. Verify the mailbox list and processing behavior.
+8. Run the real migration.
+9. Leave the old Cloudmail system untouched until the migration has been checked in Agentic Inbox.
+10. If necessary, run the migration again; existing deterministic IDs are skipped.
 
 ## Important
 
 The old Cloudmail R2 attachment keys are different from Agentic Inbox's attachment layout. The tool copies the binary object and writes the new Agentic attachment metadata so the existing Agentic Inbox attachment endpoint can serve the file.
 
-The source and target resources must be in the **same Cloudflare account**, because the target `MailboxDO` binding uses the `script_name: "agentic-inbox"` cross-Worker Durable Object binding.
+The source and target resources must be in the **same Cloudflare account**, because the target `MailboxDO` binding uses a cross-Worker Durable Object binding.
