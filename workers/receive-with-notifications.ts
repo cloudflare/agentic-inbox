@@ -91,5 +91,6 @@ export async function receiveEmailWithNotifications(
 	};
 
 	const settings = await getPostDeliverySettings(env, mailboxId);
-	runPostDelivery(env, ctx, delivered, settings, event.forward);
+	const nativeForward = event.forward ? (target: string) => event.forward!(target) : undefined;
+	runPostDelivery(env, ctx, delivered, settings, nativeForward);
 }
