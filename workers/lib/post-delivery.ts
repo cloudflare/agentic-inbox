@@ -111,12 +111,18 @@ export async function getPostDeliverySettings(env: Env, mailboxId: string): Prom
  * Runs after an email has been durably stored. Notification failures are
  * deliberately isolated from mailbox delivery so a broken Telegram bot or
  * forwarding destination can never make an email disappear.
+ *
+ * For mailbox forwarding we intentionally use Cloudflare's native
+ * EmailMessage.forward() instead of composing a new message through Resend.
+ * This preserves the original RFC message, including the original From,
+ * MIME structure, attachments, inline CID images, and threading headers.
  */
 export async function runPostDelivery(
   env: Env,
   executionCtx: ExecutionContext,
   email: DeliveredEmail,
   settings: NotificationSettings,
+  nativeForward?: (target: string) => Promise<void>,
 ) {
   const internal = isInternal(email, env);
   const forwarding = settings.forwarding;
@@ -136,18 +142,23 @@ export async function runPostDelivery(
       !recipientAddresses.includes(target) &&
       email.alreadyForwarded !== true
     ) {
-      tasks.push(
-        sendEmail(env.EMAIL, {
-          to: target,
-          from: email.mailboxId,
-          subject: `[Forwarded] ${email.subject || "(no subject)"}`,
-          text: renderForwardBody(email),
-          headers: {
-            "X-Agentic-Inbox-Forwarded": "1",
-            ...(email.messageId ? { "X-Agentic-Inbox-Original-Message-Id": email.messageId } : {}),
-          },
-        }),
-      );
+      if (nativeForward) {
+        tasks.push(nativeForward(target));
+      } else {
+        // Keep a safe fallback for non-email callers of this helper.
+        tasks.push(
+          sendEmail(env.EMAIL, {
+            to: target,
+            from: email.mailboxId,
+            subject: `[Forwarded] ${email.subject || "(no subject)"}`,
+            text: renderForwardBody(email),
+            headers: {
+              "X-Agentic-Inbox-Forwarded": "1",
+              ...(email.messageId ? { "X-Agentic-Inbox-Original-Message-Id": email.messageId } : {}),
+            },
+          }),
+        );
+      }
     }
   }
 
