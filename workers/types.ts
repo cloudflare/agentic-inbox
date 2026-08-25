@@ -9,4 +9,6 @@ export interface Env extends Cloudflare.Env {
 	APP_NAME?: string;
 	ADMIN_EMAIL?: string;
 	ADMIN_PASSWORD?: string;
+	/** Dedicated R2 bucket for mailbox signature/logo assets. Bind this in Cloudflare. */
+	SIGNATURE_ASSETS: R2Bucket;
 }
