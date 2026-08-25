@@ -23,10 +23,10 @@ Designed for people coming from **web / Ionic / Capacitor**: SwiftUI views ≈ R
 ## Open in Xcode (Mac required)
 
 1. Install Xcode 15+ (iOS 17 SDK).
-2. Open `AgenticInbox.xcodeproj`.
+2. Open `Inboxies.xcodeproj`.
 3. Set your **Team** under Signing & Capabilities.
-4. Confirm bundle ID `com.cloudflare.AgenticInbox` (or change it — then update Worker secret `APPLE_CLIENT_ID` to match).
-5. Capability **Sign in with Apple** is declared in `AgenticInbox.entitlements`.
+4. Confirm bundle ID `co.inboxies.app` (or change it — then update Worker secret `APPLE_CLIENT_ID` to match).
+5. Capability **Sign in with Apple** is declared in `Inboxies.entitlements`.
 6. On the sign-in screen, set **API base URL** to your Worker (simulator → `http://127.0.0.1:5173` when `pnpm dev` is running on the Mac).
 
 ### Optional: XcodeGen
@@ -37,7 +37,7 @@ If you prefer regenerating the project from `project.yml`:
 brew install xcodegen
 cd ios/AgenticInbox
 xcodegen generate
-open AgenticInbox.xcodeproj
+open Inboxies.xcodeproj
 ```
 
 ## Backend secrets for mobile
@@ -65,8 +65,8 @@ Web continues to use Cloudflare Access (`POLICY_AUD` / `TEAM_DOMAIN`). Productio
 ## Folder map
 
 ```
-AgenticInbox/
-  AgenticInboxApp.swift      # @main
+Inboxies/
+  InboxiesApp.swift          # @main
   Config/AppConfig.swift     # API base URL, bundle ID
   Models/                    # Codable types matching backend JSON
   Services/                  # API, auth, app state, agent WS

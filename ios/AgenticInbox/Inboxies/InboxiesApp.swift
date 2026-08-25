@@ -1,10 +1,10 @@
-// AgenticInbox — native iOS MVP client for the Cloudflare Agentic Inbox backend.
+// Inboxies — native iOS MVP client for the Cloudflare Agentic Inbox backend.
 // Mentally map: SwiftUI View ≈ React component, @Observable ≈ Zustand/context, async/await ≈ fetch.
 
 import SwiftUI
 
 @main
-struct AgenticInboxApp: App {
+struct InboxiesApp: App {
     @State private var authStore = AuthStore()
     @State private var appModel = AppModel()
 
