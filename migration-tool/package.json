@@ -1,0 +1,12 @@
+{
+  "name": "cloudmail-agentic-migrator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "wrangler": "^4.44.0"
+  }
+}
