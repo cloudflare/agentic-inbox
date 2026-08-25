@@ -92,5 +92,8 @@ export async function receiveEmailWithNotifications(
 
 	const settings = await getPostDeliverySettings(env, mailboxId);
 	const nativeForward = event.forward ? (target: string) => event.forward!(target) : undefined;
-	runPostDelivery(env, ctx, delivered, settings, nativeForward);
+	// Await this function: native EmailMessage.forward() must run before the
+	// email event handler finishes. Telegram remains waitUntil()-backed inside
+	// runPostDelivery and is independent of forwarding failures.
+	await runPostDelivery(env, ctx, delivered, settings, nativeForward);
 }
