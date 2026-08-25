@@ -1,15 +1,17 @@
 import { Button, Input } from "@cloudflare/kumo";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink, useLocation } from "react-router";
 import { login, register } from "~/services/auth";
 
 export function meta() {
-	return [{ title: "Astra Trade Mail — Sign in" }];
+	return [{ title: "Sign in" }];
 }
 
 export default function AuthRoute() {
 	const location = useLocation();
 	const isRegister = location.pathname === "/register";
+	const [appName, setAppName] = useState("Agentic Inbox");
+	const [teamDomain, setTeamDomain] = useState("astratradehk.com");
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
@@ -17,6 +19,23 @@ export default function AuthRoute() {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState<string | null>(null);
+
+	useEffect(() => {
+		let cancelled = false;
+		fetch("/api/v1/auth/config")
+			.then((response) => response.ok ? response.json() as Promise<{ appName?: string; teamDomain?: string }> : null)
+			.then((config) => {
+				if (cancelled || !config) return;
+				if (config.appName?.trim()) setAppName(config.appName.trim());
+				if (config.teamDomain?.trim()) setTeamDomain(config.teamDomain.trim().replace(/^@/, ""));
+			})
+			.catch(() => undefined);
+		return () => { cancelled = true; };
+	}, []);
+
+	useEffect(() => {
+		document.title = `${appName} — ${isRegister ? "Register" : "Sign in"}`;
+	}, [appName, isRegister]);
 
 	const submit = async (event: React.FormEvent) => {
 		event.preventDefault();
@@ -54,7 +73,7 @@ export default function AuthRoute() {
 			<div className="relative w-full max-w-md rounded-2xl border border-white/20 bg-white/90 shadow-2xl p-8 backdrop-blur-xl">
 				<div className="text-center mb-8">
 					<div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-black/10 text-xl font-bold">✉</div>
-					<h1 className="text-2xl font-bold text-gray-900">Astra Trade Mail</h1>
+					<h1 className="text-2xl font-bold text-gray-900">{appName}</h1>
 					<p className="mt-1 text-sm text-gray-600">{isRegister ? "Create your company mailbox account" : "Sign in to your company mailbox"}</p>
 				</div>
 
@@ -62,7 +81,7 @@ export default function AuthRoute() {
 					{error && <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 					{message && <div className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">{message}</div>}
 					{isRegister && <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" required />}
-					<Input label="Company email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@astratradehk.com" required />
+					<Input label="Company email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={`name@${teamDomain}`} required />
 					<Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" minLength={8} required />
 					{isRegister && <Input label="Confirm password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />}
 					<Button type="submit" variant="primary" className="w-full" loading={busy}>
