@@ -22,10 +22,9 @@ export const adminApi = {
 	listUsers: () => call<{ users: AdminUser[] }>("/api/v1/admin/users"),
 	approve: (email: string) => call("/api/v1/admin/approve", "POST", { email }),
 	setStatus: (email: string, status: AdminUser["status"]) => call("/api/v1/admin/status", "POST", { email, status }),
-	resetPassword: (email: string, password: string) => call("/api/v1/admin/reset-password", "POST", { email, password }),
+	resetPassword: (email: string, password: string, name?: string) => call("/api/v1/admin/reset-password", "POST", { email, password, name }),
 	uploadLoginBackground: async (file: File) => {
-		const form = new FormData();
-		form.set("file", file);
+		const form = new FormData(); form.set("file", file);
 		const response = await fetch("/api/v1/admin/login-background", { method: "POST", credentials: "same-origin", body: form });
 		const data = await response.json().catch(() => ({})) as { error?: string };
 		if (!response.ok) throw new Error(data.error || `Request failed: ${response.status}`);
