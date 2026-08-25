@@ -31,17 +31,20 @@ async function fetchImageAsDataUrl(url: string): Promise<string | null> {
 	try {
 		const response = await fetch(url, { credentials: "include" });
 		if (!response.ok) return null;
-		return await blobToDataUrl(await response.blob());
+		const blob = await response.blob();
+		if (!blob.type.startsWith("image/")) return null;
+		return await blobToDataUrl(blob);
 	} catch {
 		return null;
 	}
 }
 
 /**
- * The iframe is sandboxed and therefore cannot rely on mailbox session
- * cookies for attachment URLs. Convert both CID references and the API URLs
- * produced by the legacy rewriteInlineImages helper into data URLs while
- * still running the requests in the authenticated parent page.
+ * Email message components currently rewrite CID references before handing
+ * the body to this component. The rewritten URL can be relative OR absolute.
+ * Convert those attachment URLs in the authenticated parent page, then put
+ * the resulting data URL into the sandboxed iframe. This avoids requiring
+ * the sandboxed iframe to carry mailbox authentication cookies.
  */
 async function rewriteInlineImagesForIframe(
 	body: string,
@@ -52,10 +55,12 @@ async function rewriteInlineImagesForIframe(
 	if (!body) return body;
 	let result = body;
 
-	// First handle the API URLs already produced by rewriteInlineImages().
-	// This is important because the message-view components historically pass
-	// a rewritten body to EmailIframe without the mailbox/attachment props.
-	const apiImageRe = /(?:src|background)=["'](\/api\/v1\/mailboxes\/[^"']+\/emails\/[^"']+\/attachments\/[^"']+)["']/gi;
+	// Match both:
+	//   /api/v1/mailboxes/.../attachments/...
+	//   https://mail.example.com/api/v1/mailboxes/.../attachments/...
+	// The previous implementation only matched the first form, while
+	// rewriteInlineImages() normally produces the second form in the browser.
+	const apiImageRe = /(?:src|background)=["']((?:https?:\/\/[^"'\s]+)?\/api\/v1\/mailboxes\/[^"'\s]+\/emails\/[^"'\s]+\/attachments\/[^"'\s]+)["']/gi;
 	const apiUrls = [...result.matchAll(apiImageRe)].map((m) => m[1]);
 	for (const url of [...new Set(apiUrls)]) {
 		const dataUrl = await fetchImageAsDataUrl(url);
