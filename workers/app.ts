@@ -4,7 +4,6 @@
 
 import { routeAgentRequest } from "agents";
 import { Hono } from "hono";
-import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp } from "./index";
 import { receiveEmailWithNotifications } from "./receive-with-notifications";
@@ -27,30 +26,12 @@ declare module "react-router" {
 const requestHandler = createRequestHandler(() => import("virtual:react-router/server-build"), import.meta.env.MODE);
 const LOGIN_BACKGROUND_KEY = "system/login-background";
 
-function getAccessUrls(teamDomain: string) {
-	const certsPath = "/cdn-cgi/access/certs";
-	const teamUrl = new URL(teamDomain);
-	const issuer = teamUrl.origin;
-	const certsUrl = teamUrl.pathname.endsWith(certsPath) ? teamUrl : new URL(certsPath, issuer);
-	return { issuer, certsUrl };
-}
-
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", async (c, next) => {
-	if (import.meta.env.DEV) return next();
-	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
-	if (!POLICY_AUD || !TEAM_DOMAIN) return c.text("Cloudflare Access must be configured in production. Set POLICY_AUD and TEAM_DOMAIN.", 500);
-	const token = c.req.header("cf-access-jwt-assertion");
-	if (!token) return c.text("Missing required CF Access JWT", 403);
-	try {
-		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
-		await jwtVerify(token, createRemoteJWKSet(certsUrl), { issuer, audience: POLICY_AUD });
-	} catch {
-		return c.text("Invalid or expired Access token", 403);
-	}
-	return next();
-});
+// Authentication is handled by the application's own session system below.
+// Do not put Cloudflare Access in front of the hostname: doing so redirects
+// visitors to a *.cloudflareaccess.com login page and prevents the app's
+// public /login and /register routes from ever being reached.
 
 app.use("/api/*", async (c, next) => {
 	if (c.req.path.startsWith("/api/v1/auth/")) return next();
