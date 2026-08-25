@@ -5,6 +5,13 @@ import { getPostDeliverySettings, runPostDelivery, type DeliveredEmail } from ".
 
 const MAX_EMAIL_SIZE = 25 * 1024 * 1024;
 
+type ForwardableEvent = {
+	raw: ReadableStream;
+	rawSize: number;
+	forward?: (target: string) => Promise<void>;
+	canBeForwarded?: boolean;
+};
+
 async function readRaw(stream: ReadableStream, size: number): Promise<Uint8Array> {
 	if (size > MAX_EMAIL_SIZE) throw new Error(`Email too large: ${size} bytes exceeds ${MAX_EMAIL_SIZE} byte limit`);
 	if (size <= 0) throw new Error(`Invalid stream size: ${size}`);
@@ -47,13 +54,13 @@ function hasForwardingMarker(parsed: any): boolean {
 }
 
 /**
- * Reads the inbound stream once, feeds the original receiver unchanged, and
- * then runs the optional forwarding/Telegram pipeline after durable storage.
- * The original Cloudflare EmailMessage is also supplied so forwarding can
- * use EmailMessage.forward() and preserve the original RFC message.
+ * Reads the inbound stream once, feeds the receiver unchanged, and then runs
+ * the optional forwarding/Telegram pipeline. The original Cloudflare
+ * ForwardableEmailMessage.forward() is kept as a bound method so that the
+ * native forwarding call retains its original receiver/context.
  */
 export async function receiveEmailWithNotifications(
-	event: { raw: ReadableStream; rawSize: number; forward?: (target: string) => Promise<void> },
+	event: ForwardableEvent,
 	env: Env,
 	ctx: ExecutionContext,
 ) {
@@ -91,9 +98,18 @@ export async function receiveEmailWithNotifications(
 	};
 
 	const settings = await getPostDeliverySettings(env, mailboxId);
-	const nativeForward = event.forward ? (target: string) => event.forward!(target) : undefined;
-	// Await this function: native EmailMessage.forward() must run before the
-	// email event handler finishes. Telegram remains waitUntil()-backed inside
-	// runPostDelivery and is independent of forwarding failures.
+	// Keep the native Cloudflare EmailMessage.forward() call bound to the
+	// original event object. This is deliberately not put in waitUntil().
+	const nativeForward = typeof event.forward === "function"
+		? event.forward.bind(event)
+		: undefined;
+
+	if (settings.forwarding?.enabled && settings.forwarding.email && !nativeForward) {
+		console.error("Native email forwarding is unavailable for this email event");
+	}
+	if (settings.forwarding?.enabled && settings.forwarding.email && event.canBeForwarded === false) {
+		console.error("Cloudflare reports this email cannot be forwarded natively");
+	}
+
 	await runPostDelivery(env, ctx, delivered, settings, nativeForward);
 }
