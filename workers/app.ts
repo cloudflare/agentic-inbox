@@ -23,6 +23,7 @@ declare module "react-router" {
 
 const requestHandler = createRequestHandler(() => import("virtual:react-router/server-build"), import.meta.env.MODE);
 const LOGIN_BACKGROUND_KEY = "system/login-background";
+const DEFAULT_APP_NAME = "Agentic Inbox";
 const app = new Hono<{ Bindings: Env }>();
 
 app.use("/api/*", async (c, next) => {
@@ -43,6 +44,7 @@ const requireMcpAdmin = async (c: any, next: () => Promise<Response>) => { const
 app.use("/mcp", requireMcpAdmin); app.use("/mcp/*", requireMcpAdmin);
 async function requireAdmin(c: any): Promise<AuthUser | Response> { const user = await getSessionUser(c.env, c.req.raw); if (!user) return c.json({ error: "Authentication required" }, 401); if (user.role !== "admin") return c.json({ error: "Administrator permission required" }, 403); return user; }
 
+app.get("/api/v1/auth/config", (c) => c.json({ appName: (c.env.APP_NAME || DEFAULT_APP_NAME).trim() || DEFAULT_APP_NAME, teamDomain: (c.env.TEAM_DOMAIN || "astratradehk.com").trim().replace(/^@/, "") }));
 app.get("/api/v1/auth/login-background", async (c) => { const object = await c.env.BUCKET.get(LOGIN_BACKGROUND_KEY); if (!object) return c.body(null, 404); const headers = new Headers(); object.writeHttpMetadata(headers); headers.set("Cache-Control", "public, max-age=300"); return new Response(object.body, { headers }); });
 app.post("/api/v1/auth/register", async (c) => {
 	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null; const email = String(body?.email ?? "").trim().toLowerCase(); const name = String(body?.name ?? "").trim(); const password = String(body?.password ?? ""); const companyDomain = (c.env.TEAM_DOMAIN || "astratradehk.com").trim().toLowerCase().replace(/^@/, ""); const domain = email.split("@")[1] || ""; const adminEmail = (c.env.ADMIN_EMAIL || "admin@astratradehk.com").trim().toLowerCase();
