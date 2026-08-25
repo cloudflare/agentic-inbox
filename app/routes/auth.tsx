@@ -1,4 +1,4 @@
-import { Button, Input } from "@cloudflare/kumo";
+import { Button, Input, Select } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
 import { Link as RouterLink, useLocation } from "react-router";
 import { login, register } from "~/services/auth";
@@ -9,9 +9,10 @@ export default function AuthRoute() {
 	const location = useLocation();
 	const isRegister = location.pathname === "/register";
 	const [appName, setAppName] = useState("Agentic Inbox");
-	const [teamDomain, setTeamDomain] = useState("astratradehk.com");
+	const [domains, setDomains] = useState<string[]>(["astratradehk.com"]);
 	const [name, setName] = useState("");
-	const [email, setEmail] = useState("");
+	const [username, setUsername] = useState("");
+	const [selectedDomain, setSelectedDomain] = useState("");
 	const [password, setPassword] = useState("");
 	const [confirm, setConfirm] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -21,12 +22,15 @@ export default function AuthRoute() {
 	useEffect(() => {
 		let cancelled = false;
 		Promise.all([
-			fetch("/branding").then((response) => response.ok ? response.json() as Promise<{ appName?: string }> : null),
-			fetch("/api/v1/auth/config").then((response) => response.ok ? response.json() as Promise<{ teamDomain?: string }> : null),
+			fetch("/branding").then((r) => r.ok ? r.json() as Promise<{ appName?: string }> : null),
+			fetch("/api/v1/auth/config").then((r) => r.ok ? r.json() as Promise<{ domains?: string[]; teamDomain?: string }> : null),
 		]).then(([branding, config]) => {
 			if (cancelled) return;
 			if (branding?.appName?.trim()) setAppName(branding.appName.trim());
-			if (config?.teamDomain?.trim()) setTeamDomain(config.teamDomain.trim().replace(/^@/, ""));
+			const configured = (config?.domains || []).map((d) => d.trim().replace(/^@/, "")).filter(Boolean);
+			const nextDomains = configured.length ? configured : (config?.teamDomain?.trim() ? [config.teamDomain.trim().replace(/^@/, "")] : ["astratradehk.com"]);
+			setDomains(nextDomains);
+			setSelectedDomain((current) => current && nextDomains.includes(current) ? current : nextDomains[0] || "");
 		}).catch(() => undefined);
 		return () => { cancelled = true; };
 	}, []);
@@ -35,12 +39,17 @@ export default function AuthRoute() {
 
 	const submit = async (event: React.FormEvent) => {
 		event.preventDefault(); setError(null); setMessage(null);
+		const local = username.trim();
+		if (!local || !selectedDomain) { setError("Please enter your username and choose a domain"); return; }
+		const email = `${local}@${selectedDomain}`;
 		if (isRegister && password !== confirm) { setError("Passwords do not match"); return; }
 		setBusy(true);
 		try {
 			if (isRegister) {
-				await register(name, email, password); setMessage("Registration submitted. An administrator must approve your account before you can sign in."); setName(""); setEmail(""); setPassword(""); setConfirm("");
-			} else { await login(email, password); window.location.href = "/"; }
+				await register(name, email, password); setMessage("Registration submitted. An administrator must approve your account before you can sign in."); setName(""); setUsername(""); setPassword(""); setConfirm("");
+			} else {
+				const user = await login(email, password); window.location.href = user.role === "admin" ? "/" : `/mailbox/${encodeURIComponent(user.email)}`;
+			}
 		} catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); } finally { setBusy(false); }
 	};
 
@@ -55,7 +64,7 @@ export default function AuthRoute() {
 					{error && <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 					{message && <div className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">{message}</div>}
 					{isRegister && <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" required />}
-					<Input label="Company email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={`name@${teamDomain}`} required />
+					<div><label className="mb-1.5 block text-sm font-medium text-gray-900">Username</label><div className="flex items-center gap-2"><div className="flex-1"><Input aria-label="Username" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} placeholder="gavin" required /></div><span className="text-sm text-gray-500">@</span><div className="flex-1">{domains.length > 1 ? <Select aria-label="Email domain" value={selectedDomain} onValueChange={(value) => value && setSelectedDomain(value)}>{domains.map((d) => <Select.Option key={d} value={d}>{d}</Select.Option>)}</Select> : <div className="h-9 flex items-center text-sm text-gray-600">{selectedDomain}</div>}</div></div></div>
 					<Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" minLength={8} required />
 					{isRegister && <Input label="Confirm password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />}
 					<Button type="submit" variant="primary" className="w-full" loading={busy}>{isRegister ? "Register" : "Sign in"}</Button>
