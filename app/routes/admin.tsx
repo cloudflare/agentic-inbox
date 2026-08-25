@@ -10,6 +10,8 @@ export default function AdminRoute() {
 	const navigate = useNavigate();
 	const [authorized, setAuthorized] = useState<boolean | null>(null);
 	const [users, setUsers] = useState<AdminUser[]>([]);
+	const [domains, setDomains] = useState<string[]>([]);
+	const [newDomain, setNewDomain] = useState("");
 	const [loading, setLoading] = useState(true);
 	const [busy, setBusy] = useState<string | null>(null);
 	const [resetEmail, setResetEmail] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export default function AdminRoute() {
 	useEffect(() => { getCurrentUser().then((user) => { if (user?.role === "admin") setAuthorized(true); else { setAuthorized(false); navigate("/", { replace: true }); } }).catch(() => { setAuthorized(false); navigate("/login", { replace: true }); }); }, [navigate]);
 
 	const load = async () => {
-		try { const [userData, branding] = await Promise.all([adminApi.listUsers(), adminApi.getBranding()]); setUsers(userData.users); setBrandName(branding.appName); setError(null); }
+		try { const [userData, branding, domainData] = await Promise.all([adminApi.listUsers(), adminApi.getBranding(), adminApi.getDomains()]); setUsers(userData.users); setBrandName(branding.appName); setDomains(domainData.domains); setError(null); }
 		catch (err) { setError(err instanceof Error ? err.message : "Unable to load administration data"); }
 		finally { setLoading(false); }
 	};
@@ -37,6 +39,8 @@ export default function AdminRoute() {
 	const resetPassword = async () => { if (!resetEmail || newPassword.length < 8) return; setBusy(resetEmail); try { await adminApi.resetPassword(resetEmail, newPassword); setResetEmail(null); setNewPassword(""); setNotice(`${resetEmail} password updated.`); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Password reset failed"); } finally { setBusy(null); } };
 	const initializeMailbox = async () => { const email = legacyEmail.trim().toLowerCase(); if (!email || legacyPassword.length < 8) return; setBusy("legacy"); setError(null); setNotice(null); try { await adminApi.resetPassword(email, legacyPassword, legacyName.trim() || email.split("@")[0]); setNotice(`${email} can now sign in with the password you just set.`); setLegacyEmail(""); setLegacyName(""); setLegacyPassword(""); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to initialize mailbox login"); } finally { setBusy(null); } };
 	const saveBrand = async () => { const value = brandName.trim(); if (!value) return; setBusy("branding"); setError(null); try { const result = await adminApi.setBranding(value); setBrandName(result.appName); setNotice("Brand name saved. Refresh the login page to see it."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to save brand name"); } finally { setBusy(null); } };
+	const addDomain = async () => { const value = newDomain.trim().replace(/^@/, "").toLowerCase(); if (!value) return; setBusy("domain-add"); setError(null); try { const result = await adminApi.addDomain(value); setDomains(result.domains); setNewDomain(""); setNotice(`${value} added.`); } catch (err) { setError(err instanceof Error ? err.message : "Unable to add domain"); } finally { setBusy(null); } };
+	const removeDomain = async (domain: string) => { setBusy(`domain:${domain}`); setError(null); try { const result = await adminApi.removeDomain(domain); setDomains(result.domains); setNotice(`${domain} removed.`); } catch (err) { setError(err instanceof Error ? err.message : "Unable to remove domain"); } finally { setBusy(null); } };
 	const uploadBackground = async (file: File) => { setBackgroundBusy(true); setError(null); try { await adminApi.uploadLoginBackground(file); setNotice("Login background updated."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to upload background"); } finally { setBackgroundBusy(false); if (fileRef.current) fileRef.current.value = ""; } };
 	const removeBackground = async () => { setBackgroundBusy(true); setError(null); try { await adminApi.removeLoginBackground(); setNotice("Login background removed."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to remove background"); } finally { setBackgroundBusy(false); } };
 
@@ -45,14 +49,13 @@ export default function AdminRoute() {
 	return (
 		<div className="min-h-screen bg-kumo-recessed p-6 md:p-10">
 			<div className="mx-auto max-w-5xl space-y-8">
-				<div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold">Administration</h1><p className="mt-1 text-sm text-kumo-subtle">Manage users, existing mailboxes, branding and the login screen.</p></div><Button variant="secondary" onClick={() => void load()}>Refresh</Button></div>
+				<div className="flex items-center justify-between gap-4"><div><h1 className="text-2xl font-bold">Administration</h1><p className="mt-1 text-sm text-kumo-subtle">Manage users, mailboxes, domains, branding and the login screen.</p></div><div className="flex gap-2"><Button variant="secondary" onClick={() => navigate("/")}>← Back to Mail</Button><Button variant="secondary" onClick={() => void load()}>Refresh</Button></div></div>
 				{error && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 				{notice && <div className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{notice}</div>}
 
-				<div className="rounded-xl border border-kumo-line bg-kumo-base p-6">
-					<h2 className="text-lg font-semibold">Branding</h2><p className="mt-1 text-sm text-kumo-subtle">This overrides the APP_NAME deployment default and is stored in the mailbox system.</p>
-					<div className="mt-4 flex gap-3 items-end"><div className="flex-1"><Input label="Brand name" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="Astra Trade Mail" maxLength={80} /></div><Button variant="primary" loading={busy === "branding"} disabled={!brandName.trim()} onClick={() => void saveBrand()}>Save brand</Button></div>
-				</div>
+				<div className="rounded-xl border border-kumo-line bg-kumo-base p-6"><h2 className="text-lg font-semibold">Branding</h2><p className="mt-1 text-sm text-kumo-subtle">This overrides the APP_NAME deployment default and is stored in the mailbox system.</p><div className="mt-4 flex gap-3 items-end"><div className="flex-1"><Input label="Brand name" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="Astra Trade Mail" maxLength={80} /></div><Button variant="primary" loading={busy === "branding"} disabled={!brandName.trim()} onClick={() => void saveBrand()}>Save brand</Button></div></div>
+
+				<div className="rounded-xl border border-kumo-line bg-kumo-base p-6"><h2 className="text-lg font-semibold">Email Domains</h2><p className="mt-1 text-sm text-kumo-subtle">These domains appear on the login screen and are accepted for employee registration.</p><div className="mt-4 flex flex-wrap gap-2">{domains.map((domain) => <div key={domain} className="flex items-center gap-2 rounded-lg border border-kumo-line px-3 py-2 text-sm"><span>@{domain}</span><button type="button" className="text-kumo-subtle hover:text-red-600" disabled={busy === `domain:${domain}`} onClick={() => void removeDomain(domain)} aria-label={`Remove ${domain}`}>×</button></div>)}</div><div className="mt-4 flex gap-3 items-end"><div className="flex-1 max-w-md"><Input label="Add domain" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} placeholder="astratrade.com" /></div><Button variant="primary" loading={busy === "domain-add"} disabled={!newDomain.trim()} onClick={() => void addDomain()}>Add domain</Button></div></div>
 
 				<div className="rounded-xl border border-kumo-line bg-kumo-base p-6"><h2 className="text-lg font-semibold">Login background</h2><p className="mt-1 text-sm text-kumo-subtle">Upload a JPG, PNG, WebP or other image up to 5 MB. It will be shown behind the login screen.</p><div className="mt-5 flex flex-wrap gap-3"><input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadBackground(file); }} /><Button variant="primary" loading={backgroundBusy} onClick={() => fileRef.current?.click()}>Choose background image</Button><Button variant="secondary" loading={backgroundBusy} onClick={() => void removeBackground()}>Remove background</Button></div></div>
 
