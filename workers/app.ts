@@ -60,7 +60,6 @@ app.use("/api/*", async (c, next) => {
 	}
 	return next();
 });
-app.use("/agents/*", async (c, next) => { const user = await getSessionUser(c.env, c.req.raw); if (!user) return c.json({ error: "Authentication required" }, 401); return next(); });
 const requireMcpAdmin = async (c: any, next: () => Promise<Response>) => { const user = await getSessionUser(c.env, c.req.raw); if (!user) return c.json({ error: "Authentication required" }, 401); if (user.role !== "admin") return c.json({ error: "MCP access is currently restricted to administrators" }, 403); return next(); };
 app.use("/mcp", requireMcpAdmin); app.use("/mcp/*", requireMcpAdmin);
 async function requireAdmin(c: any): Promise<AuthUser | Response> { const user = await getSessionUser(c.env, c.req.raw); if (!user) return c.json({ error: "Authentication required" }, 401); if (user.role !== "admin") return c.json({ error: "Administrator permission required" }, 403); return user; }
@@ -85,6 +84,37 @@ app.post("/api/v1/admin/domains", async (c) => { const admin = await requireAdmi
 app.delete("/api/v1/admin/domains", async (c) => { const admin = await requireAdmin(c); if (admin instanceof Response) return admin; const body = await c.req.json().catch(() => null) as Record<string, unknown> | null; const domain = String(body?.domain ?? "").trim().toLowerCase().replace(/^@/, ""); const domains = await getEmailDomains(c.env); if (domains.length <= 1 && domains.includes(domain)) return c.json({ error: "At least one email domain must remain" }, 400); const next = domains.filter((d) => d !== domain); await saveEmailDomains(c.env, next); return c.json({ domains: next }); });
 app.post("/api/v1/admin/login-background", async (c) => { const admin = await requireAdmin(c); if (admin instanceof Response) return admin; const form = await c.req.raw.formData().catch(() => null); const file = form?.get("file"); if (!(file instanceof File)) return c.json({ error: "Image file is required" }, 400); if (!file.type.startsWith("image/")) return c.json({ error: "Only image files are allowed" }, 400); if (file.size > 5 * 1024 * 1024) return c.json({ error: "Image must be 5 MB or smaller" }, 400); await c.env.BUCKET.put(LOGIN_BACKGROUND_KEY, file.stream(), { httpMetadata: { contentType: file.type } }); return c.json({ ok: true }); });
 app.delete("/api/v1/admin/login-background", async (c) => { const admin = await requireAdmin(c); if (admin instanceof Response) return admin; await c.env.BUCKET.delete(LOGIN_BACKGROUND_KEY); return c.json({ ok: true }); });
-app.get("/api/v1/mailboxes", async (c) => { const user = await getSessionUser(c.env, c.req.raw); if (!user) return c.json({ error: "Authentication required" }, 401); const allMailboxes = await listMailboxes(c.env.BUCKET); const visible = user.role === "admin" ? allMailboxes : allMailboxes.filter((m) => m.id.toLowerCase() === user.email.toLowerCase()); return c.json(visible.map((m) => ({ ...m, name: m.id }))); });
-const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" }); app.all("/mcp", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext)); app.all("/mcp/*", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext)); app.route("/", apiApp); app.all("/agents/*", async (c) => { const response = await routeAgentRequest(c.req.raw, c.env); if (response) return response; return c.text("Agent not found", 404); }); app.all("*", (c) => requestHandler(c.req.raw, { cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext } }));
+app.get("/api/v1/mailboxes", async (c) => { const user = await getSessionUser(c.env, c.req.raw); if (!user) return c.json({ error: "Authentication required" }, 401); const allMailboxes = await listMailboxes(c.env.BUCKET); const visible = user.role === "admin" ? allMailboxes : allMailboxes.filter((m) => m.id.toLowerCase() === user.email.toLowerCase()); return c.json(visible.map((m) => ({ ...m, name: m.id })));
+});
+const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
+app.all("/mcp", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext));
+app.all("/mcp/*", async (c) => mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext));
+app.route("/", apiApp);
+
+// Agent authentication is handled by routeAgentRequest's WebSocket-aware hooks.
+// This is important for same-origin browser WebSockets: the Agent SDK performs
+// the upgrade after these hooks run, while preserving the request/cookie context.
+async function authorizeAgentRequest(request: Request, env: Env): Promise<Response | undefined> {
+	const user = await getSessionUser(env, request);
+	if (!user) return new Response(JSON.stringify({ error: "Authentication required" }), { status: 401, headers: { "Content-Type": "application/json" } });
+
+	// /agents/EmailAgent/:mailboxId/... — keep the same mailbox authorization
+	// rules used by the REST API.
+	const pathname = new URL(request.url).pathname;
+	const parts = pathname.split("/").filter(Boolean);
+	const mailboxId = parts.length >= 3 && parts[0] === "agents" ? decodeURIComponent(parts[2] || "") : "";
+	if (mailboxId && !canAccessMailbox(user, mailboxId)) {
+		return new Response(JSON.stringify({ error: "You do not have permission to access this mailbox" }), { status: 403, headers: { "Content-Type": "application/json" } });
+	}
+}
+
+app.all("/agents/*", async (c) => {
+	const response = await routeAgentRequest(c.req.raw, c.env, {
+		onBeforeConnect: (request) => authorizeAgentRequest(request, c.env),
+		onBeforeRequest: (request) => authorizeAgentRequest(request, c.env),
+	});
+	if (response) return response;
+	return c.text("Agent not found", 404);
+});
+app.all("*", (c) => requestHandler(c.req.raw, { cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext } }));
 export default { fetch: app.fetch, async email(event: { raw: ReadableStream; rawSize: number; forward: (target: string) => Promise<void> }, env: Env, ctx: ExecutionContext) { try { await receiveEmailWithNotifications(event, env, ctx); } catch (e) { console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack); throw e; } } };
