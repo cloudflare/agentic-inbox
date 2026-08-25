@@ -4,7 +4,7 @@ import { Link as RouterLink, useLocation } from "react-router";
 import { login, register } from "~/services/auth";
 
 export function meta() {
-	return [{ title: "Agentic Inbox — Sign in" }];
+	return [{ title: "Astra Trade Mail — Sign in" }];
 }
 
 export default function AuthRoute() {
@@ -54,7 +54,7 @@ export default function AuthRoute() {
 			<div className="relative w-full max-w-md rounded-2xl border border-white/20 bg-white/90 shadow-2xl p-8 backdrop-blur-xl">
 				<div className="text-center mb-8">
 					<div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-black/10 text-xl font-bold">✉</div>
-					<h1 className="text-2xl font-bold text-gray-900">Agentic Inbox</h1>
+					<h1 className="text-2xl font-bold text-gray-900">Astra Trade Mail</h1>
 					<p className="mt-1 text-sm text-gray-600">{isRegister ? "Create your company mailbox account" : "Sign in to your company mailbox"}</p>
 				</div>
 
