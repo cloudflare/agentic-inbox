@@ -1,0 +1,46 @@
+name: AI model hotfix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-ai-model:
+    if: ${{ !contains(github.event.head_commit.message, '[ai-model-hotfix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Switch Agentic Inbox chat model to Cloudflare Free-compatible model
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('workers/agent/index.ts')
+          s = p.read_text()
+          old = '@cf/moonshotai/kimi-k2.5'
+          new = '@cf/zai-org/glm-4.7-flash'
+          count = s.count(old)
+          if count < 2:
+              raise SystemExit(f'Expected at least 2 Kimi K2.5 references, found {count}')
+          p.write_text(s.replace(old, new))
+          print(f'Replaced {count} model references')
+          PY
+
+      - name: Commit model change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add workers/agent/index.ts
+          git commit -m '[ai-model-hotfix] Use GLM-4.7-Flash for Agent chat'
+          git push
+
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/ai-model-hotfix.yml
+          git commit -m '[ai-model-hotfix] Remove temporary workflow'
+          git push
