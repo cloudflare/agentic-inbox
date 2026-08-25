@@ -82,11 +82,11 @@ app.post("/api/v1/auth/register", async (c) => {
 	const email = String(body?.email ?? "").trim().toLowerCase();
 	const name = String(body?.name ?? "").trim();
 	const password = String(body?.password ?? "");
-	const domains = (c.env.DOMAINS || "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+	const companyDomain = (c.env.TEAM_DOMAIN || "astratradehk.com").trim().toLowerCase().replace(/^@/, "");
 	const domain = email.split("@")[1] || "";
 	const adminEmail = (c.env.ADMIN_EMAIL || "admin@astratradehk.com").trim().toLowerCase();
 	if (!email || !name || password.length < 8) return c.json({ error: "Name, company email and an 8+ character password are required" }, 400);
-	if (!domains.some((d) => domain === d)) return c.json({ error: "Registration is restricted to the company email domain" }, 403);
+	if (!companyDomain || domain !== companyDomain) return c.json({ error: "Registration is restricted to the company email domain" }, 403);
 	if (email === adminEmail) return c.json({ error: "This address is reserved for the administrator" }, 403);
 	try { await seedAdmin(c.env); } catch (error) { console.error("Admin bootstrap failed during registration", error); return c.json({ error: error instanceof Error ? error.message : "Admin initialization failed" }, 500); }
 	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global"));
