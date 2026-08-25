@@ -2,8 +2,6 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./types";
 import { sendEmail } from "./email-sender";
 
-// Cloudflare Workers Web Crypto rejects PBKDF2 iteration counts above 100,000.
-// Keep this at the supported ceiling so password hashing works in production.
 const PBKDF2_ITERATIONS = 100_000;
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 interface UserRecord { email: string; name: string; role: "admin" | "employee"; status: "pending" | "active" | "disabled"; password_hash: string; created_at: string; }
@@ -33,14 +31,7 @@ export class UserAuthDO extends DurableObject<Env> {
   if (url.pathname === "/register" && request.method === "POST") {
    const email = normalizeEmail(String(body.email ?? "")); const name = String(body.name ?? "").trim(); const password = String(body.password ?? ""); if (!email || !name || password.length < 8) return Response.json({ error: "Name, email and an 8+ character password are required" }, { status: 400 }); if (!email.includes("@")) return Response.json({ error: "Invalid email address" }, { status: 400 }); if (this.ctx.storage.sql.exec("SELECT email FROM users WHERE email = ?", email).toArray().length > 0) return Response.json({ error: "An account with this email already exists" }, { status: 409 }); const passwordHash = await hashPassword(password); this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, name, "employee", "pending", passwordHash, new Date().toISOString());
    const adminEmail = normalizeEmail(String(this.env.ADMIN_EMAIL || "admin@astratradehk.com"));
-   this.ctx.waitUntil(sendEmail(this.env.EMAIL, {
-    to: adminEmail,
-    from: "admin@astratradehk.com",
-    subject: "New mailbox registration pending approval",
-    text: `A new mailbox registration is waiting for your approval.\n\nName: ${name}\nEmail: ${email}\nStatus: pending\n\nPlease sign in to Agentic Inbox and approve this account from the administrator page.`,
-   }).catch((error) => {
-    console.error("Failed to send new-registration notification:", error instanceof Error ? error.message : error);
-   }));
+   this.ctx.waitUntil(sendEmail(this.env.EMAIL, { to: adminEmail, from: "admin@astratradehk.com", subject: "New mailbox registration pending approval", text: `A new mailbox registration is waiting for your approval.\n\nName: ${name}\nEmail: ${email}\nStatus: pending\n\nPlease sign in to Astra Trade Mail and approve this account from the administrator page.` }).catch((error) => { console.error("Failed to send new-registration notification:", error instanceof Error ? error.message : error); }));
    return Response.json({ status: "pending" }, { status: 201 });
   }
   if (url.pathname === "/login" && request.method === "POST") {
@@ -51,7 +42,17 @@ export class UserAuthDO extends DurableObject<Env> {
   if (url.pathname === "/admin/users" && request.method === "GET") { const users = this.ctx.storage.sql.exec("SELECT email,name,role,status,created_at FROM users ORDER BY created_at ASC").toArray(); return Response.json({ users: users.map(publicUser) }); }
   if (url.pathname === "/admin/approve" && request.method === "POST") { const email = normalizeEmail(String(body.email ?? "")); this.ctx.storage.sql.exec("UPDATE users SET status='active' WHERE email=? AND role='employee'", email); const row = this.ctx.storage.sql.exec("SELECT email,name,role,status,created_at FROM users WHERE email=?", email).toArray()[0]; return row ? Response.json({ user: publicUser(row) }) : Response.json({ error: "User not found" }, { status: 404 }); }
   if (url.pathname === "/admin/status" && request.method === "POST") { const email = normalizeEmail(String(body.email ?? "")); const status = String(body.status ?? ""); if (!["active", "disabled", "pending"].includes(status)) return Response.json({ error: "Invalid status" }, { status: 400 }); this.ctx.storage.sql.exec("UPDATE users SET status=? WHERE email=? AND role='employee'", status, email); return Response.json({ ok: true }); }
-  if (url.pathname === "/admin/reset-password" && request.method === "POST") { const email = normalizeEmail(String(body.email ?? "")); const password = String(body.password ?? ""); if (password.length < 8) return Response.json({ error: "Password must be at least 8 characters" }, { status: 400 }); const passwordHash = await hashPassword(password); this.ctx.storage.sql.exec("UPDATE users SET password_hash=? WHERE email=?", passwordHash, email); this.ctx.storage.sql.exec("DELETE FROM sessions WHERE email=?", email); return Response.json({ ok: true }); }
+  if (url.pathname === "/admin/reset-password" && request.method === "POST") {
+   const email = normalizeEmail(String(body.email ?? "")); const password = String(body.password ?? ""); const name = String(body.name ?? "").trim() || email.split("@")[0];
+   if (!email.includes("@")) return Response.json({ error: "Invalid email address" }, { status: 400 });
+   if (password.length < 8) return Response.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+   const passwordHash = await hashPassword(password);
+   const existing = this.ctx.storage.sql.exec("SELECT email FROM users WHERE email=?", email).toArray()[0];
+   if (existing) this.ctx.storage.sql.exec("UPDATE users SET password_hash=?, status='active', role='employee' WHERE email=?", passwordHash, email);
+   else this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, name, "employee", "active", passwordHash, new Date().toISOString());
+   this.ctx.storage.sql.exec("DELETE FROM sessions WHERE email=?", email);
+   return Response.json({ ok: true });
+  }
   return Response.json({ error: "Not found" }, { status: 404 });
  }
 }
