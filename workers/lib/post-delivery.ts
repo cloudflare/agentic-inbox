@@ -108,14 +108,13 @@ export async function getPostDeliverySettings(env: Env, mailboxId: string): Prom
 }
 
 /**
- * Runs after an email has been durably stored. Notification failures are
- * deliberately isolated from mailbox delivery so a broken Telegram bot or
- * forwarding destination can never make an email disappear.
+ * Runs after an email has been durably stored.
  *
- * For mailbox forwarding we intentionally use Cloudflare's native
- * EmailMessage.forward() instead of composing a new message through Resend.
- * This preserves the original RFC message, including the original From,
- * MIME structure, attachments, inline CID images, and threading headers.
+ * Native Cloudflare EmailMessage.forward() is intentionally awaited while the
+ * email event is still active. Cloudflare's native forward is tied to the
+ * original EmailMessage event and must not be deferred into waitUntil().
+ * Telegram notification is independent and is scheduled separately, so a
+ * forwarding failure can never suppress Telegram notification.
  */
 export async function runPostDelivery(
   env: Env,
@@ -129,10 +128,6 @@ export async function runPostDelivery(
   const telegram = settings.telegram;
   const tasks: Promise<unknown>[] = [];
 
-  // External mail is the supported production path for forwarding/Telegram.
-  // Internal delivery is deliberately skipped for now: internal mail has a
-  // different Durable Object delivery path and must not be changed merely to
-  // add notifications.
   if (!internal && forwarding?.enabled && forwarding.email) {
     const target = forwarding.email.trim().toLowerCase();
     const recipientAddresses = extractAddresses(email.recipient);
@@ -143,9 +138,17 @@ export async function runPostDelivery(
       email.alreadyForwarded !== true
     ) {
       if (nativeForward) {
-        tasks.push(nativeForward(target));
+        // IMPORTANT: do not defer EmailMessage.forward() to waitUntil().
+        // It must execute while the Cloudflare email event is alive.
+        try {
+          await nativeForward(target);
+        } catch (error) {
+          console.error(
+            `Native forwarding to ${target} failed:`,
+            error instanceof Error ? error.message : error,
+          );
+        }
       } else {
-        // Keep a safe fallback for non-email callers of this helper.
         tasks.push(
           sendEmail(env.EMAIL, {
             to: target,
