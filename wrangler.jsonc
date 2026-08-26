@@ -7,8 +7,7 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
 		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": [],
-		"ADMIN_EMAIL": "admin@astratradehk.com"
+		"EMAIL_ADDRESSES": []
 	},
 	"send_email": [{ "name": "EMAIL", "remote": true }],
 	"r2_buckets": [{

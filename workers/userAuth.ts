@@ -30,8 +30,9 @@ export class UserAuthDO extends DurableObject<Env> {
   }
   if (url.pathname === "/register" && request.method === "POST") {
    const email = normalizeEmail(String(body.email ?? "")); const name = String(body.name ?? "").trim(); const password = String(body.password ?? ""); if (!email || !name || password.length < 8) return Response.json({ error: "Name, email and an 8+ character password are required" }, { status: 400 }); if (!email.includes("@")) return Response.json({ error: "Invalid email address" }, { status: 400 }); if (this.ctx.storage.sql.exec("SELECT email FROM users WHERE email = ?", email).toArray().length > 0) return Response.json({ error: "An account with this email already exists" }, { status: 409 }); const passwordHash = await hashPassword(password); this.ctx.storage.sql.exec("INSERT INTO users (email,name,role,status,password_hash,created_at) VALUES (?,?,?,?,?,?)", email, name, "employee", "pending", passwordHash, new Date().toISOString());
-   const adminEmail = normalizeEmail(String(this.env.ADMIN_EMAIL || "admin@astratradehk.com"));
-   this.ctx.waitUntil(sendEmail(this.env.EMAIL, { to: adminEmail, from: "admin@astratradehk.com", subject: "New mailbox registration pending approval", text: `A new mailbox registration is waiting for your approval.\n\nName: ${name}\nEmail: ${email}\nStatus: pending\n\nPlease sign in to Astra Trade Mail and approve this account from the administrator page.` }).catch((error) => { console.error("Failed to send new-registration notification:", error instanceof Error ? error.message : error); }));
+   const adminEmail = normalizeEmail(String(this.env.ADMIN_EMAIL || ""));
+   if (!adminEmail) return Response.json({ error: "ADMIN_EMAIL is not configured" }, { status: 500 });
+   this.ctx.waitUntil(sendEmail(this.env.EMAIL, { to: adminEmail, from: adminEmail, subject: "New mailbox registration pending approval", text: `A new mailbox registration is waiting for your approval.\n\nName: ${name}\nEmail: ${email}\nStatus: pending\n\nPlease sign in to the mailbox administration page and approve this account.` }).catch((error) => { console.error("Failed to send new-registration notification:", error instanceof Error ? error.message : error); }));
    return Response.json({ status: "pending" }, { status: 201 });
   }
   if (url.pathname === "/login" && request.method === "POST") {

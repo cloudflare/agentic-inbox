@@ -25,7 +25,6 @@ const requestHandler = createRequestHandler(() => import("virtual:react-router/s
 const LOGIN_BACKGROUND_KEY = "system/login-background";
 const DOMAINS_KEY = "system/email-domains.json";
 const DEFAULT_APP_NAME = "Agentic Inbox";
-const DEFAULT_DOMAIN = "astratradehk.com";
 const app = new Hono<{ Bindings: Env }>();
 
 async function getEmailDomains(env: Env): Promise<string[]> {
@@ -39,7 +38,7 @@ async function getEmailDomains(env: Env): Promise<string[]> {
 			}
 		}
 	} catch (error) { console.error("Unable to load stored email domains", error); }
-	const raw = env.TEAM_DOMAINS || env.TEAM_DOMAIN || DEFAULT_DOMAIN;
+	const raw = env.TEAM_DOMAINS || env.TEAM_DOMAIN || "";
 	return [...new Set(raw.split(",").map((d) => d.trim().toLowerCase().replace(/^@/, "")).filter(Boolean))];
 }
 
@@ -64,11 +63,11 @@ const requireMcpAdmin = async (c: any, next: () => Promise<Response>) => { const
 app.use("/mcp", requireMcpAdmin); app.use("/mcp/*", requireMcpAdmin);
 async function requireAdmin(c: any): Promise<AuthUser | Response> { const user = await getSessionUser(c.env, c.req.raw); if (!user) return c.json({ error: "Authentication required" }, 401); if (user.role !== "admin") return c.json({ error: "Administrator permission required" }, 403); return user; }
 
-app.get("/api/v1/auth/config", async (c) => { const domains = await getEmailDomains(c.env); return c.json({ appName: (c.env.APP_NAME || DEFAULT_APP_NAME).trim() || DEFAULT_APP_NAME, teamDomain: domains[0] || DEFAULT_DOMAIN, domains }); });
+app.get("/api/v1/auth/config", async (c) => { const domains = await getEmailDomains(c.env); return c.json({ appName: (c.env.APP_NAME || DEFAULT_APP_NAME).trim() || DEFAULT_APP_NAME, teamDomain: domains[0] || "", domains }); });
 app.get("/api/v1/auth/login-background", async (c) => { const object = await c.env.BUCKET.get(LOGIN_BACKGROUND_KEY); if (!object) return c.body(null, 404); const headers = new Headers(); object.writeHttpMetadata(headers); headers.set("Cache-Control", "public, max-age=300"); return new Response(object.body, { headers }); });
 app.post("/api/v1/auth/register", async (c) => {
-	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null; const email = String(body?.email ?? "").trim().toLowerCase(); const name = String(body?.name ?? "").trim(); const password = String(body?.password ?? ""); const domains = await getEmailDomains(c.env); const domain = email.split("@")[1] || ""; const adminEmail = (c.env.ADMIN_EMAIL || "admin@astratradehk.com").trim().toLowerCase();
-	if (!email || !name || password.length < 8) return c.json({ error: "Name, company email and an 8+ character password are required" }, 400); if (!domains.includes(domain)) return c.json({ error: "Registration is restricted to the company email domain" }, 403); if (email === adminEmail) return c.json({ error: "This address is reserved for the administrator" }, 403);
+	const body = await c.req.json().catch(() => null) as Record<string, unknown> | null; const email = String(body?.email ?? "").trim().toLowerCase(); const name = String(body?.name ?? "").trim(); const password = String(body?.password ?? ""); const domains = await getEmailDomains(c.env); const domain = email.split("@")[1] || ""; const adminEmail = (c.env.ADMIN_EMAIL || "").trim().toLowerCase();
+	if (!email || !name || password.length < 8) return c.json({ error: "Name, company email and an 8+ character password are required" }, 400); if (!domains.includes(domain)) return c.json({ error: "Registration is restricted to the company email domain" }, 403); if (adminEmail && email === adminEmail) return c.json({ error: "This address is reserved for the administrator" }, 403);
 	try { await seedAdmin(c.env); } catch (error) { console.error("Admin bootstrap failed during registration", error); return c.json({ error: error instanceof Error ? error.message : "Admin initialization failed" }, 500); }
 	const stub = c.env.USER_AUTH.get(c.env.USER_AUTH.idFromName("global")); const response = await stub.fetch("https://user-auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, name, password }) }); return new Response(response.body, response);
 });

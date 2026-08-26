@@ -11,9 +11,6 @@ export function getSessionToken(request: Request): string | null {
 	return null;
 }
 
-// The server-side session remains valid for 7 days, but the browser cookie is
-// now a session cookie. Closing the browser removes the cookie, so the next
-// browser session requires a fresh login. The user can also explicitly sign out.
 export function sessionCookie(token: string): string { return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax`; }
 export function expiredSessionCookie(): string { return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`; }
 
@@ -29,7 +26,8 @@ export function isAdmin(user: AuthUser): boolean { return user.role === "admin";
 
 export async function seedAdmin(env: Env): Promise<void> {
 	if (!env.ADMIN_PASSWORD) throw new Error("ADMIN_PASSWORD is not configured");
-	const email = (env.ADMIN_EMAIL || "admin@astratradehk.com").trim().toLowerCase();
+	const email = (env.ADMIN_EMAIL || "").trim().toLowerCase();
+	if (!email) throw new Error("ADMIN_EMAIL is not configured");
 	const stub = env.USER_AUTH.get(env.USER_AUTH.idFromName("global"));
 	const response = await stub.fetch("https://user-auth/seed-admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password: env.ADMIN_PASSWORD }) });
 	if (!response.ok) { const detail = await response.text().catch(() => ""); throw new Error(`Admin initialization failed (${response.status})${detail ? `: ${detail}` : ""}`); }

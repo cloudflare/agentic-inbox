@@ -9,7 +9,7 @@ export default function AuthRoute() {
 	const location = useLocation();
 	const isRegister = location.pathname === "/register";
 	const [appName, setAppName] = useState("Agentic Inbox");
-	const [domains, setDomains] = useState<string[]>(["astratradehk.com"]);
+	const [domains, setDomains] = useState<string[]>([]);
 	const [name, setName] = useState("");
 	const [username, setUsername] = useState("");
 	const [selectedDomain, setSelectedDomain] = useState("");
@@ -28,7 +28,7 @@ export default function AuthRoute() {
 			if (cancelled) return;
 			if (branding?.appName?.trim()) setAppName(branding.appName.trim());
 			const configured = (config?.domains || []).map((d) => d.trim().replace(/^@/, "")).filter(Boolean);
-			const nextDomains = configured.length ? configured : (config?.teamDomain?.trim() ? [config.teamDomain.trim().replace(/^@/, "")] : ["astratradehk.com"]);
+			const nextDomains = configured.length ? configured : (config?.teamDomain?.trim() ? [config.teamDomain.trim().replace(/^@/, "")] : []);
 			setDomains(nextDomains);
 			setSelectedDomain((current) => current && nextDomains.includes(current) ? current : nextDomains[0] || "");
 		}).catch(() => undefined);
