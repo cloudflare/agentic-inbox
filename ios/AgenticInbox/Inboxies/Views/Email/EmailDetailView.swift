@@ -12,13 +12,15 @@ struct EmailDetailView: View {
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(AppTheme.ink)
 
+                    actionBar
+
                     ForEach(app.threadEmails) { message in
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text(message.displaySender)
                                     .font(.system(size: 15, weight: .semibold))
                                 Spacer()
-                                Text(message.date.prefix(10))
+                                Text(message.date.prefix(16))
                                     .font(.system(size: 13))
                                     .foregroundStyle(AppTheme.muted)
                             }
@@ -26,12 +28,17 @@ struct EmailDetailView: View {
                                 .font(.system(size: 13))
                                 .foregroundStyle(AppTheme.muted)
 
-                            Divider()
+                            if let cc = message.cc, !cc.isEmpty {
+                                Text("Cc: \(cc)")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(AppTheme.muted)
+                            }
 
-                            Text(stripHTML(message.body ?? message.snippet ?? ""))
-                                .font(.system(size: 16))
-                                .foregroundStyle(AppTheme.ink)
-                                .textSelection(.enabled)
+                            Divider().overlay(AppTheme.line)
+
+                            EmailBodyView(htmlOrText: message.body ?? message.snippet ?? "")
+
+                            AttachmentListView(email: message)
                         }
                         .padding(16)
                         .background(AppTheme.surface)
@@ -50,16 +57,40 @@ struct EmailDetailView: View {
         }
     }
 
-    private func stripHTML(_ html: String) -> String {
-        html
-            .replacingOccurrences(of: "<br>", with: "\n", options: .caseInsensitive)
-            .replacingOccurrences(of: "<br/>", with: "\n", options: .caseInsensitive)
-            .replacingOccurrences(of: "<br />", with: "\n", options: .caseInsensitive)
-            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+    private var actionBar: some View {
+        HStack(spacing: 10) {
+            actionButton("Reply", systemImage: "arrowshape.turn.up.left") {
+                Task {
+                    let source = app.threadEmails.last ?? email
+                    await app.startCompose(mode: .reply, original: source)
+                }
+            }
+            actionButton("Reply All", systemImage: "arrowshape.turn.up.left.2") {
+                Task {
+                    let source = app.threadEmails.last ?? email
+                    await app.startCompose(mode: .replyAll, original: source)
+                }
+            }
+            actionButton("Forward", systemImage: "arrowshape.turn.up.right") {
+                Task {
+                    let source = app.threadEmails.last ?? email
+                    await app.startCompose(mode: .forward, original: source)
+                }
+            }
+            Spacer()
+        }
+    }
+
+    private func actionButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 13, weight: .medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(AppTheme.pillFill)
+                .foregroundStyle(AppTheme.ink)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }

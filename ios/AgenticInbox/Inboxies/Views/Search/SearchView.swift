@@ -9,32 +9,28 @@ struct SearchView: View {
     @State private var results: [Email] = []
     @State private var isSearching = false
     @State private var errorMessage: String?
+    @State private var showChat = false
     @FocusState private var focused: Bool
+
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var hasResults: Bool {
+        !results.isEmpty
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             AppTheme.background.ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {
-                if !query.isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(AppTheme.muted)
-                        Text("Ask AI “\(query)”")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(AppTheme.ink)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
+                if !trimmedQuery.isEmpty {
+                    askAIButton
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 20)
                 }
-
-                Text("Results")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(AppTheme.muted)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
 
                 if isSearching {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -43,15 +39,31 @@ struct SearchView: View {
                         .foregroundStyle(.red)
                         .padding()
                     Spacer()
-                } else {
+                } else if hasResults {
+                    Text("Results")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AppTheme.muted)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+
                     EmailListView(emails: results, highlightQuery: query) { email in
                         Task {
                             await app.openEmail(email)
                             dismiss()
                         }
                     }
+                } else if trimmedQuery.count >= 2 {
+                    Text("No matching emails")
+                        .font(.system(size: 15))
+                        .foregroundStyle(AppTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 24)
+                    Spacer()
+                } else {
+                    Spacer()
                 }
             }
+            .padding(.top, 28)
             .safeAreaInset(edge: .bottom) {
                 Color.clear.frame(height: 70)
             }
@@ -64,9 +76,45 @@ struct SearchView: View {
         .task(id: query) {
             await runSearch()
         }
+        .sheet(isPresented: $showChat) {
+            ChatSheetView(seedPrompt: trimmedQuery)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var askAIButton: some View {
+        Button {
+            showChat = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .medium))
+                Text("Ask AI “\(trimmedQuery)”")
+                    .font(.system(size: 16, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 52)
+            .background(AppTheme.surface)
+            .foregroundStyle(AppTheme.ink)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
     }
 
     private var searchBar: some View {
+        HStack(spacing: 10) {
+            searchField
+            cancelButton
+        }
+        .searchGlassContainer(spacing: 10)
+    }
+
+    private var searchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(AppTheme.muted)
@@ -82,28 +130,37 @@ struct SearchView: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(AppTheme.muted)
                 }
-            }
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .background(AppTheme.pillFill)
-                    .clipShape(Circle())
-                    .foregroundStyle(AppTheme.ink)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear")
             }
         }
         .padding(.horizontal, 14)
         .frame(height: 52)
-        .background(AppTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+        .searchGlass(in: RoundedRectangle(cornerRadius: 50, style: .continuous))
+    }
+
+    private var cancelButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(AppTheme.ink)
+                .frame(height: 52)
+                .frame(width: 52)
+                .frame(alignment: .center)
+        }
+        .buttonStyle(.plain)
+        .searchGlass(in: Capsule())
+        .accessibilityLabel("Cancel")
     }
 
     private func runSearch() async {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = trimmedQuery
         guard let mailboxId = app.selectedMailboxId else { return }
         guard q.count >= 2 else {
             results = []
+            errorMessage = nil
             return
         }
         isSearching = true
@@ -118,6 +175,31 @@ struct SearchView: View {
             // ignore
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func searchGlass<S: Shape>(in shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay {
+                    shape.stroke(Color.white.opacity(0.45), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        }
+    }
+
+    @ViewBuilder
+    func searchGlassContainer(spacing: CGFloat) -> some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) { self }
+        } else {
+            self
         }
     }
 }

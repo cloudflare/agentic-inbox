@@ -57,9 +57,9 @@ pnpm install
 pnpm run dev
 ```
 
-### Native iOS client (MVP)
+### Native iOS client
 
-A SwiftUI app lives in [`ios/`](./ios/README.md). It reuses this Worker API, adds Sign in with Apple (mobile JWT), multi-conversation agent chat, and a Notion-inspired mobile shell. Open `ios/AgenticInbox/Inboxies.xcodeproj` on a Mac.
+A SwiftUI app lives in [`ios/`](./ios/README.md) (open `ios/AgenticInbox/Inboxies.xcodeproj`). It reuses this Worker API with Sign in with Apple (mobile JWT), Notion-inspired shell, multi-conversation AI chat, and Phase 2 Mail-like minimizable compose (send/reply/forward/drafts, HTML bodies, attachments).
 
 ### Configuration
 

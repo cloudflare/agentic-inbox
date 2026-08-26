@@ -22,6 +22,11 @@
 		657FD1C8E2A34619AC81A913 /* Models/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81A66857B664AEE886504D3 /* Models/Models.swift */; };
 		83101517849E451C9A64357A /* Views/Auth/SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7BDA4C7494146D8B2557D10 /* Views/Auth/SignInView.swift */; };
 		C543C24F6A504509B345B919 /* Views/Email/EmailListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA619084E624222B919A7C4 /* Views/Email/EmailListView.swift */; };
+		7E8CC069F60B4F6283899600 /* Services/ComposeFormModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */; };
+		08C8AEBB61714B47A9B57E95 /* Views/Compose/ComposeDockBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276C8945F603459A8A0C1FBE /* Views/Compose/ComposeDockBar.swift */; };
+		B79E45379B0F49C6AB6CD957 /* Views/Compose/ComposeSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898D73DC019C4035B7FA5403 /* Views/Compose/ComposeSheetView.swift */; };
+		0A8E360836CB41A7892396E2 /* Views/Email/AttachmentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF772F64F27842E2A7E84279 /* Views/Email/AttachmentListView.swift */; };
+		5C6166AA480E4D3C8C0FE11B /* Views/Email/EmailBodyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B572B6236F2243868CCEFD07 /* Views/Email/EmailBodyView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +48,11 @@
 		D81A66857B664AEE886504D3 /* Models/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Models.swift; sourceTree = "<group>"; };
 		F444315A11E44D83826E7D65 /* Inboxies.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Inboxies.entitlements; sourceTree = "<group>"; };
 		FAA619084E624222B919A7C4 /* Views/Email/EmailListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailListView.swift; sourceTree = "<group>"; };
+		09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ComposeFormModel.swift; sourceTree = "<group>"; };
+		276C8945F603459A8A0C1FBE /* Views/Compose/ComposeDockBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Compose/ComposeDockBar.swift; sourceTree = "<group>"; };
+		898D73DC019C4035B7FA5403 /* Views/Compose/ComposeSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Compose/ComposeSheetView.swift; sourceTree = "<group>"; };
+		EF772F64F27842E2A7E84279 /* Views/Email/AttachmentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/AttachmentListView.swift; sourceTree = "<group>"; };
+		B572B6236F2243868CCEFD07 /* Views/Email/EmailBodyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailBodyView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,9 +92,14 @@
 				2153D18D975F436E94786CB2 /* Services/AgentChatClient.swift */,
 				010262344D5842BD893A671C /* Services/AppModel.swift */,
 				43432D294A6A4E8886288B5C /* Services/AuthStore.swift */,
+				09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */,
 				28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */,
 				B7BDA4C7494146D8B2557D10 /* Views/Auth/SignInView.swift */,
 				D339D5F9D3E646D58813D854 /* Views/Chat/ChatSheetView.swift */,
+				276C8945F603459A8A0C1FBE /* Views/Compose/ComposeDockBar.swift */,
+				898D73DC019C4035B7FA5403 /* Views/Compose/ComposeSheetView.swift */,
+				EF772F64F27842E2A7E84279 /* Views/Email/AttachmentListView.swift */,
+				B572B6236F2243868CCEFD07 /* Views/Email/EmailBodyView.swift */,
 				68CBCACD0F1941F796F4F461 /* Views/Email/EmailDetailView.swift */,
 				FAA619084E624222B919A7C4 /* Views/Email/EmailListView.swift */,
 				74318D3C6D954DCA9AE3A5EF /* Views/Home/HomeShellView.swift */,
@@ -166,9 +181,14 @@
 				12FD0B712C114D8F82E0825F /* Services/AgentChatClient.swift in Sources */,
 				2EC70370129F423785536DB2 /* Services/AppModel.swift in Sources */,
 				340C18C527B44FD1B96E612C /* Services/AuthStore.swift in Sources */,
+				7E8CC069F60B4F6283899600 /* Services/ComposeFormModel.swift in Sources */,
 				18F25040136B47988CE9E925 /* Theme/AppTheme.swift in Sources */,
 				83101517849E451C9A64357A /* Views/Auth/SignInView.swift in Sources */,
 				219CF0985CEB43F58D0A6180 /* Views/Chat/ChatSheetView.swift in Sources */,
+				08C8AEBB61714B47A9B57E95 /* Views/Compose/ComposeDockBar.swift in Sources */,
+				B79E45379B0F49C6AB6CD957 /* Views/Compose/ComposeSheetView.swift in Sources */,
+				0A8E360836CB41A7892396E2 /* Views/Email/AttachmentListView.swift in Sources */,
+				5C6166AA480E4D3C8C0FE11B /* Views/Email/EmailBodyView.swift in Sources */,
 				411FB5F3E3824817A4909D02 /* Views/Email/EmailDetailView.swift in Sources */,
 				C543C24F6A504509B345B919 /* Views/Email/EmailListView.swift in Sources */,
 				23E7B306C65E4F21A0AEB90C /* Views/Home/HomeShellView.swift in Sources */,

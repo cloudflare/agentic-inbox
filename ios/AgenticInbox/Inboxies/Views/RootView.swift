@@ -8,7 +8,7 @@ struct RootView: View {
         Group {
             if auth.isAuthenticated {
                 HomeShellView()
-                    .task {
+                    .task(id: auth.token) {
                         await app.bootstrap(authToken: auth.token)
                     }
             } else {

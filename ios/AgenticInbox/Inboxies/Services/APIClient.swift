@@ -40,11 +40,45 @@ final class APIClient: @unchecked Sendable {
         body: [String: Any]? = nil,
         authed: Bool = true
     ) async throws -> T {
+        let (data, http) = try await perform(
+            path: path,
+            method: method,
+            query: query,
+            body: body,
+            authed: authed
+        )
+        if http.statusCode == 204 {
+            if T.self == EmptyResponse.self {
+                return EmptyResponse() as! T
+            }
+        }
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            throw APIError.decoding(error)
+        }
+    }
+
+    func requestData(
+        path: String,
+        method: String = "GET",
+        query: [String: String] = [:],
+        authed: Bool = true
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await perform(path: path, method: method, query: query, body: nil, authed: authed)
+    }
+
+    private func perform(
+        path: String,
+        method: String,
+        query: [String: String],
+        body: [String: Any]?,
+        authed: Bool
+    ) async throws -> (Data, HTTPURLResponse) {
         guard var components = URLComponents(url: AppConfig.apiBaseURL, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
         }
         let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
-        // Preserve existing base path if any (usually empty for Worker roots).
         let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         components.path = basePath.isEmpty ? cleanPath : "/\(basePath)\(cleanPath)"
         if !query.isEmpty {
@@ -71,16 +105,7 @@ final class APIClient: @unchecked Sendable {
                 let text = String(data: data, encoding: .utf8) ?? ""
                 throw APIError.http(http.statusCode, text)
             }
-            if http.statusCode == 204 {
-                if T.self == EmptyResponse.self {
-                    return EmptyResponse() as! T
-                }
-            }
-            do {
-                return try decoder.decode(T.self, from: data)
-            } catch {
-                throw APIError.decoding(error)
-            }
+            return (data, http)
         } catch let error as APIError {
             throw error
         } catch {
@@ -90,6 +115,10 @@ final class APIClient: @unchecked Sendable {
 
     func listMailboxes() async throws -> [Mailbox] {
         try await request(path: "/api/v1/mailboxes")
+    }
+
+    func getMailbox(mailboxId: String) async throws -> Mailbox {
+        try await request(path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)")
     }
 
     func listFolders(mailboxId: String) async throws -> [Folder] {
@@ -124,6 +153,13 @@ final class APIClient: @unchecked Sendable {
         )
     }
 
+    func deleteEmail(mailboxId: String, id: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/emails/\(id.urlPathEncoded)",
+            method: "DELETE"
+        )
+    }
+
     func searchEmails(mailboxId: String, query: String, page: Int = 1) async throws -> EmailListResponse {
         try await request(
             path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/search",
@@ -133,6 +169,45 @@ final class APIClient: @unchecked Sendable {
                 "limit": "25",
             ]
         )
+    }
+
+    func sendEmail(mailboxId: String, payload: [String: Any]) async throws -> SendEmailResponse {
+        try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/emails",
+            method: "POST",
+            body: payload
+        )
+    }
+
+    func replyToEmail(mailboxId: String, emailId: String, payload: [String: Any]) async throws -> SendEmailResponse {
+        try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/emails/\(emailId.urlPathEncoded)/reply",
+            method: "POST",
+            body: payload
+        )
+    }
+
+    func forwardEmail(mailboxId: String, emailId: String, payload: [String: Any]) async throws -> SendEmailResponse {
+        try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/emails/\(emailId.urlPathEncoded)/forward",
+            method: "POST",
+            body: payload
+        )
+    }
+
+    func saveDraft(mailboxId: String, draft: [String: Any]) async throws -> DraftSaveResponse {
+        try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/drafts",
+            method: "POST",
+            body: draft
+        )
+    }
+
+    func getAttachment(mailboxId: String, emailId: String, attachmentId: String) async throws -> Data {
+        let (data, _) = try await requestData(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/emails/\(emailId.urlPathEncoded)/attachments/\(attachmentId.urlPathEncoded)"
+        )
+        return data
     }
 
     func listConversations(mailboxId: String) async throws -> [AgentConversation] {
