@@ -29,7 +29,6 @@ export async function isPromptInjection(ai: Ai, bodyHtml: string | null | undefi
 
 	try {
 		const response = (await ai.run(
-			// @ts-expect-error — model string not in generated union
 			"@cf/meta/llama-3.1-8b-instruct-fast",
 			{
 				messages: [
