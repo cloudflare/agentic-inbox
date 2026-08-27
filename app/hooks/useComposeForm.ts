@@ -4,14 +4,87 @@ import { buildQuotedReplyBlock, escapeHtml, formatComposeDate, getSignatureBlock
 import { useDeleteEmail, useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
-function appendUniqueAddress(addresses:string[],seen:Set<string>,address:string,exclude?:string){const t=address.trim();if(!t)return;const n=t.toLowerCase();if(n===exclude||seen.has(n))return;seen.add(n);addresses.push(t);}
+function normalizeEmailAddress(value:string){
+	const match=value.match(/<([^>]+)>/);
+	return (match?.[1] || value).trim().toLowerCase();
+}
+
+function appendUniqueAddress(
+	addresses:string[],
+	seen:Set<string>,
+	address:string,
+	exclude?:string
+){
+	const t=address.trim();
+	if(!t)return;
+
+	const n=normalizeEmailAddress(t);
+
+	if(n===exclude || seen.has(n))return;
+
+	seen.add(n);
+	addresses.push(t);
+}
 interface ComposeFormFields{to:string;cc:string;bcc:string;showCcBcc:boolean;subject:string;body:string;}
 interface ComposeAttachment{content:string;filename:string;type:string;disposition:"attachment";size:number;}
 const EMPTY_FIELDS:ComposeFormFields={to:"",cc:"",bcc:"",showCcBcc:false,subject:"",body:""};const MAX_ATTACHMENT_SIZE=20*1024*1024;const MAX_TOTAL_ATTACHMENT_SIZE=24*1024*1024;
 function getPrefixedSubject(subject:string,prefix:"Re"|"Fwd"){const p=`${prefix}: `;return subject.startsWith(p)?subject:`${p}${subject}`;}
 function buildForwardBody(original:NonNullable<ReturnType<typeof useUIStore.getState>["composeOptions"]["originalEmail"]>,sigBlock:string){return `<p><br></p>${sigBlock?`${sigBlock}<br>`:""}<div style="border:1px solid #ddd;padding:1em;background-color:#f9f9f9;margin:1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${escapeHtml(original.sender)}<br><strong>Date:</strong> ${formatComposeDate(original.date)}<br><strong>Subject:</strong> ${escapeHtml(original.subject)}<br><br>${escapeHtml(stripHtml(original.body||"")).replace(/\n/g,"<br>")}</div>`;}
-function buildReplyAllFields(original:NonNullable<ReturnType<typeof useUIStore.getState>["composeOptions"]["originalEmail"]>,selfAddress?:string){const to:string[]=[];const seen=new Set<string>();appendUniqueAddress(to,seen,original.sender,selfAddress);for(const r of splitEmailList(original.recipient))appendUniqueAddress(to,seen,r,selfAddress);const cc:string[]=[];const ccSeen=new Set<string>();for(const r of splitEmailList(original.cc)){const n=r.toLowerCase();if(n===selfAddress||seen.has(n)||ccSeen.has(n))continue;ccSeen.add(n);cc.push(r);}return{to:to.join(", "),cc:cc.join(", "),showCcBcc:cc.length>0};}
-function buildInitialComposeFields(options:ReturnType<typeof useUIStore.getState>["composeOptions"],mailboxEmail:string|undefined,sigBlock:string):ComposeFormFields{const{draftEmail:draft,originalEmail:original,mode}=options;if(draft)return{to:draft.recipient||"",cc:draft.cc||"",bcc:draft.bcc||"",showCcBcc:Boolean(draft.cc||draft.bcc),subject:draft.subject||"",body:draft.body||""};if(!original)return{...EMPTY_FIELDS,body:sigBlock?`<p><br></p>${sigBlock}`:""};if(mode==="reply")return{...EMPTY_FIELDS,to:original.sender,subject:getPrefixedSubject(original.subject,"Re"),body:`<p><br></p>${sigBlock?`${sigBlock}<br>`:""}${buildQuotedReplyBlock(original.date,original.sender,original.body||"")}`};if(mode==="reply-all"){const r=buildReplyAllFields(original,mailboxEmail?.toLowerCase());return{...EMPTY_FIELDS,...r,subject:getPrefixedSubject(original.subject,"Re"),body:`<p><br></p>${sigBlock?`${sigBlock}<br>`:""}${buildQuotedReplyBlock(original.date,original.sender,original.body||"")}`};}if(mode==="forward")return{...EMPTY_FIELDS,subject:getPrefixedSubject(original.subject,"Fwd"),body:buildForwardBody(original,sigBlock)};return{...EMPTY_FIELDS,body:sigBlock?`<p><br></p>${sigBlock}`:""};}
+function buildReplyAllFields(
+	original:NonNullable<ReturnType<typeof useUIStore.getState>["composeOptions"]["originalEmail"]>,
+	selfAddress?:string
+){
+	const normalizedSelf=selfAddress
+		? normalizeEmailAddress(selfAddress)
+		: undefined;
+
+	const to:string[]=[];
+	const seen=new Set<string>();
+
+	appendUniqueAddress(
+		to,
+		seen,
+		original.sender,
+		normalizedSelf
+	);
+
+	for(const r of splitEmailList(original.recipient)){
+		appendUniqueAddress(
+			to,
+			seen,
+			r,
+			normalizedSelf
+		);
+	}
+
+	const cc:string[]=[];
+	const ccSeen=new Set<string>();
+
+	for(const r of splitEmailList(original.cc)){
+		const n=normalizeEmailAddress(r);
+
+		if(
+			n===normalizedSelf ||
+			seen.has(n) ||
+			ccSeen.has(n)
+		){
+			continue;
+		}
+
+		ccSeen.add(n);
+		cc.push(r);
+	}
+
+	return {
+		to:to.join(", "),
+		cc:cc.join(", "),
+		showCcBcc:cc.length>0
+	};
+}
+function buildInitialComposeFields(options:ReturnType<typeof useUIStore.getState>["composeOptions"],mailboxEmail:string|undefined,sigBlock:string):ComposeFormFields{const{draftEmail:draft,originalEmail:original,mode}=options;if(draft)return{to:draft.recipient||"",cc:draft.cc||"",bcc:draft.bcc||"",showCcBcc:Boolean(draft.cc||draft.bcc),subject:draft.subject||"",body:draft.body||""};if(!original)return{...EMPTY_FIELDS,body:sigBlock?`<p><br></p>${sigBlock}`:""};if(mode==="reply")return{...EMPTY_FIELDS,to:original.sender,subject:getPrefixedSubject(original.subject,"Re"),body:`<p><br></p>${sigBlock?`${sigBlock}<br>`:""}${buildQuotedReplyBlock(original.date,original.sender,original.body||"")}`};if(mode==="reply-all"){const r=buildReplyAllFields(
+	original,
+	mailboxEmail
+);return{...EMPTY_FIELDS,...r,subject:getPrefixedSubject(original.subject,"Re"),body:`<p><br></p>${sigBlock?`${sigBlock}<br>`:""}${buildQuotedReplyBlock(original.date,original.sender,original.body||"")}`};}if(mode==="forward")return{...EMPTY_FIELDS,subject:getPrefixedSubject(original.subject,"Fwd"),body:buildForwardBody(original,sigBlock)};return{...EMPTY_FIELDS,body:sigBlock?`<p><br></p>${sigBlock}`:""};}
 async function fileToBase64(file:File){const bytes=new Uint8Array(await file.arrayBuffer());let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode.apply(null,Array.from(bytes.subarray(i,i+0x8000)));return btoa(binary);}
 async function fetchLogoAttachment(mailboxId:string,logoKey?:string){if(!logoKey)return null;const res=await fetch(`/api/v1/mailboxes/${encodeURIComponent(mailboxId)}/signature-logo`,{cache:"no-store"});if(!res.ok)return null;const type=res.headers.get("content-type")||"image/png";const blob=await res.blob();return{content:await fileToBase64(new File([blob],"company-logo",{type})),filename:`company-logo.${type.split("/")[1]||"png"}`,type,disposition:"inline" as const,contentId:"company-signature-logo"};}
 function convertSignatureToCid(html:string){return html.replace(/src=["'][^"']*\/api\/v1\/mailboxes\/[^"']*\/signature-logo[^"']*["']/gi,'src="cid:company-signature-logo"').replace(/src=["'](data:image\/[a-z0-9.+-]+;base64,[^"']+)["']/gi,'src="cid:company-signature-logo"');}
