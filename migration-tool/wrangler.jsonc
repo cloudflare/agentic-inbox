@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloudmail-agentic-migrator",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "TARGET_WORKER_NAME": "agentic-inbox"
+  }
+}

@@ -122,7 +122,15 @@ export default function ThreadMessage({
 								</span>
 								{isDraft && <Badge variant="outline">Draft</Badge>}
 							</div>
-							<div className="text-xs text-kumo-subtle">To: {email.recipient}</div>
+							<div className="text-xs text-kumo-subtle">
+	To: {email.recipient}
+</div>
+
+{email.cc && (
+	<div className="text-xs text-kumo-subtle">
+		Cc: {email.cc}
+	</div>
+)}
 						</div>
 					</div>
 					<div className="flex items-center gap-1 shrink-0">

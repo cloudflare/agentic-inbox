@@ -1,0 +1,11 @@
+{
+  "name": "cloudmail-agentic-migrator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npx wrangler deploy",
+    "deploy": "npx wrangler deploy",
+    "types": "npx wrangler types"
+  }
+}

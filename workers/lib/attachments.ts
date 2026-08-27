@@ -20,6 +20,9 @@ export interface StoredAttachment {
 
 /**
  * Store base64-encoded attachments to R2 and return metadata for the DO.
+ * Content-ID alone does not mean a file is an inline resource: some senders
+ * add Content-ID to ordinary attachments. PostalMime's `related` flag is the
+ * reliable signal for HTML-related inline parts.
  */
 export async function storeAttachments(
 	bucket: Env["BUCKET"],
@@ -37,7 +40,6 @@ export async function storeAttachments(
 	const results: StoredAttachment[] = [];
 	for (const att of attachments) {
 		const attachmentId = crypto.randomUUID();
-		// Sanitize filename to prevent path traversal in R2 keys
 		const safeFilename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
 		const key = `attachments/${emailId}/${attachmentId}/${safeFilename}`;
 		const binaryStr = atob(att.content);
@@ -50,7 +52,7 @@ export async function storeAttachments(
 			mimetype: att.type,
 			size: bytes.byteLength,
 			content_id: att.contentId || null,
-			disposition: att.disposition,
+			disposition: att.disposition || "attachment",
 		});
 	}
 	return results;
