@@ -30,7 +30,15 @@ export default function SingleMessageView({
 							<div className="text-sm font-medium text-kumo-default truncate">
 								{email.sender}
 							</div>
-							<div className="text-xs text-kumo-subtle">To: {email.recipient}</div>
+							<div className="text-xs text-kumo-subtle">
+	To: {email.recipient}
+</div>
+
+{email.cc && (
+	<div className="text-xs text-kumo-subtle">
+		Cc: {email.cc}
+	</div>
+)}
 						</div>
 					</div>
 					<span className="text-xs text-kumo-subtle shrink-0">
