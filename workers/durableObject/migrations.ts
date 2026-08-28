@@ -179,8 +179,16 @@ export const mailboxMigrations: Migration[] = [
                 last_message_preview TEXT
             );
 
-            CREATE INDEX IF NOT EXISTS idx_agent_conversations_updated
+			CREATE INDEX IF NOT EXISTS idx_agent_conversations_updated
                 ON agent_conversations(updated_at DESC);
         `),
+	},
+	{
+		name: "10_add_sender_name",
+		sql: txn(`ALTER TABLE emails ADD COLUMN sender_name TEXT;`),
+	},
+	{
+		name: "11_mark_draft_emails_as_read",
+		sql: txn(`UPDATE emails SET read = 1 WHERE folder_id = 'draft' AND read = 0;`),
 	},
 ];

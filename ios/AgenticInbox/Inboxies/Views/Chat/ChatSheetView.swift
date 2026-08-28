@@ -48,6 +48,7 @@ struct ConversationsListView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(AppTheme.background)
+        .refreshable { await app.refreshConversations() }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 76) }
         .task { await app.refreshConversations() }
     }
@@ -228,7 +229,7 @@ private struct ChatBubble: View {
             if message.role == "user" { Spacer(minLength: 40) }
             Text(message.text)
                 .font(.system(size: 15))
-                .foregroundStyle(message.role == "user" ? Color.white : AppTheme.ink)
+                .foregroundStyle(AppTheme.ink)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(message.role == "user" ? AppTheme.pillActive : AppTheme.surface)

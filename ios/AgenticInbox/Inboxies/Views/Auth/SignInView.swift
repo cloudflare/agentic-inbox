@@ -41,25 +41,33 @@ struct SignInView: View {
                     SignInWithAppleButton(.signIn) { request in
                         request.requestedScopes = [.fullName, .email]
                     } onCompletion: { result in
-                        Task { await handleApple(result) }
+                        Task {
+                            commitAPIBaseURL()
+                            await handleApple(result)
+                        }
                     }
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 52)
                     .padding(.horizontal, 32)
 
                     #if DEBUG
-                    Button {
-                        Task { await auth.signInDev() }
-                    } label: {
-                        Text("Continue with Dev Login")
-                            .font(.system(size: 15, weight: .medium))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(AppTheme.pillFill)
-                            .foregroundStyle(AppTheme.ink)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    if AppConfig.isLocalDevelopmentAPI {
+                        Button {
+                            Task {
+                                commitAPIBaseURL()
+                                await auth.signInDev()
+                            }
+                        } label: {
+                            Text("Continue with Dev Login")
+                                .font(.system(size: 15, weight: .medium))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 48)
+                                .background(AppTheme.pillFill)
+                                .foregroundStyle(AppTheme.ink)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .padding(.horizontal, 32)
                     }
-                    .padding(.horizontal, 32)
                     #endif
                 }
 
@@ -80,9 +88,12 @@ struct SignInView: View {
                     Text("API base URL")
                         .font(.caption)
                         .foregroundStyle(AppTheme.muted)
-                    TextField("https://…", text: $apiBase)
+                    TextField("inboxies.email", text: $apiBase)
+                        .keyboardType(.URL)
+                        .textContentType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .submitLabel(.done)
                         .font(.system(size: 14, design: .monospaced))
                         .padding(12)
                         .background(AppTheme.surface)
@@ -90,10 +101,26 @@ struct SignInView: View {
                         .onChange(of: apiBase) { _, value in
                             UserDefaults.standard.set(value, forKey: "apiBaseURL")
                         }
+                        .onSubmit {
+                            commitAPIBaseURL()
+                        }
+                    Text("Bare domains (inboxies.email) automatically use https://")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.muted)
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 24)
             }
+        }
+    }
+
+    private func commitAPIBaseURL() {
+        let value = apiBase.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = AppConfig.parseAPIBaseURL(value) {
+            apiBase = url.absoluteString
+            UserDefaults.standard.set(apiBase, forKey: "apiBaseURL")
+        } else {
+            UserDefaults.standard.set(value, forKey: "apiBaseURL")
         }
     }
 

@@ -15,6 +15,11 @@ import {
 	buildThreadingHeaders,
 	listMailboxes,
 } from "./lib/email-helpers";
+import {
+	displayNameFromAddressField,
+	normalizeDisplayName,
+	senderNameFromRawHeaders,
+} from "../shared/sender";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
@@ -193,7 +198,9 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
 	await stub.createEmail(Folders.SENT, {
-		id: messageId, subject, sender: fromEmail, recipient: toStr,
+		id: messageId, subject, sender: fromEmail,
+		sender_name: displayNameFromAddressField(from),
+		recipient: toStr,
 		cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
 		bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
 		date: new Date().toISOString(), body: html || text || "",
@@ -525,14 +532,20 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 
 	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
 
+	const fromAddress = (parsedEmail.from?.address || "").toLowerCase();
+	const fromHeaders = JSON.stringify(parsedEmail.headers);
+	const senderName =
+		normalizeDisplayName(parsedEmail.from?.name) ??
+		senderNameFromRawHeaders(fromHeaders);
+
 	await stub.createEmail(Folders.INBOX, {
 		id: messageId, subject: parsedEmail.subject || "",
-		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", "),
+		sender: fromAddress, sender_name: senderName, recipient: allRecipients.join(", "),
 		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
 		date: new Date().toISOString(), // uses receive time, not the email's Date header
 		body: parsedEmail.html || parsedEmail.text || "",
 		in_reply_to: inReplyTo, email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
-		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
+		thread_id: threadId, message_id: originalMessageId, raw_headers: fromHeaders,
 	}, attachmentData);
 
 	// Auto-drafts land in the reserved multi-chat conversation so user chats stay clean.

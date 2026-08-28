@@ -2,15 +2,22 @@ import SwiftUI
 
 /// Notion-like search screen: floating bottom search field + result rows.
 struct SearchView: View {
+    var initialQuery: String = ""
+
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
 
-    @State private var query = ""
+    @State private var query: String
     @State private var results: [Email] = []
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var showChat = false
     @FocusState private var focused: Bool
+
+    init(initialQuery: String = "") {
+        self.initialQuery = initialQuery
+        _query = State(initialValue: initialQuery)
+    }
 
     private var trimmedQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -32,21 +39,24 @@ struct SearchView: View {
                         .padding(.bottom, 20)
                 }
 
-                if isSearching {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let errorMessage {
+                if let errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(.red)
                         .padding()
                     Spacer()
-                } else if hasResults {
+                } else if isSearching || hasResults {
                     Text("Results")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(AppTheme.muted)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
+                        .opacity(hasResults && !isSearching ? 1 : 0)
 
-                    EmailListView(emails: results, highlightQuery: query) { email in
+                    EmailListView(
+                        emails: results,
+                        highlightQuery: query,
+                        isLoading: isSearching
+                    ) { email in
                         Task {
                             await app.openEmail(email)
                             dismiss()
@@ -72,7 +82,7 @@ struct SearchView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 10)
         }
-        .onAppear { focused = true }
+        .onAppear { focused = initialQuery.isEmpty }
         .task(id: query) {
             await runSearch()
         }

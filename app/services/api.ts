@@ -33,6 +33,7 @@ async function request<T>(
 	try {
 		const res = await fetch(url, {
 			...options,
+			credentials: "include",
 			signal,
 			headers: {
 				"Content-Type": "application/json",
@@ -41,8 +42,15 @@ async function request<T>(
 		});
 
 		if (!res.ok) {
-			const body = await res.json().catch(() => ({}));
-			throw new ApiError(res.status, body as Record<string, unknown>);
+			const contentType = res.headers.get("content-type") ?? "";
+			if (contentType.includes("application/json")) {
+				const body = await res.json().catch(() => ({}));
+				throw new ApiError(res.status, body as Record<string, unknown>);
+			}
+			const text = (await res.text().catch(() => "")).trim();
+			throw new ApiError(res.status, {
+				error: text || `Request failed: ${res.status}`,
+			});
 		}
 
 		if (res.status === 204) return undefined as T;

@@ -32,7 +32,20 @@ Designed for people coming from **web / Ionic / Capacitor**: SwiftUI views ≈ R
 3. Set your **Team** under Signing & Capabilities.
 4. Confirm bundle ID `co.inboxies.app` (or change it — then update Worker secret `APPLE_CLIENT_ID` to match).
 5. Capability **Sign in with Apple** is declared in `Inboxies.entitlements`.
-6. On the sign-in screen, set **API base URL** to your Worker (simulator → `http://127.0.0.1:5173` when `pnpm dev` is running on the Mac).
+6. On the sign-in screen, set **API base URL** to your Worker (simulator → `http://127.0.0.1:5173` when `pnpm dev` is running on the Mac). Production: `https://inboxies.email` works only after Access bypass (below).
+
+### Cloudflare Access (required for production)
+
+`inboxies.email` is behind Cloudflare Access. The iOS app cannot complete an Access browser login, so Access intercepts `/api/v1/auth/apple` and returns HTML — that shows up as a JSON decode error.
+
+In **Zero Trust → Access → Applications**, keep Access on the web UI and add more-specific Bypass apps so the Worker (not Access) authenticates the API:
+
+| Application path | Policy |
+|---|---|
+| `inboxies.email/api/*` | **Bypass**, Include **Everyone** |
+| `inboxies.email/agents/*` | **Bypass**, Include **Everyone** (AI chat WebSocket) |
+
+More-specific paths take precedence over the apex `inboxies.email` Allow policy. The Worker still requires a mobile Bearer token (or the web `CF_Authorization` cookie). Redeploy the Worker after pulling these changes so cookie-based web API calls keep working with the bypass.
 
 ### Optional: XcodeGen
 

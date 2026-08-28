@@ -200,6 +200,15 @@ export function getNonInlineAttachments(attachments?: Attachment[]): Attachment[
 	return attachments?.filter((attachment) => attachment.disposition !== "inline") ?? [];
 }
 
+/** List rows use `has_attachment` (thread-wide). Opened messages use the files on this email. */
+export function hasFileAttachment(email: {
+	has_attachment?: boolean;
+	attachments?: Attachment[];
+}): boolean {
+	if (email.has_attachment) return true;
+	return getNonInlineAttachments(email.attachments).length > 0;
+}
+
 export function getAttachmentUrl(
 	mailboxId: string,
 	emailId: string,

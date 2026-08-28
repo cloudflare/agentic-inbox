@@ -25,7 +25,11 @@ final class AgentChatClient: NSObject, ObservableObject {
         let agentName = "\(mailboxId)::\(conversationId)"
             .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""
         let base = AppConfig.apiBaseURL
-        var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false),
+              components.host != nil else {
+            statusText = "Invalid API URL"
+            return
+        }
         components.scheme = base.scheme == "https" ? "wss" : "ws"
         components.path = "\(AppConfig.agentPathPrefix)/\(agentName)"
         guard let url = components.url else { return }

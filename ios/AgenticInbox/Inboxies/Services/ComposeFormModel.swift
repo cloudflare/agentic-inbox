@@ -29,9 +29,9 @@ final class ComposeFormModel {
     var fromEmail: String
     var fromName: String?
 
-    var toTokens: [String] = []
-    var ccTokens: [String] = []
-    var bccTokens: [String] = []
+    var toTokens: [MailAddress] = []
+    var ccTokens: [MailAddress] = []
+    var bccTokens: [MailAddress] = []
     var toDraft = ""
     var ccDraft = ""
     var bccDraft = ""
@@ -65,9 +65,9 @@ final class ComposeFormModel {
 
         let signature = ComposeHTML.signatureLine(fromName: mailboxFromName)
 
-        var nextTo: [String] = []
-        var nextCc: [String] = []
-        var nextBcc: [String] = []
+        var nextTo: [MailAddress] = []
+        var nextCc: [MailAddress] = []
+        var nextBcc: [MailAddress] = []
         var nextShowCcBcc = false
         var nextSubject = ""
         var nextBody = ""
@@ -79,9 +79,9 @@ final class ComposeFormModel {
             nextDraftId = draft.id
             nextOriginalId = draft.inReplyTo
             nextThreadId = draft.threadId
-            nextTo = ComposeHTML.splitAddresses(draft.recipient)
-            nextCc = ComposeHTML.splitAddresses(draft.cc)
-            nextBcc = ComposeHTML.splitAddresses(draft.bcc)
+            nextTo = MailAddress.parseList(draft.recipient)
+            nextCc = MailAddress.parseList(draft.cc)
+            nextBcc = MailAddress.parseList(draft.bcc)
             nextShowCcBcc = !nextCc.isEmpty || !nextBcc.isEmpty
             nextSubject = draft.subject
             nextBody = ComposeHTML.htmlToEditableText(draft.body ?? "")
@@ -90,7 +90,7 @@ final class ComposeFormModel {
             nextThreadId = original.threadId ?? original.id
             switch mode {
             case .reply:
-                nextTo = [original.sender]
+                nextTo = [original.fromAddress]
                 nextSubject = ComposeHTML.prefixedSubject(original.subject, prefix: "Re")
                 nextBody = ComposeHTML.replyBody(original: original, signature: signature)
             case .replyAll:
@@ -163,9 +163,9 @@ final class ComposeFormModel {
         commit(&bccDraft, into: &bccTokens)
     }
 
-    func removeTo(_ token: String) { toTokens.removeAll { $0 == token } }
-    func removeCc(_ token: String) { ccTokens.removeAll { $0 == token } }
-    func removeBcc(_ token: String) { bccTokens.removeAll { $0 == token } }
+    func removeTo(_ token: MailAddress) { toTokens.removeAll { $0.id == token.id } }
+    func removeCc(_ token: MailAddress) { ccTokens.removeAll { $0.id == token.id } }
+    func removeBcc(_ token: MailAddress) { bccTokens.removeAll { $0.id == token.id } }
 
     func selectFrom(mailbox: Mailbox) {
         fromMailboxId = mailbox.id
@@ -183,9 +183,9 @@ final class ComposeFormModel {
             var payload: [String: Any] = [
                 "body": ComposeHTML.textToHTML(body),
             ]
-            if !toTokens.isEmpty { payload["to"] = toTokens.joined(separator: ", ") }
-            if !ccTokens.isEmpty { payload["cc"] = ccTokens.joined(separator: ", ") }
-            if !bccTokens.isEmpty { payload["bcc"] = bccTokens.joined(separator: ", ") }
+            if !toTokens.isEmpty { payload["to"] = toTokens.map(\.email).joined(separator: ", ") }
+            if !ccTokens.isEmpty { payload["cc"] = ccTokens.map(\.email).joined(separator: ", ") }
+            if !bccTokens.isEmpty { payload["bcc"] = bccTokens.map(\.email).joined(separator: ", ") }
             if !subject.isEmpty { payload["subject"] = subject }
             if let originalEmailId { payload["in_reply_to"] = originalEmailId }
             if let threadId { payload["thread_id"] = threadId }
@@ -218,12 +218,15 @@ final class ComposeFormModel {
             "html": html,
             "text": text,
         ]
-        payload["to"] = toTokens.count == 1 ? toTokens[0] as Any : toTokens as Any
+        let toEmails = toTokens.map(\.email)
+        payload["to"] = toEmails.count == 1 ? toEmails[0] as Any : toEmails as Any
         if !ccTokens.isEmpty {
-            payload["cc"] = ccTokens.count == 1 ? ccTokens[0] as Any : ccTokens as Any
+            let ccEmails = ccTokens.map(\.email)
+            payload["cc"] = ccEmails.count == 1 ? ccEmails[0] as Any : ccEmails as Any
         }
         if !bccTokens.isEmpty {
-            payload["bcc"] = bccTokens.count == 1 ? bccTokens[0] as Any : bccTokens as Any
+            let bccEmails = bccTokens.map(\.email)
+            payload["bcc"] = bccEmails.count == 1 ? bccEmails[0] as Any : bccEmails as Any
         }
         if let fromName, !fromName.isEmpty {
             payload["from"] = ["email": fromEmail, "name": fromName]
@@ -267,19 +270,26 @@ final class ComposeFormModel {
         }
     }
 
-    private func commit(_ draft: inout String, into tokens: inout [String]) {
-        let parts = ComposeHTML.splitAddresses(draft)
-        for part in parts where !tokens.contains(where: { $0.caseInsensitiveCompare(part) == .orderedSame }) {
+    private func commit(_ draft: inout String, into tokens: inout [MailAddress]) {
+        let parts = MailAddress.parseList(draft)
+        for part in parts where !tokens.contains(where: { $0.id == part.id }) {
             tokens.append(part)
         }
         draft = ""
     }
 
     private static func snapshot(
-        to: [String], cc: [String], bcc: [String],
+        to: [MailAddress], cc: [MailAddress], bcc: [MailAddress],
         subject: String, body: String, from: String
     ) -> String {
-        [to.joined(separator: ","), cc.joined(separator: ","), bcc.joined(separator: ","), subject, body, from]
+        [
+            to.map(\.email).joined(separator: ","),
+            cc.map(\.email).joined(separator: ","),
+            bcc.map(\.email).joined(separator: ","),
+            subject,
+            body,
+            from,
+        ]
             .joined(separator: "|")
     }
 }
@@ -338,7 +348,7 @@ enum ComposeHTML {
 
     static func replyBody(original: Email, signature: String) -> String {
         let quoted = stripHTML(original.body ?? "")
-        let header = "On \(formatDate(original.date)), \(original.sender) wrote:"
+        let header = "On \(formatDate(original.date)), \(original.formattedFrom) wrote:"
         var parts: [String] = [""]
         if !signature.isEmpty { parts.append(signature) }
         parts.append("")
@@ -352,7 +362,7 @@ enum ComposeHTML {
         if !signature.isEmpty { parts.append(signature) }
         parts.append("")
         parts.append("---------- Forwarded message ----------")
-        parts.append("From: \(original.sender)")
+        parts.append("From: \(original.formattedFrom)")
         parts.append("Date: \(formatDate(original.date))")
         parts.append("Subject: \(original.subject)")
         parts.append("To: \(original.recipient)")
@@ -361,29 +371,29 @@ enum ComposeHTML {
         return parts.joined(separator: "\n")
     }
 
-    static func replyAllFields(original: Email, selfAddress: String) -> (to: [String], cc: [String]) {
+    static func replyAllFields(original: Email, selfAddress: String) -> (to: [MailAddress], cc: [MailAddress]) {
         let selfLower = selfAddress.lowercased()
-        var to: [String] = []
+        var to: [MailAddress] = []
         var toSeen = Set<String>()
 
-        func appendUnique(_ address: String, into list: inout [String], seen: inout Set<String>) {
-            let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
-            let normalized = trimmed.lowercased()
+        func appendUnique(_ address: MailAddress, into list: inout [MailAddress], seen: inout Set<String>) {
+            let email = address.email.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !email.isEmpty else { return }
+            let normalized = email.lowercased()
             guard normalized != selfLower, !seen.contains(normalized) else { return }
             seen.insert(normalized)
-            list.append(trimmed)
+            list.append(address)
         }
 
-        appendUnique(original.sender, into: &to, seen: &toSeen)
-        for recipient in splitAddresses(original.recipient) {
+        appendUnique(original.fromAddress, into: &to, seen: &toSeen)
+        for recipient in original.toAddresses {
             appendUnique(recipient, into: &to, seen: &toSeen)
         }
 
-        var cc: [String] = []
+        var cc: [MailAddress] = []
         var ccSeen = Set<String>()
-        for recipient in splitAddresses(original.cc) {
-            let normalized = recipient.lowercased()
+        for recipient in original.ccAddresses {
+            let normalized = recipient.email.lowercased()
             if normalized == selfLower || toSeen.contains(normalized) || ccSeen.contains(normalized) {
                 continue
             }

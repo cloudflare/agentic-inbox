@@ -47,6 +47,30 @@ function isPublicAuthPath(pathname: string): boolean {
 	);
 }
 
+function readCookie(header: string | undefined, name: string): string | undefined {
+	if (!header) return undefined;
+	for (const part of header.split(";")) {
+		const trimmed = part.trim();
+		const eq = trimmed.indexOf("=");
+		if (eq === -1) continue;
+		if (trimmed.slice(0, eq) !== name) continue;
+		try {
+			return decodeURIComponent(trimmed.slice(eq + 1));
+		} catch {
+			return trimmed.slice(eq + 1);
+		}
+	}
+	return undefined;
+}
+
+/** Access JWT from the edge header, or the CF_Authorization cookie after a path bypass. */
+function getAccessJwt(c: { req: { header: (name: string) => string | undefined } }): string | undefined {
+	return (
+		c.req.header("cf-access-jwt-assertion") ||
+		readCookie(c.req.header("cookie"), "CF_Authorization")
+	);
+}
+
 async function verifyCfAccessToken(
 	token: string,
 	env: Env,
@@ -82,7 +106,7 @@ app.use("*", async (c, next) => {
 
 	const { POLICY_AUD, TEAM_DOMAIN, MOBILE_JWT_SECRET } = c.env;
 
-	const accessToken = c.req.header("cf-access-jwt-assertion");
+	const accessToken = getAccessJwt(c);
 	if (accessToken) {
 		if (!POLICY_AUD || !TEAM_DOMAIN) {
 			return c.text(

@@ -158,7 +158,7 @@ export async function toolDraftReply(
 	const quotedBlock = original
 		? buildQuotedReplyBlock({
 				date: original.date,
-				sender: original.sender || params.to,
+				sender: original.sender_name || original.sender || params.to,
 				body: original.body ?? undefined,
 			})
 		: "";
@@ -428,7 +428,7 @@ export async function toolSendReply(
 	}
 	const quotedBlock = buildQuotedReplyBlock({
 		date: originalEmail.date,
-		sender: originalEmail.sender || params.to,
+		sender: originalEmail.sender_name || originalEmail.sender || params.to,
 		body: originalEmail.body ?? undefined,
 	});
 	const fullBodyHtml = sanitizedBody + quotedBlock;

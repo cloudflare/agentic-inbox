@@ -4,13 +4,22 @@ enum APIError: LocalizedError {
     case invalidURL
     case http(Int, String)
     case decoding(Error)
+    case notJSON(String)
+    case cloudflareAccess
     case transport(Error)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL: return "Invalid API URL"
-        case .http(let code, let body): return "HTTP \(code): \(body)"
+        case .http(_, let body) where !body.isEmpty:
+            return body
+        case .http(let code, _):
+            return "HTTP \(code)"
         case .decoding(let err): return "Decode error: \(err.localizedDescription)"
+        case .notJSON(let preview):
+            return "API returned HTML instead of JSON. \(preview)"
+        case .cloudflareAccess:
+            return "Cloudflare Access is blocking the API. Add a Bypass policy for inboxies.email/api/* (and /agents/* for chat) in Zero Trust, or the Worker never sees Sign in with Apple."
         case .transport(let err): return err.localizedDescription
         }
     }
@@ -22,6 +31,7 @@ final class APIClient: @unchecked Sendable {
 
     private let session: URLSession
     private let decoder: JSONDecoder
+    private let redirectGuard = SameHostRedirectGuard()
 
     /// Injected by AuthStore / AppModel when the session token changes.
     var authTokenProvider: @Sendable () -> String? = { nil }
@@ -29,7 +39,8 @@ final class APIClient: @unchecked Sendable {
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
-        session = URLSession(configuration: config)
+        config.httpShouldSetCookies = false
+        session = URLSession(configuration: config, delegate: redirectGuard, delegateQueue: nil)
         decoder = JSONDecoder()
     }
 
@@ -51,6 +62,14 @@ final class APIClient: @unchecked Sendable {
             if T.self == EmptyResponse.self {
                 return EmptyResponse() as! T
             }
+        }
+        if isCloudflareAccessChallenge(http, data: data) {
+            throw APIError.cloudflareAccess
+        }
+        let contentType = http.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
+        if !contentType.contains("json") {
+            let preview = String(data: data, encoding: .utf8).map { String($0.prefix(160)) } ?? ""
+            throw APIError.notJSON(preview)
         }
         do {
             return try decoder.decode(T.self, from: data)
@@ -75,7 +94,8 @@ final class APIClient: @unchecked Sendable {
         body: [String: Any]?,
         authed: Bool
     ) async throws -> (Data, HTTPURLResponse) {
-        guard var components = URLComponents(url: AppConfig.apiBaseURL, resolvingAgainstBaseURL: false) else {
+        guard var components = URLComponents(url: AppConfig.apiBaseURL, resolvingAgainstBaseURL: false),
+              components.host != nil else {
             throw APIError.invalidURL
         }
         let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
@@ -101,9 +121,11 @@ final class APIClient: @unchecked Sendable {
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.http(-1, "No HTTP response")
             }
+            if isCloudflareAccessChallenge(http, data: data) {
+                throw APIError.cloudflareAccess
+            }
             guard (200..<300).contains(http.statusCode) else {
-                let text = String(data: data, encoding: .utf8) ?? ""
-                throw APIError.http(http.statusCode, text)
+                throw APIError.http(http.statusCode, httpErrorMessage(from: data))
             }
             return (data, http)
         } catch let error as APIError {
@@ -146,10 +168,30 @@ final class APIClient: @unchecked Sendable {
     }
 
     func markRead(mailboxId: String, id: String) async throws -> Email {
-        try await request(
+        try await updateEmail(mailboxId: mailboxId, id: id, read: true)
+    }
+
+    func updateEmail(
+        mailboxId: String,
+        id: String,
+        read: Bool? = nil,
+        starred: Bool? = nil
+    ) async throws -> Email {
+        var body: [String: Any] = [:]
+        if let read { body["read"] = read }
+        if let starred { body["starred"] = starred }
+        return try await request(
             path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/emails/\(id.urlPathEncoded)",
             method: "PUT",
-            body: ["read": true]
+            body: body
+        )
+    }
+
+    func moveEmail(mailboxId: String, id: String, folderId: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/emails/\(id.urlPathEncoded)/move",
+            method: "POST",
+            body: ["folderId": folderId]
         )
     }
 
@@ -233,6 +275,45 @@ final class APIClient: @unchecked Sendable {
 }
 
 struct EmptyResponse: Decodable {}
+
+/// Do not follow Cloudflare Access's 302 to the login HTML page — that body is
+/// not JSON and surfaces as a confusing decode error.
+private final class SameHostRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest
+    ) async -> URLRequest? {
+        guard let fromHost = task.originalRequest?.url?.host,
+              let toHost = request.url?.host,
+              fromHost.caseInsensitiveCompare(toHost) == .orderedSame else {
+            return nil
+        }
+        return request
+    }
+}
+
+private func httpErrorMessage(from data: Data) -> String {
+    if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let error = obj["error"] as? String, !error.isEmpty {
+        return error
+    }
+    return String(data: data, encoding: .utf8) ?? ""
+}
+
+private func isCloudflareAccessChallenge(_ http: HTTPURLResponse, data: Data) -> Bool {
+    if let auth = http.value(forHTTPHeaderField: "WWW-Authenticate")?.lowercased(),
+       auth.contains("cloudflare-access") {
+        return true
+    }
+    if let location = http.value(forHTTPHeaderField: "Location")?.lowercased(),
+       location.contains("cloudflareaccess.com") || location.contains("cdn-cgi/access/login") {
+        return true
+    }
+    let preview = String(data: data, encoding: .utf8)?.prefix(400).lowercased() ?? ""
+    return preview.contains("cloudflareaccess.com") || preview.contains("cloudflare access")
+}
 
 extension String {
     var urlPathEncoded: String {

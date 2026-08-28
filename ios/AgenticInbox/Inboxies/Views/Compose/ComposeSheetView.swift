@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// System sheet compose chrome matching Ask AI / email detail, Notion-styled fields.
 struct ComposeSheetView: View {
@@ -7,13 +8,12 @@ struct ComposeSheetView: View {
 
     @State private var showCloseActions = false
     @State private var showFromPicker = false
+    @State private var recipientFocus: Field?
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
         case to, cc, bcc, subject, body
     }
-
-    private static let recipientFont = Font.system(size: 13)
 
     private var form: ComposeFormModel { session.form }
 
@@ -50,6 +50,11 @@ struct ComposeSheetView: View {
             }
             .background(AppTheme.background)
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: focusedField) { _, new in
+                if new == .subject || new == .body {
+                    recipientFocus = nil
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -97,7 +102,7 @@ struct ComposeSheetView: View {
 
     private var titleRow: some View {
         Text(form.displayTitle)
-            .font(.system(size: 26, weight: .bold))
+            .font(.system(size: AppTheme.FontSize.largeTitle, weight: .bold))
             .foregroundStyle(AppTheme.ink)
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -114,15 +119,14 @@ struct ComposeSheetView: View {
                 Text("From \(fromDisplayName)")
                     .foregroundStyle(AppTheme.muted)
                     .lineLimit(1)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: AppTheme.FontSize.sender, weight: .medium))
                 if app.mailboxes.count > 1 {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: AppTheme.FontSize.chevron, weight: .semibold))
                         .foregroundStyle(AppTheme.muted)
                 }
                 Spacer(minLength: 0)
             }
-            .font(.system(size: 12))
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .contentShape(Rectangle())
@@ -132,61 +136,15 @@ struct ComposeSheetView: View {
     }
 
     private var toRow: some View {
-        recipientRow(label: "To:") {
-            tokenField(
-                tokens: form.toTokens,
-                draft: Binding(
-                    get: { form.toDraft },
-                    set: { form.toDraft = $0 }
-                ),
-                focus: .to,
-                placeholder: "Add an email",
-                onCommit: { form.commitPendingTokens() },
-                onRemove: { form.removeTo($0) }
-            )
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    form.showCcBcc.toggle()
-                }
-                if form.showCcBcc {
-                    focusedField = .cc
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(AppTheme.muted)
-                    .frame(width: 28, height: 18)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(form.showCcBcc ? "Hide Cc and Bcc" : "Show Cc and Bcc")
-        }
+        recipientRow(label: "To:", field: .to, showsOverflowMenu: true)
     }
 
     private var ccRow: some View {
-        recipientRow(label: "Cc") {
-            tokenField(
-                tokens: form.ccTokens,
-                draft: Binding(get: { form.ccDraft }, set: { form.ccDraft = $0 }),
-                focus: .cc,
-                placeholder: "Add an email",
-                onCommit: { form.commitPendingTokens() },
-                onRemove: { form.removeCc($0) }
-            )
-        }
+        recipientRow(label: "Cc", field: .cc)
     }
 
     private var bccRow: some View {
-        recipientRow(label: "Bcc") {
-            tokenField(
-                tokens: form.bccTokens,
-                draft: Binding(get: { form.bccDraft }, set: { form.bccDraft = $0 }),
-                focus: .bcc,
-                placeholder: "Add an email",
-                onCommit: { form.commitPendingTokens() },
-                onRemove: { form.removeBcc($0) }
-            )
-        }
+        recipientRow(label: "Bcc", field: .bcc)
     }
 
     private var subjectRow: some View {
@@ -195,7 +153,7 @@ struct ComposeSheetView: View {
             set: { form.subject = $0 }
         ))
         .focused($focusedField, equals: .subject)
-        .font(.system(size: 14, weight: .medium))
+        .font(.system(size: AppTheme.FontSize.inlineTitle, weight: .medium))
         .foregroundStyle(AppTheme.ink)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -207,7 +165,7 @@ struct ComposeSheetView: View {
             set: { form.body = $0 }
         ))
         .focused($focusedField, equals: .body)
-        .font(.system(size: 17))
+        .font(.system(size: AppTheme.FontSize.body))
         .foregroundStyle(AppTheme.ink)
         .scrollContentBackground(.hidden)
         .padding(.horizontal, 12)
@@ -221,40 +179,117 @@ struct ComposeSheetView: View {
             .padding(.leading, 16)
     }
 
-    private func recipientRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+    private func recipientRow(label: String, field: Field, showsOverflowMenu: Bool = false) -> some View {
+        let isActive = recipientFocus == field
+        let labeledField = HStack(alignment: .top, spacing: 8) {
             Text(label)
-                .font(Self.recipientFont)
+                .font(.system(size: AppTheme.FontSize.meta, weight: .medium))
                 .foregroundStyle(AppTheme.muted)
                 .frame(minWidth: 28, alignment: .leading)
-            content()
+                .frame(height: CollapsedTokenMetrics.lineHeight)
+            tokenField(for: field)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        return HStack(alignment: .top, spacing: 8) {
+            if isActive {
+                labeledField
+            } else {
+                labeledField
+                    .contentShape(Rectangle())
+                    .onTapGesture { activateRecipient(field) }
+            }
+
+            if showsOverflowMenu {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        form.showCcBcc.toggle()
+                    }
+                    if form.showCcBcc {
+                        activateRecipient(.cc)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: AppTheme.FontSize.sender, weight: .semibold))
+                        .foregroundStyle(AppTheme.muted)
+                        .frame(width: 28, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(form.showCcBcc ? "Hide Cc and Bcc" : "Show Cc and Bcc")
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
 
+    @ViewBuilder
+    private func tokenField(for field: Field) -> some View {
+        switch field {
+        case .to:
+            tokenField(
+                tokens: form.toTokens,
+                draft: Binding(get: { form.toDraft }, set: { form.toDraft = $0 }),
+                focus: .to,
+                placeholder: "Add an email",
+                onCommit: { form.commitPendingTokens() },
+                onRemove: { form.removeTo($0) }
+            )
+        case .cc:
+            tokenField(
+                tokens: form.ccTokens,
+                draft: Binding(get: { form.ccDraft }, set: { form.ccDraft = $0 }),
+                focus: .cc,
+                placeholder: "Add an email",
+                onCommit: { form.commitPendingTokens() },
+                onRemove: { form.removeCc($0) }
+            )
+        case .bcc:
+            tokenField(
+                tokens: form.bccTokens,
+                draft: Binding(get: { form.bccDraft }, set: { form.bccDraft = $0 }),
+                focus: .bcc,
+                placeholder: "Add an email",
+                onCommit: { form.commitPendingTokens() },
+                onRemove: { form.removeBcc($0) }
+            )
+        case .subject, .body:
+            EmptyView()
+        }
+    }
+
+    private func activateRecipient(_ field: Field) {
+        focusedField = nil
+        recipientFocus = field
+    }
+
     private func tokenField(
-        tokens: [String],
+        tokens: [MailAddress],
         draft: Binding<String>,
         focus: Field,
         placeholder: String,
         onCommit: @escaping () -> Void,
-        onRemove: @escaping (String) -> Void
+        onRemove: @escaping (MailAddress) -> Void
     ) -> some View {
-        FlowRecipientTokens(tokens: tokens, onRemove: onRemove) {
-            TextField(placeholder, text: draft)
-                .font(Self.recipientFont)
-                .textFieldStyle(.plain)
-                .focused($focusedField, equals: focus)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.emailAddress)
-                .onSubmit(onCommit)
-                .onChange(of: draft.wrappedValue) { _, newValue in
-                    if Self.shouldCommitToken(newValue) {
-                        onCommit()
-                    }
+        RecipientTokenEditor(
+            tokens: tokens,
+            draft: draft,
+            isFocused: recipientFocus == focus,
+            placeholder: placeholder,
+            onCommit: onCommit,
+            onRemove: onRemove,
+            onFocusChange: { focused in
+                if focused {
+                    activateRecipient(focus)
+                } else if recipientFocus == focus {
+                    recipientFocus = nil
                 }
+            }
+        )
+        .onChange(of: draft.wrappedValue) { _, newValue in
+            if Self.shouldCommitToken(newValue) {
+                onCommit()
+            }
         }
     }
 
@@ -293,49 +328,367 @@ struct ComposeSheetView: View {
     }
 }
 
-/// Simple wrapping token row for recipient chips.
-private struct FlowRecipientTokens<Trailing: View>: View {
-    let tokens: [String]
-    let onRemove: (String) -> Void
-    @ViewBuilder var trailing: () -> Trailing
+/// Wrapping recipient chips plus a field that highlights the last token before deleting it.
+private struct RecipientTokenEditor: View {
+    let tokens: [MailAddress]
+    @Binding var draft: String
+    var isFocused: Bool
+    var placeholder: String
+    var onCommit: () -> Void
+    var onRemove: (MailAddress) -> Void
+    var onFocusChange: (Bool) -> Void
+
+    @State private var pendingRemovalID: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if !tokens.isEmpty {
-                FlexibleTokenWrap(tokens: tokens, onRemove: onRemove)
+        Group {
+            if isFocused {
+                expandedEditor
+            } else {
+                CollapsedTokenSummary(tokens: tokens, placeholder: placeholder)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(collapsedAccessibilityLabel)
+                    .accessibilityHint("Edits recipients")
+                    .accessibilityAddTraits(.isButton)
             }
-            trailing()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onChange(of: draft) { _, _ in
+            guard pendingRemovalID != nil else { return }
+            pendingRemovalID = nil
+        }
+        .onChange(of: isFocused) { _, focused in
+            if focused {
+                pendingRemovalID = nil
+            } else {
+                pendingRemovalID = nil
+                onCommit()
+            }
+        }
+        .onChange(of: tokens.map(\.id)) { _, ids in
+            if let pendingRemovalID, !ids.contains(pendingRemovalID) {
+                self.pendingRemovalID = nil
+            }
+        }
+    }
+
+    private var collapsedAccessibilityLabel: String {
+        if tokens.isEmpty { return placeholder }
+        let names = tokens.map(\.tokenLabel)
+        if names.count <= 3 { return names.joined(separator: ", ") }
+        return "\(names.prefix(3).joined(separator: ", ")) and \(names.count - 3) others"
+    }
+
+    private var expandedEditor: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(tokens) { token in
+                RecipientTokenPill(
+                    token: token,
+                    isPendingRemoval: token.id == pendingRemovalID,
+                    onRemove: {
+                        pendingRemovalID = nil
+                        onRemove(token)
+                    }
+                )
+            }
+            BackspaceTextField(
+                text: $draft,
+                placeholder: tokens.isEmpty ? placeholder : "",
+                isFocused: isFocused,
+                onSubmit: onCommit,
+                onDeleteBackwardWhenEmpty: handleDeleteWhenEmpty,
+                onBeganEditing: { onFocusChange(true) }
+            )
+        }
+        .frame(maxWidth: .infinity, minHeight: CollapsedTokenMetrics.lineHeight, alignment: .leading)
+    }
+
+    private func handleDeleteWhenEmpty() {
+        guard let last = tokens.last else { return }
+        if pendingRemovalID == last.id {
+            pendingRemovalID = nil
+            onRemove(last)
+        } else {
+            withAnimation(.easeInOut(duration: 0.12)) {
+                pendingRemovalID = last.id
+            }
+        }
     }
 }
 
-private struct FlexibleTokenWrap: View {
-    let tokens: [String]
-    let onRemove: (String) -> Void
+private enum CollapsedTokenMetrics {
+    static let spacing: CGFloat = 6
+    static let minPillWidth: CGFloat = 56
+    static let pillHorizontalPadding: CGFloat = 16
+    static let pillFont = UIFont.systemFont(ofSize: AppTheme.FontSize.meta, weight: .medium)
+
+    static var lineHeight: CGFloat {
+        ceil(pillFont.lineHeight) + 8
+    }
+
+    static func overflowLabel(hidden: Int) -> String {
+        "+ \(hidden) others"
+    }
+
+    static func textWidth(_ string: String) -> CGFloat {
+        ceil((string as NSString).size(withAttributes: [.font: pillFont]).width)
+    }
+
+    static func naturalPillWidth(label: String) -> CGFloat {
+        textWidth(label) + pillHorizontalPadding
+    }
+
+    static func overflowWidth(hidden: Int) -> CGFloat {
+        guard hidden > 0 else { return 0 }
+        return textWidth(overflowLabel(hidden: hidden)) + spacing
+    }
+
+    static func layout(
+        tokens: [MailAddress],
+        width: CGFloat
+    ) -> (visible: [MailAddress], hidden: Int, widths: [CGFloat]) {
+        guard !tokens.isEmpty else { return ([], 0, []) }
+        let width = max(width, minPillWidth)
+
+        for hidden in 0..<tokens.count {
+            let visible = Array(tokens.prefix(tokens.count - hidden))
+            var remaining = width - overflowWidth(hidden: hidden)
+            var widths: [CGFloat] = []
+            var fits = true
+
+            for (index, token) in visible.enumerated() {
+                let natural = naturalPillWidth(label: token.tokenLabel)
+                let isLast = index == visible.count - 1
+                if natural <= remaining {
+                    widths.append(natural)
+                    remaining -= natural + spacing
+                } else if isLast, remaining >= minPillWidth {
+                    widths.append(remaining)
+                    remaining = 0
+                } else {
+                    fits = false
+                    break
+                }
+            }
+
+            if fits {
+                return (visible, hidden, widths)
+            }
+        }
+
+        let hidden = tokens.count - 1
+        let firstWidth = max(minPillWidth, width - overflowWidth(hidden: hidden))
+        return (Array(tokens.prefix(1)), hidden, [firstWidth])
+    }
+}
+
+private struct CollapsedTokenSummary: View {
+    let tokens: [MailAddress]
+    var placeholder: String
+    @State private var width: CGFloat = 0
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(tokens, id: \.self) { token in
-                    HStack(spacing: 4) {
-                        Text(token)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(AppTheme.accent)
-                        Button {
-                            onRemove(token)
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(AppTheme.accent.opacity(0.7))
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(AppTheme.accent.opacity(0.12))
-                    .clipShape(Capsule())
+        HStack(alignment: .center, spacing: CollapsedTokenMetrics.spacing) {
+            if tokens.isEmpty {
+                Text(placeholder)
+                    .font(.system(size: AppTheme.FontSize.meta, weight: .medium))
+                    .foregroundStyle(AppTheme.muted)
+                    .lineLimit(1)
+            } else {
+                let plan = CollapsedTokenMetrics.layout(tokens: tokens, width: width)
+                ForEach(Array(plan.visible.enumerated()), id: \.element.id) { index, token in
+                    RecipientTokenPill(
+                        token: token,
+                        isPendingRemoval: false,
+                        showsRemove: false,
+                        maxWidth: plan.widths[index],
+                        onRemove: {}
+                    )
+                }
+                if plan.hidden > 0 {
+                    Text(CollapsedTokenMetrics.overflowLabel(hidden: plan.hidden))
+                        .font(.system(size: AppTheme.FontSize.meta, weight: .medium))
+                        .foregroundStyle(AppTheme.muted)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
             }
         }
+        .frame(maxWidth: .infinity, minHeight: CollapsedTokenMetrics.lineHeight, alignment: .leading)
+        .contentShape(Rectangle())
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            guard abs(width - newWidth) > 0.5 else { return }
+            width = newWidth
+        }
+    }
+}
+
+private struct RecipientTokenPill: View {
+    let token: MailAddress
+    var isPendingRemoval: Bool
+    var showsRemove: Bool = true
+    var maxWidth: CGFloat? = nil
+    var onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(token.tokenLabel)
+                .font(.system(size: AppTheme.FontSize.meta, weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if showsRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: AppTheme.FontSize.chevron, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(token.tokenLabel)")
+            }
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, showsRemove ? 6 : 8)
+        .padding(.vertical, 4)
+        .frame(maxWidth: maxWidth, alignment: .leading)
+        .background(isPendingRemoval ? AppTheme.pillActive : AppTheme.pillFill)
+        .clipShape(Capsule())
+        .foregroundStyle(isPendingRemoval ? AppTheme.ink : AppTheme.muted)
+        .fixedSize(horizontal: maxWidth == nil, vertical: true)
+        .accessibilityAddTraits(isPendingRemoval ? .isSelected : [])
+        .accessibilityValue(token.email)
+        .accessibilityHint(showsRemove ? (isPendingRemoval ? "Delete again to remove" : "Double tap the close button to remove") : "")
+    }
+}
+
+/// Email field that reports backspace when empty so tokens can be selected, then removed.
+private struct BackspaceTextField: UIViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var isFocused: Bool
+    var onSubmit: () -> Void
+    var onDeleteBackwardWhenEmpty: () -> Void
+    var onBeganEditing: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> TokenUITextField {
+        let field = TokenUITextField()
+        field.delegate = context.coordinator
+        field.borderStyle = .none
+        field.backgroundColor = .clear
+        field.autocapitalizationType = .none
+        field.autocorrectionType = .no
+        field.spellCheckingType = .no
+        field.keyboardType = .emailAddress
+        field.returnKeyType = .next
+        field.tintColor = UIColor(AppTheme.ink)
+        field.textColor = UIColor(AppTheme.ink)
+        field.font = UIFont.systemFont(ofSize: AppTheme.FontSize.recipient)
+        field.setContentHuggingPriority(.required, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged), for: .editingChanged)
+        context.coordinator.text = $text
+        context.coordinator.onSubmit = onSubmit
+        context.coordinator.onDeleteBackwardWhenEmpty = onDeleteBackwardWhenEmpty
+        context.coordinator.onBeganEditing = onBeganEditing
+        field.onDeleteBackwardWhenEmpty = { [weak coordinator = context.coordinator] in
+            coordinator?.onDeleteBackwardWhenEmpty()
+        }
+        return field
+    }
+
+    func updateUIView(_ uiView: TokenUITextField, context: Context) {
+        context.coordinator.text = $text
+        context.coordinator.onSubmit = onSubmit
+        context.coordinator.onDeleteBackwardWhenEmpty = onDeleteBackwardWhenEmpty
+        context.coordinator.onBeganEditing = onBeganEditing
+        uiView.onDeleteBackwardWhenEmpty = { [weak coordinator = context.coordinator] in
+            coordinator?.onDeleteBackwardWhenEmpty()
+        }
+
+        if uiView.isFirstResponder {
+            // Don't push SwiftUI's lagged string back into a live field (wipes the
+            // latest character). Only apply SwiftUI changes that clear after commit.
+            if text.isEmpty, !(uiView.text ?? "").isEmpty {
+                uiView.text = ""
+            }
+        } else if uiView.text != text {
+            uiView.text = text
+        }
+        if uiView.placeholder != placeholder {
+            uiView.attributedPlaceholder = NSAttributedString(
+                string: placeholder,
+                attributes: [
+                    .foregroundColor: UIColor(AppTheme.muted),
+                    .font: UIFont.systemFont(ofSize: AppTheme.FontSize.recipient),
+                ]
+            )
+        }
+
+        // Only resign after SwiftUI has acknowledged this field was focused and then
+        // moved focus elsewhere. Resigning whenever `isFocused` is false drops the
+        // keyboard on the first keystroke (FocusState lags the UIKit first responder).
+        if isFocused {
+            context.coordinator.swiftUIOwnsFocus = true
+            if !uiView.isFirstResponder {
+                DispatchQueue.main.async {
+                    guard context.coordinator.swiftUIOwnsFocus else { return }
+                    uiView.becomeFirstResponder()
+                }
+            }
+        } else if context.coordinator.swiftUIOwnsFocus {
+            context.coordinator.swiftUIOwnsFocus = false
+            if uiView.isFirstResponder {
+                uiView.resignFirstResponder()
+            }
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: TokenUITextField, context: Context) -> CGSize? {
+        uiView.intrinsicContentSize
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var text: Binding<String> = .constant("")
+        var onSubmit: () -> Void = {}
+        var onDeleteBackwardWhenEmpty: () -> Void = {}
+        var onBeganEditing: () -> Void = {}
+        var swiftUIOwnsFocus = false
+
+        @objc func editingChanged(_ textField: UITextField) {
+            let value = textField.text ?? ""
+            if text.wrappedValue != value {
+                text.wrappedValue = value
+            }
+        }
+
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            onBeganEditing()
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            onSubmit()
+            return true
+        }
+    }
+}
+
+private final class TokenUITextField: UITextField {
+    var onDeleteBackwardWhenEmpty: (() -> Void)?
+
+    /// Keep a stable size so FlowLayout does not relayout (and steal focus) per keystroke.
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: 128, height: CollapsedTokenMetrics.lineHeight)
+    }
+
+    override func deleteBackward() {
+        if (text ?? "").isEmpty {
+            onDeleteBackwardWhenEmpty?()
+            return
+        }
+        super.deleteBackward()
     }
 }

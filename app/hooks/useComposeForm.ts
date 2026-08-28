@@ -14,6 +14,7 @@ import {
 	stripHtml,
 	toEmailListValue,
 } from "~/lib/utils";
+import { displaySenderName } from "shared/sender";
 import { useDeleteEmail, useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
@@ -63,7 +64,12 @@ function buildForwardBody(
 	original: NonNullable<ReturnType<typeof useUIStore.getState>["composeOptions"]["originalEmail"]>,
 	sigBlock: string,
 ) {
-	const safeSender = escapeHtml(original.sender);
+	const senderLabel = displaySenderName(original);
+	const safeSender = escapeHtml(
+		senderLabel !== original.sender
+			? `${senderLabel} <${original.sender}>`
+			: original.sender,
+	);
 	const safeSubject = escapeHtml(original.subject);
 	const safeBody = escapeHtml(stripHtml(original.body || "")).replace(/\n/g, "<br>");
 
@@ -134,7 +140,7 @@ function buildInitialComposeFields(
 			...EMPTY_FIELDS,
 			to: original.sender,
 			subject: getPrefixedSubject(original.subject, "Re"),
-			body: `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}${buildQuotedReplyBlock(original.date, original.sender, original.body || "")}`,
+			body: `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}${buildQuotedReplyBlock(original.date, displaySenderName(original), original.body || "")}`,
 		};
 	}
 
@@ -144,7 +150,7 @@ function buildInitialComposeFields(
 			...EMPTY_FIELDS,
 			...recipients,
 			subject: getPrefixedSubject(original.subject, "Re"),
-			body: `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}${buildQuotedReplyBlock(original.date, original.sender, original.body || "")}`,
+			body: `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}${buildQuotedReplyBlock(original.date, displaySenderName(original), original.body || "")}`,
 		};
 	}
 

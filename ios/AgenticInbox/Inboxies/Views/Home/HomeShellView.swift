@@ -5,6 +5,7 @@ import SwiftUI
 struct HomeShellView: View {
     @Environment(AuthStore.self) private var auth
     @Environment(AppModel.self) private var app
+    @Environment(\.undoManager) private var undoManager
 
     @Namespace private var tabNamespace
 
@@ -13,6 +14,7 @@ struct HomeShellView: View {
     @State private var chatSeedPrompt: String?
     @State private var pendingConversationId: String?
     @State private var tabNavigatingForward = true
+    @State private var registeredArchiveUndoID: UUID?
 
     private let folderTabs: [HomeTab] = [
         .chats,
@@ -36,12 +38,16 @@ struct HomeShellView: View {
             .sheet(isPresented: $showChat, onDismiss: dismissChat) {
                 chatSheet
             }
-            .sheet(item: selectedEmailItem) { item in
-                EmailDetailView(email: item.email)
+            .sheet(item: selectedEmailItem) { _ in
+                EmailDetailView()
             }
             .sheet(isPresented: composeExpandedBinding) {
                 expandedComposeSheet
             }
+            .onChange(of: app.archiveUndo?.id) { _, newID in
+                registerArchiveUndoIfNeeded(newID)
+            }
+            .sensoryFeedback(.success, trigger: app.archiveUndo?.id)
     }
 
     private var shell: some View {
@@ -99,12 +105,37 @@ struct HomeShellView: View {
     @ViewBuilder
     private var composeChrome: some View {
         VStack(spacing: 10) {
+            if let offer = app.archiveUndo {
+                UndoToastBanner(message: "Archived") {
+                    Task { await app.undoArchive(offer) }
+                }
+                .padding(.horizontal, 16)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             if let session = app.composeSession, session.isMinimized {
                 ComposeDockBar(session: session)
             }
             bottomBar
         }
         .padding(.bottom, 10)
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: app.archiveUndo?.id)
+    }
+
+    private func registerArchiveUndoIfNeeded(_ newID: UUID?) {
+        guard let newID, let offer = app.archiveUndo, offer.id == newID else {
+            if newID == nil {
+                registeredArchiveUndoID = nil
+            }
+            return
+        }
+        guard registeredArchiveUndoID != newID else { return }
+        registeredArchiveUndoID = newID
+        undoManager?.registerUndo(withTarget: app) { model in
+            Task { @MainActor in
+                await model.undoArchive(offer)
+            }
+        }
+        undoManager?.setActionName("Archive")
     }
 
     private var selectedEmailItem: Binding<IdentifiedEmail?> {
@@ -145,40 +176,72 @@ struct HomeShellView: View {
                 auth.signOut()
             }
         } label: {
-            Text(initials)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(AppTheme.ink)
-                .frame(width: 40, height: 40)
-                .background(AppTheme.pillFill, in: Circle())
+            mailboxAvatar(initials: initials)
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .accessibilityLabel("Mailbox")
-        .accessibilityValue(mailboxTitle)
+        .accessibilityValue("\(mailboxName), \(mailboxTitle)")
+    }
+
+    private func mailboxAvatar(initials: String) -> some View {
+        Text(initials)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(AppTheme.ink)
+            .frame(width: 52, height: 52)
+            .background(AppTheme.pillFill, in: Circle())
     }
 
     private var topBar: some View {
-        HStack() {
-            mailboxButton
-
-            if app.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            }
-
-            if !mailboxTitle.isEmpty {
-                Text(mailboxTitle)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(AppTheme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .truncationMode(.middle)
-            }
+        HStack(alignment: .center, spacing: 12) {
+            mailboxControl
+            mailboxIdentity
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 4)
+        .skeletonPulse(app.isMailboxLoading)
+        .modifier(MailboxLoadingAccessibility(isLoading: app.isMailboxLoading))
+    }
+
+    /// Same 52pt circle whether the menu is ready or still a skeleton, so the
+    /// initial never pops in and shoves the title.
+    @ViewBuilder
+    private var mailboxControl: some View {
+        ZStack {
+            mailboxButton
+                .opacity(app.isMailboxLoading ? 0 : 1)
+                .allowsHitTesting(!app.isMailboxLoading)
+                .accessibilityHidden(app.isMailboxLoading)
+            if app.isMailboxLoading {
+                Circle()
+                    .fill(AppTheme.pillFill)
+                    .frame(width: 52, height: 52)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(width: 52, height: 52)
+    }
+
+    /// Two-line title is always laid out so the tab strip does not jump when
+    /// the mailbox name/email arrive.
+    private var mailboxIdentity: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(app.isMailboxLoading ? "Mailbox Name" : displayMailboxName)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(AppTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .truncationMode(.tail)
+            Text(app.isMailboxLoading ? "name@inboxies.email" : displayMailboxTitle)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(AppTheme.muted)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .opacity(!app.isMailboxLoading && mailboxTitle.isEmpty ? 0 : 1)
+        }
+        .redacted(reason: app.isMailboxLoading ? .placeholder : [])
     }
 
     private var tabStrip: some View {
@@ -208,10 +271,10 @@ struct HomeShellView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: tab.systemImage)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                             if active {
                                 Text(tab.title)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                                     .transition(
@@ -222,7 +285,7 @@ struct HomeShellView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .foregroundStyle(active ? Color.white : AppTheme.ink)
+                        .foregroundStyle(AppTheme.ink)
                         .background {
                             Capsule()
                                 .fill(AppTheme.pillFill)
@@ -249,7 +312,11 @@ struct HomeShellView: View {
         Group {
             switch app.selectedTab {
             case .folder:
-                EmailListView(emails: app.emails) { email in
+                EmailListView(
+                    emails: app.emails,
+                    isLoading: app.isLoading,
+                    onRefresh: { await app.refreshCurrentTab() }
+                ) { email in
                     Task { await app.openEmail(email) }
                 }
             case .chats:
@@ -326,13 +393,52 @@ struct HomeShellView: View {
         app.selectedMailbox?.email ?? auth.userEmail ?? ""
     }
 
+    /// Non-empty stand-in so the subtitle line keeps its height after load.
+    private var displayMailboxTitle: String {
+        mailboxTitle.isEmpty ? " " : mailboxTitle
+    }
+
+    private var mailboxName: String {
+        let mailbox = app.selectedMailbox
+        if let fromName = mailbox?.settings?.fromName, !fromName.isEmpty {
+            return fromName
+        }
+        if let name = mailbox?.name, !name.isEmpty, name != mailbox?.email {
+            return name
+        }
+        if let local = mailboxTitle.split(separator: "@").first, !local.isEmpty {
+            return String(local)
+        }
+        return mailbox?.name ?? mailboxTitle
+    }
+
+    private var displayMailboxName: String {
+        mailboxName.isEmpty ? " " : mailboxName
+    }
+
     private var initials: String {
-        let source = mailboxTitle.isEmpty ? "A" : mailboxTitle
+        let source = mailboxName.isEmpty ? (mailboxTitle.isEmpty ? "A" : mailboxTitle) : mailboxName
         return String(source.prefix(1)).uppercased()
     }
 }
 
 private struct IdentifiedEmail: Identifiable {
-    var id: String { email.id }
+    /// Stable id so prev/next email swaps don't dismiss and re-present the sheet.
+    var id: String { "email-detail" }
     let email: Email
+}
+
+private struct MailboxLoadingAccessibility: ViewModifier {
+    var isLoading: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isLoading {
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Loading mailbox")
+        } else {
+            content
+        }
+    }
 }

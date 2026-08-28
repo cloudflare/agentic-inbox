@@ -3,11 +3,13 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Badge, Button, Loader, Pagination, Tooltip } from "@cloudflare/kumo";
-import { ArrowLeftIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, MagnifyingGlassIcon, PaperclipIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
+import { Folders } from "shared/folders";
 import MailboxSplitView from "~/components/MailboxSplitView";
-import { formatListDate, getSnippetText } from "~/lib/utils";
+import { formatListDate, getSnippetText, hasFileAttachment } from "~/lib/utils";
+import { displaySenderName } from "shared/sender";
 import { useUpdateEmail } from "~/queries/emails";
 import { useSearchEmails, SEARCH_PAGE_SIZE } from "~/queries/search";
 import { useUIStore } from "~/hooks/useUIStore";
@@ -64,8 +66,9 @@ export default function SearchResultsRoute() {
 	const totalCount = searchData?.totalCount ?? 0;
 	const isPanelOpen = selectedEmailId !== null || isComposing;
 
-	const handleRowClick = (email: Email) => { selectEmail(email.id); if (!email.read && mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } }); };
+	const handleRowClick = (email: Email) => { selectEmail(email.id); if (!email.read && email.folder_id !== Folders.DRAFT && mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } }); };
 	const folderDisplayName = (name: string | null | undefined): string => { if (!name) return ""; const map: Record<string, string> = { inbox: "Inbox", sent: "Sent", draft: "Drafts", archive: "Archive", trash: "Trash" }; return map[name.toLowerCase()] || name; };
+	const isUnread = (email: Email) => !email.read && email.folder_id !== Folders.DRAFT;
 
 	return (
 		<MailboxSplitView
@@ -92,10 +95,10 @@ export default function SearchResultsRoute() {
 							const folderName = (email as Email & { folder_name?: string }).folder_name;
 							return (
 								<div key={email.id} role="button" tabIndex={0} onClick={() => handleRowClick(email)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleRowClick(email); } }} className={`group flex items-center gap-3 w-full text-left cursor-pointer transition-colors border-b border-kumo-line px-4 py-2.5 md:px-5 md:py-3 ${isPanelOpen ? "md:px-4 md:py-2.5" : ""} ${isSelected ? "bg-kumo-tint" : "hover:bg-kumo-tint"}`}>
-									<div className="w-2.5 shrink-0 flex justify-center">{!email.read && <div className="h-2 w-2 rounded-full bg-kumo-brand" />}</div>
+									<div className="w-2.5 shrink-0 flex justify-center">{isUnread(email) && <div className="h-2 w-2 rounded-full bg-kumo-brand" />}</div>
 									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2"><span className={`truncate text-sm ${!email.read ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}>{highlightTerms(email.sender.split("@")[0], urlQuery)}</span>{folderName && <Badge variant="outline">{folderDisplayName(folderName)}</Badge>}<span className="text-sm text-kumo-subtle shrink-0 ml-auto">{formatListDate(email.date)}</span></div>
-										<div className={`truncate text-sm mt-0.5 ${!email.read ? "font-medium text-kumo-default" : "text-kumo-subtle"}`}>{highlightTerms(email.subject, urlQuery)}</div>
+										<div className="flex items-center gap-2"><span className={`truncate text-sm ${isUnread(email) ? "font-semibold text-kumo-default" : "text-kumo-strong"}`}>{highlightTerms(displaySenderName(email), urlQuery)}</span>{folderName && <Badge variant="outline">{folderDisplayName(folderName)}</Badge>}<span className="text-sm text-kumo-subtle shrink-0 ml-auto flex items-center gap-1.5">{hasFileAttachment(email) && <PaperclipIcon size={12} className="shrink-0" aria-label="Has attachment" />}{formatListDate(email.date)}</span></div>
+										<div className={`truncate text-sm mt-0.5 ${isUnread(email) ? "font-medium text-kumo-default" : "text-kumo-subtle"}`}>{highlightTerms(email.subject, urlQuery)}</div>
 										{snippet && <div className="truncate text-xs text-kumo-subtle mt-0.5">{highlightTerms(snippet, urlQuery)}</div>}
 									</div>
 								</div>
