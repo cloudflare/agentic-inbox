@@ -15,11 +15,24 @@ import {
 	buildThreadingHeaders,
 	listMailboxes,
 } from "./lib/email-helpers";
+import {
+	displayNameFromAddressField,
+	normalizeDisplayName,
+	senderNameFromRawHeaders,
+} from "../shared/sender";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
+import {
+	AUTO_CONVERSATION_ID,
+	agentInstanceName,
+} from "../shared/agent-conversations";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import {
+	issueMobileSessionToken,
+	verifyAppleIdentityToken,
+} from "./lib/apple-auth";
 
 type AppContext = Context<MailboxContext>;
 
@@ -185,7 +198,9 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
 	await stub.createEmail(Folders.SENT, {
-		id: messageId, subject, sender: fromEmail, recipient: toStr,
+		id: messageId, subject, sender: fromEmail,
+		sender_name: displayNameFromAddressField(from),
+		recipient: toStr,
 		cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
 		bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
 		date: new Date().toISOString(), body: html || text || "",
@@ -294,6 +309,131 @@ app.delete("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => 
 	return ok ? c.body(null, 204) : c.json({ error: "Folder not found or cannot be deleted" }, 400);
 });
 
+// -- Agent conversations (multi-chat registry for mobile / future web) ----
+
+app.get("/api/v1/mailboxes/:mailboxId/agent/conversations", async (c: AppContext) => {
+	const stub = c.var.mailboxStub as any;
+	await stub.ensureAutoAgentConversation();
+	return c.json(await stub.listAgentConversations());
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/agent/conversations", async (c: AppContext) => {
+	const body = (await c.req.json().catch(() => ({}))) as { title?: string };
+	const stub = c.var.mailboxStub as any;
+	const conversation = await stub.createAgentConversation({
+		title: body.title,
+	});
+	return c.json(conversation, 201);
+});
+
+app.patch(
+	"/api/v1/mailboxes/:mailboxId/agent/conversations/:conversationId",
+	async (c: AppContext) => {
+		const conversationId = c.req.param("conversationId")!;
+		const body = (await c.req.json()) as {
+			title?: string;
+			lastMessagePreview?: string | null;
+		};
+		const stub = c.var.mailboxStub as any;
+		const updated = await stub.updateAgentConversation(conversationId, body);
+		return updated
+			? c.json(updated)
+			: c.json({ error: "Conversation not found" }, 404);
+	},
+);
+
+app.delete(
+	"/api/v1/mailboxes/:mailboxId/agent/conversations/:conversationId",
+	async (c: AppContext) => {
+		const conversationId = c.req.param("conversationId")!;
+		if (conversationId === AUTO_CONVERSATION_ID) {
+			return c.json({ error: "Cannot delete the auto-drafts conversation" }, 400);
+		}
+		const stub = c.var.mailboxStub as any;
+		const ok = await stub.deleteAgentConversation(conversationId);
+		return ok ? c.body(null, 204) : c.json({ error: "Conversation not found" }, 404);
+	},
+);
+
+// -- Auth (mobile Sign in with Apple) --------------------------------
+
+const AppleAuthBody = z.object({
+	identityToken: z.string().min(1),
+	fullName: z
+		.object({
+			givenName: z.string().optional(),
+			familyName: z.string().optional(),
+		})
+		.optional(),
+});
+
+app.post("/api/v1/auth/apple", async (c) => {
+	const appleClientId = c.env.APPLE_CLIENT_ID;
+	const mobileSecret = c.env.MOBILE_JWT_SECRET;
+	if (!appleClientId || !mobileSecret) {
+		return c.json(
+			{
+				error:
+					"Apple Sign In is not configured. Set APPLE_CLIENT_ID and MOBILE_JWT_SECRET secrets.",
+			},
+			503,
+		);
+	}
+
+	const parsed = AppleAuthBody.safeParse(await c.req.json());
+	if (!parsed.success) {
+		return c.json({ error: "identityToken is required" }, 400);
+	}
+
+	try {
+		const claims = await verifyAppleIdentityToken(
+			parsed.data.identityToken,
+			appleClientId,
+		);
+		const session = await issueMobileSessionToken(mobileSecret, {
+			sub: claims.sub,
+			email: claims.email,
+			auth: "apple",
+		});
+		return c.json({
+			token: session.token,
+			expiresAt: session.expiresAt,
+			user: {
+				id: claims.sub,
+				email: claims.email ?? null,
+				fullName: parsed.data.fullName ?? null,
+			},
+		});
+	} catch (e) {
+		console.error("Apple auth failed:", (e as Error).message);
+		return c.json({ error: "Invalid Apple identity token" }, 401);
+	}
+});
+
+/**
+ * Local-only helper so the iOS simulator can exercise the app without a real
+ * Apple identity token. Disabled outside development.
+ */
+app.post("/api/v1/auth/dev", async (c) => {
+	if (!import.meta.env.DEV) {
+		return c.json({ error: "Dev auth is only available in local development" }, 404);
+	}
+	const mobileSecret =
+		c.env.MOBILE_JWT_SECRET || "dev-mobile-jwt-secret-change-me";
+	const body = (await c.req.json().catch(() => ({}))) as { email?: string };
+	const email = body.email?.trim() || "dev@example.com";
+	const session = await issueMobileSessionToken(mobileSecret, {
+		sub: `dev:${email}`,
+		email,
+		auth: "dev",
+	});
+	return c.json({
+		token: session.token,
+		expiresAt: session.expiresAt,
+		user: { id: `dev:${email}`, email, fullName: null },
+	});
+});
+
 // -- Search ---------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
@@ -392,21 +532,47 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 
 	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
 
+	const fromAddress = (parsedEmail.from?.address || "").toLowerCase();
+	const fromHeaders = JSON.stringify(parsedEmail.headers);
+	const senderName =
+		normalizeDisplayName(parsedEmail.from?.name) ??
+		senderNameFromRawHeaders(fromHeaders);
+
 	await stub.createEmail(Folders.INBOX, {
 		id: messageId, subject: parsedEmail.subject || "",
-		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", "),
+		sender: fromAddress, sender_name: senderName, recipient: allRecipients.join(", "),
 		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
 		date: new Date().toISOString(), // uses receive time, not the email's Date header
 		body: parsedEmail.html || parsedEmail.text || "",
 		in_reply_to: inReplyTo, email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
-		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
+		thread_id: threadId, message_id: originalMessageId, raw_headers: fromHeaders,
 	}, attachmentData);
 
-	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
-	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
-		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
-	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+	// Auto-drafts land in the reserved multi-chat conversation so user chats stay clean.
+	ctx.waitUntil(
+		(async () => {
+			await stub.ensureAutoAgentConversation();
+			const agentName = agentInstanceName(mailboxId, AUTO_CONVERSATION_ID);
+			const agentStub = env.EMAIL_AGENT.get(
+				env.EMAIL_AGENT.idFromName(agentName),
+			);
+			await agentStub.fetch(
+				new Request("https://agents/onNewEmail", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						mailboxId,
+						emailId: messageId,
+						sender: (parsedEmail.from?.address || "").toLowerCase(),
+						subject: parsedEmail.subject || "",
+						threadId,
+					}),
+				}),
+			);
+		})().catch((e) =>
+			console.error("Auto-draft trigger failed:", (e as Error).message),
+		),
+	);
 }
 
 export { app, receiveEmail };

@@ -1,0 +1,39 @@
+name: Inboxies
+options:
+  bundleIdPrefix: co.inboxies
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    TARGETED_DEVICE_FAMILY: "1"
+    DEVELOPMENT_TEAM: B6X6773H7F
+    SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: false
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: false
+targets:
+  Inboxies:
+    type: application
+    platform: iOS
+    sources:
+      - path: Inboxies
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.inboxies.app
+        INFOPLIST_FILE: Inboxies/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Inboxies/Inboxies.entitlements
+        GENERATE_INFOPLIST_FILE: false
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "1.0"
+        INFOPLIST_KEY_CFBundleDisplayName: Inboxies
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        SUPPORTS_MACCATALYST: false
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: false
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: false
+schemes:
+  Inboxies:
+    build:
+      targets:
+        Inboxies: all
+    run:
+      config: Debug

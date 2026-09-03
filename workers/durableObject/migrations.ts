@@ -168,4 +168,27 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
 	},
+	{
+		name: "9_add_agent_conversations",
+		sql: txn(`
+            CREATE TABLE agent_conversations (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_message_preview TEXT
+            );
+
+			CREATE INDEX IF NOT EXISTS idx_agent_conversations_updated
+                ON agent_conversations(updated_at DESC);
+        `),
+	},
+	{
+		name: "10_add_sender_name",
+		sql: txn(`ALTER TABLE emails ADD COLUMN sender_name TEXT;`),
+	},
+	{
+		name: "11_mark_draft_emails_as_read",
+		sql: txn(`UPDATE emails SET read = 1 WHERE folder_id = 'draft' AND read = 0;`),
+	},
 ];

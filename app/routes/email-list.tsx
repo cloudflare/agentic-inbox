@@ -10,6 +10,7 @@ import {
 	EnvelopeOpenIcon,
 	EnvelopeSimpleIcon,
 	FileIcon,
+	PaperclipIcon,
 	PaperPlaneTiltIcon,
 	PencilSimpleIcon,
 	StarIcon,
@@ -21,8 +22,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { Folders } from "shared/folders";
 import { formatListDate } from "shared/dates";
+import { formatParticipants } from "shared/sender";
 import MailboxSplitView from "~/components/MailboxSplitView";
-import { getSnippetText } from "~/lib/utils";
+import { getSnippetText, hasFileAttachment } from "~/lib/utils";
 import {
 	useDeleteEmail,
 	useEmails,
@@ -232,9 +234,8 @@ export default function EmailListRoute() {
 
 	// Thread-aware helpers
 	const hasUnread = (email: Email): boolean => {
-		if (email.thread_unread_count !== undefined) {
-			return email.thread_unread_count > 0;
-		}
+		if (email.folder_id === Folders.DRAFT) return false;
+		if ((email.thread_unread_count ?? 0) > 0) return true;
 		return !email.read;
 	};
 
@@ -254,18 +255,6 @@ export default function EmailListRoute() {
 				});
 			}
 		}
-	};
-
-	const formatParticipants = (email: Email): string => {
-		if (email.participants) {
-			const names = email.participants
-				.split(",")
-				.map((p) => p.trim().split("@")[0])
-				.filter((name, idx, arr) => arr.indexOf(name) === idx);
-			if (names.length <= 3) return names.join(", ");
-			return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
-		}
-		return email.sender.split("@")[0];
 	};
 
 	return (
@@ -384,7 +373,14 @@ export default function EmailListRoute() {
 														</span>
 													</Tooltip>
 												)}
-												<span className="text-sm text-kumo-subtle shrink-0 ml-auto">
+												<span className="text-sm text-kumo-subtle shrink-0 ml-auto flex items-center gap-1.5">
+													{hasFileAttachment(email) && (
+														<PaperclipIcon
+															size={12}
+															className="shrink-0"
+															aria-label="Has attachment"
+														/>
+													)}
 													{formatListDate(email.date)}
 												</span>
 											</div>

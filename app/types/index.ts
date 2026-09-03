@@ -29,6 +29,7 @@ export interface Email {
 	folder_id?: string | null;
 	subject: string;
 	sender: string;
+	sender_name?: string | null;
 	recipient: string;
 	cc?: string;
 	bcc?: string;
@@ -48,6 +49,7 @@ export interface Email {
 	participants?: string;
 	needs_reply?: boolean;
 	has_draft?: boolean;
+	has_attachment?: boolean;
 }
 
 export interface Attachment {
@@ -63,4 +65,12 @@ export interface Folder {
 	id: string;
 	name: string;
 	unreadCount: number;
+}
+
+export interface AgentConversation {
+	id: string;
+	title: string;
+	createdAt: string;
+	updatedAt: string;
+	lastMessagePreview?: string | null;
 }

@@ -15,6 +15,7 @@ import {
 	resolveOriginalEmail,
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
+import { displayNameFromAddressField } from "../../shared/sender";
 import { Folders } from "../../shared/folders";
 import type { MailboxContext } from "../lib/mailbox";
 
@@ -61,6 +62,7 @@ export async function handleReplyEmail(c: AppContext) {
 			id: messageId,
 			subject,
 			sender: fromEmail,
+			sender_name: displayNameFromAddressField(from),
 			recipient: toStr,
 			cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
 			bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
@@ -151,6 +153,7 @@ export async function handleForwardEmail(c: AppContext) {
 			id: messageId,
 			subject,
 			sender: fromEmail,
+			sender_name: displayNameFromAddressField(from),
 			recipient: toStr,
 			cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
 			bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,

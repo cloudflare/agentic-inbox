@@ -152,14 +152,24 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 				title={status === 404 ? "404 — Page not found" : title}
 				description={description}
 				contents={
-					<Button
-						variant="primary"
-						onClick={() => {
-							window.location.href = "/";
-						}}
-					>
-						Go Home
-					</Button>
+					<div className="flex gap-2">
+						<Button
+							variant="primary"
+							onClick={() => {
+								window.location.href = "/";
+							}}
+						>
+							Go Home
+						</Button>
+						<Button
+							variant="secondary"
+							onClick={() => {
+								window.location.href = "/cdn-cgi/access/logout";
+							}}
+						>
+							Log out
+						</Button>
+					</div>
 				}
 			/>
 		</div>

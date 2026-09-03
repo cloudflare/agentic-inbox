@@ -81,6 +81,17 @@ export default function SettingsRoute() {
 							onChange={(e) => setDisplayName(e.target.value)}
 						/>
 						<Input label="Email" type="email" value={mailbox.email} disabled />
+						<div className="pt-2">
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={() => {
+									window.location.href = "/cdn-cgi/access/logout";
+								}}
+							>
+								Log out of Cloudflare Access
+							</Button>
+						</div>
 					</div>
 				</div>
 

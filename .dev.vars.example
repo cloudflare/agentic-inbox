@@ -1,3 +1,9 @@
 # Cloudflare Access (required in production). TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 POLICY_AUD=your-access-policy-audience-tag
 TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+
+# iOS Sign in with Apple (optional locally; required for production mobile auth)
+# APPLE_CLIENT_ID is the iOS app bundle identifier (aud claim on Apple identity tokens).
+APPLE_CLIENT_ID=com.example.AgenticInbox
+# HS256 secret used to mint/verify mobile session JWTs after Apple Sign In.
+MOBILE_JWT_SECRET=dev-mobile-jwt-secret-change-me

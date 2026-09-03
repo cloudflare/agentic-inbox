@@ -1,0 +1,420 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		12FD0B712C114D8F82E0825F /* Services/AgentChatClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2153D18D975F436E94786CB2 /* Services/AgentChatClient.swift */; };
+		18F25040136B47988CE9E925 /* Theme/AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */; };
+		C1D2E3F4A5B6478990ABCD04 /* Theme/LiquidGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7478990ABCD04 /* Theme/LiquidGlass.swift */; };
+		219CF0985CEB43F58D0A6180 /* Views/Chat/ChatSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D339D5F9D3E646D58813D854 /* Views/Chat/ChatSheetView.swift */; };
+		23E7B306C65E4F21A0AEB90C /* Views/Home/HomeShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74318D3C6D954DCA9AE3A5EF /* Views/Home/HomeShellView.swift */; };
+		D2E3F4A5B6C7478990ABCD05 /* Views/Home/FolderTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F4A5B6C7D8478990ABCD05 /* Views/Home/FolderTabBar.swift */; };
+		2EC70370129F423785536DB2 /* Services/AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010262344D5842BD893A671C /* Services/AppModel.swift */; };
+		340C18C527B44FD1B96E612C /* Services/AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43432D294A6A4E8886288B5C /* Services/AuthStore.swift */; };
+		36FD2CCDC03848B0B12D0871 /* InboxiesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA5A54FAAA74727A76C3CC2 /* InboxiesApp.swift */; };
+		411FB5F3E3824817A4909D02 /* Views/Email/EmailDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68CBCACD0F1941F796F4F461 /* Views/Email/EmailDetailView.swift */; };
+		46DAC9E33345457C952F8E8E /* Services/APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 083DA184D3E44E4895F6F2E1 /* Services/APIClient.swift */; };
+		4E114F70C529443291821DA5 /* Views/Search/SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83D37F469E5F418DB189BA76 /* Views/Search/SearchView.swift */; };
+		5369F800D7D2405DBBF9A789 /* Views/RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 063B7A93C3B6424791462165 /* Views/RootView.swift */; };
+		61D0A24CAA2F48D88FF6EB52 /* Config/AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CCC0BA3ECA48D3ACAAD064 /* Config/AppConfig.swift */; };
+		657FD1C8E2A34619AC81A913 /* Models/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81A66857B664AEE886504D3 /* Models/Models.swift */; };
+		83101517849E451C9A64357A /* Views/Auth/SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7BDA4C7494146D8B2557D10 /* Views/Auth/SignInView.swift */; };
+		C543C24F6A504509B345B919 /* Views/Email/EmailListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA619084E624222B919A7C4 /* Views/Email/EmailListView.swift */; };
+		7E8CC069F60B4F6283899600 /* Services/ComposeFormModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */; };
+		08C8AEBB61714B47A9B57E95 /* Views/Compose/ComposeDockBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276C8945F603459A8A0C1FBE /* Views/Compose/ComposeDockBar.swift */; };
+		B79E45379B0F49C6AB6CD957 /* Views/Compose/ComposeSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898D73DC019C4035B7FA5403 /* Views/Compose/ComposeSheetView.swift */; };
+		0A8E360836CB41A7892396E2 /* Views/Email/AttachmentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF772F64F27842E2A7E84279 /* Views/Email/AttachmentListView.swift */; };
+		5C6166AA480E4D3C8C0FE11B /* Views/Email/EmailBodyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B572B6236F2243868CCEFD07 /* Views/Email/EmailBodyView.swift */; };
+		6AE0059EAD914AD79D02011F /* Views/Email/EmailActionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B6D0BA36EC4EE7BEC367D7 /* Views/Email/EmailActionsSheet.swift */; };
+		D9F52B3A0C8E5F7B9D1E2345 /* Views/Components/UndoToastBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E41A2F9B7D4E6A8C0F1234 /* Views/Components/UndoToastBanner.swift */; };
+		4A0B2D3F9C7E5B22C1F6D8E5 /* Views/Components/FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9A1C2E8B6D4A11B0E5C7D4 /* Views/Components/FlowLayout.swift */; };
+		B1C2D3E4F5A6478990ABCD01 /* Services/SwipeActionPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD01 /* Services/SwipeActionPreferences.swift */; };
+		B1C2D3E4F5A6478990ABCD02 /* Services/EmailActionExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD02 /* Services/EmailActionExecutor.swift */; };
+		B1C2D3E4F5A6478990ABCD03 /* Views/Settings/SettingsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD03 /* Views/Settings/SettingsSheetView.swift */; };
+		B1C2D3E4F5A6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */; };
+		B1C2D3E4F5A6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */; };
+		B1C2D3E4F5A6478990ABCD06 /* Views/PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		010262344D5842BD893A671C /* Services/AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AppModel.swift; sourceTree = "<group>"; };
+		063B7A93C3B6424791462165 /* Views/RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/RootView.swift; sourceTree = "<group>"; };
+		083DA184D3E44E4895F6F2E1 /* Services/APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/APIClient.swift; sourceTree = "<group>"; };
+		1ADA91EDA69A47BA95EB9514 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1CA5A54FAAA74727A76C3CC2 /* InboxiesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxiesApp.swift; sourceTree = "<group>"; };
+		2153D18D975F436E94786CB2 /* Services/AgentChatClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AgentChatClient.swift; sourceTree = "<group>"; };
+		21CCC0BA3ECA48D3ACAAD064 /* Config/AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config/AppConfig.swift; sourceTree = "<group>"; };
+		28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/AppTheme.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7478990ABCD04 /* Theme/LiquidGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/LiquidGlass.swift; sourceTree = "<group>"; };
+		43432D294A6A4E8886288B5C /* Services/AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AuthStore.swift; sourceTree = "<group>"; };
+		68CBCACD0F1941F796F4F461 /* Views/Email/EmailDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailDetailView.swift; sourceTree = "<group>"; };
+		74318D3C6D954DCA9AE3A5EF /* Views/Home/HomeShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Home/HomeShellView.swift; sourceTree = "<group>"; };
+		E3F4A5B6C7D8478990ABCD05 /* Views/Home/FolderTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Home/FolderTabBar.swift; sourceTree = "<group>"; };
+		83D37F469E5F418DB189BA76 /* Views/Search/SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Search/SearchView.swift; sourceTree = "<group>"; };
+		84F2F99145F3443BBB8E283E /* Inboxies.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Inboxies.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B7BDA4C7494146D8B2557D10 /* Views/Auth/SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Auth/SignInView.swift; sourceTree = "<group>"; };
+		D339D5F9D3E646D58813D854 /* Views/Chat/ChatSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Chat/ChatSheetView.swift; sourceTree = "<group>"; };
+		D81A66857B664AEE886504D3 /* Models/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Models.swift; sourceTree = "<group>"; };
+		F444315A11E44D83826E7D65 /* Inboxies.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Inboxies.entitlements; sourceTree = "<group>"; };
+		FAA619084E624222B919A7C4 /* Views/Email/EmailListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailListView.swift; sourceTree = "<group>"; };
+		09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ComposeFormModel.swift; sourceTree = "<group>"; };
+		276C8945F603459A8A0C1FBE /* Views/Compose/ComposeDockBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Compose/ComposeDockBar.swift; sourceTree = "<group>"; };
+		898D73DC019C4035B7FA5403 /* Views/Compose/ComposeSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Compose/ComposeSheetView.swift; sourceTree = "<group>"; };
+		EF772F64F27842E2A7E84279 /* Views/Email/AttachmentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/AttachmentListView.swift; sourceTree = "<group>"; };
+		B572B6236F2243868CCEFD07 /* Views/Email/EmailBodyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailBodyView.swift; sourceTree = "<group>"; };
+		A6B6D0BA36EC4EE7BEC367D7 /* Views/Email/EmailActionsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailActionsSheet.swift; sourceTree = "<group>"; };
+		C8E41A2F9B7D4E6A8C0F1234 /* Views/Components/UndoToastBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/UndoToastBanner.swift; sourceTree = "<group>"; };
+		3F9A1C2E8B6D4A11B0E5C7D4 /* Views/Components/FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/FlowLayout.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD01 /* Services/SwipeActionPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/SwipeActionPreferences.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD02 /* Services/EmailActionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/EmailActionExecutor.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD03 /* Views/Settings/SettingsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/SettingsSheetView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/AgentPromptSettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/SwipeSettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/PreviewSupport.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5D87004AA269404390A77014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		718F166D78714FA78A5A37E8 = {
+			isa = PBXGroup;
+			children = (
+				D3E3E6419B804E808C731975 /* Inboxies */,
+				C44B4DF80ADE4AD9902FB46E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C44B4DF80ADE4AD9902FB46E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				84F2F99145F3443BBB8E283E /* Inboxies.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D3E3E6419B804E808C731975 /* Inboxies */ = {
+			isa = PBXGroup;
+			children = (
+				1CA5A54FAAA74727A76C3CC2 /* InboxiesApp.swift */,
+				21CCC0BA3ECA48D3ACAAD064 /* Config/AppConfig.swift */,
+				D81A66857B664AEE886504D3 /* Models/Models.swift */,
+				083DA184D3E44E4895F6F2E1 /* Services/APIClient.swift */,
+				2153D18D975F436E94786CB2 /* Services/AgentChatClient.swift */,
+				010262344D5842BD893A671C /* Services/AppModel.swift */,
+				43432D294A6A4E8886288B5C /* Services/AuthStore.swift */,
+				09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */,
+				A1B2C3D4E5F6478990ABCD01 /* Services/SwipeActionPreferences.swift */,
+				A1B2C3D4E5F6478990ABCD02 /* Services/EmailActionExecutor.swift */,
+				28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */,
+				B2C3D4E5F6A7478990ABCD04 /* Theme/LiquidGlass.swift */,
+				B7BDA4C7494146D8B2557D10 /* Views/Auth/SignInView.swift */,
+				D339D5F9D3E646D58813D854 /* Views/Chat/ChatSheetView.swift */,
+				276C8945F603459A8A0C1FBE /* Views/Compose/ComposeDockBar.swift */,
+				898D73DC019C4035B7FA5403 /* Views/Compose/ComposeSheetView.swift */,
+				EF772F64F27842E2A7E84279 /* Views/Email/AttachmentListView.swift */,
+				B572B6236F2243868CCEFD07 /* Views/Email/EmailBodyView.swift */,
+				A6B6D0BA36EC4EE7BEC367D7 /* Views/Email/EmailActionsSheet.swift */,
+				C8E41A2F9B7D4E6A8C0F1234 /* Views/Components/UndoToastBanner.swift */,
+				3F9A1C2E8B6D4A11B0E5C7D4 /* Views/Components/FlowLayout.swift */,
+				68CBCACD0F1941F796F4F461 /* Views/Email/EmailDetailView.swift */,
+				FAA619084E624222B919A7C4 /* Views/Email/EmailListView.swift */,
+				74318D3C6D954DCA9AE3A5EF /* Views/Home/HomeShellView.swift */,
+				E3F4A5B6C7D8478990ABCD05 /* Views/Home/FolderTabBar.swift */,
+				A1B2C3D4E5F6478990ABCD03 /* Views/Settings/SettingsSheetView.swift */,
+				A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */,
+				A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */,
+				A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */,
+				063B7A93C3B6424791462165 /* Views/RootView.swift */,
+				83D37F469E5F418DB189BA76 /* Views/Search/SearchView.swift */,
+				1ADA91EDA69A47BA95EB9514 /* Info.plist */,
+				F444315A11E44D83826E7D65 /* Inboxies.entitlements */,
+			);
+			path = Inboxies;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		33113F54BEEF49AE94810DA3 /* Inboxies */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9A8DC015703545A8A4CE5BFB /* Build configuration list for PBXNativeTarget "Inboxies" */;
+			buildPhases = (
+				AE98C3E856454DF7A38B7272 /* Sources */,
+				5D87004AA269404390A77014 /* Frameworks */,
+				D374C1C3D321457888E81CB3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Inboxies;
+			productName = Inboxies;
+			productReference = 84F2F99145F3443BBB8E283E /* Inboxies.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9BB052F9A81F42B8830069B2 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 2700;
+			};
+			buildConfigurationList = 0B245440D3704210BD80D3F3 /* Build configuration list for PBXProject "Inboxies" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 718F166D78714FA78A5A37E8;
+			productRefGroup = C44B4DF80ADE4AD9902FB46E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				33113F54BEEF49AE94810DA3 /* Inboxies */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D374C1C3D321457888E81CB3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AE98C3E856454DF7A38B7272 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				36FD2CCDC03848B0B12D0871 /* InboxiesApp.swift in Sources */,
+				61D0A24CAA2F48D88FF6EB52 /* Config/AppConfig.swift in Sources */,
+				657FD1C8E2A34619AC81A913 /* Models/Models.swift in Sources */,
+				46DAC9E33345457C952F8E8E /* Services/APIClient.swift in Sources */,
+				12FD0B712C114D8F82E0825F /* Services/AgentChatClient.swift in Sources */,
+				2EC70370129F423785536DB2 /* Services/AppModel.swift in Sources */,
+				340C18C527B44FD1B96E612C /* Services/AuthStore.swift in Sources */,
+				7E8CC069F60B4F6283899600 /* Services/ComposeFormModel.swift in Sources */,
+				18F25040136B47988CE9E925 /* Theme/AppTheme.swift in Sources */,
+				C1D2E3F4A5B6478990ABCD04 /* Theme/LiquidGlass.swift in Sources */,
+				83101517849E451C9A64357A /* Views/Auth/SignInView.swift in Sources */,
+				219CF0985CEB43F58D0A6180 /* Views/Chat/ChatSheetView.swift in Sources */,
+				08C8AEBB61714B47A9B57E95 /* Views/Compose/ComposeDockBar.swift in Sources */,
+				B79E45379B0F49C6AB6CD957 /* Views/Compose/ComposeSheetView.swift in Sources */,
+				0A8E360836CB41A7892396E2 /* Views/Email/AttachmentListView.swift in Sources */,
+				5C6166AA480E4D3C8C0FE11B /* Views/Email/EmailBodyView.swift in Sources */,
+				6AE0059EAD914AD79D02011F /* Views/Email/EmailActionsSheet.swift in Sources */,
+				D9F52B3A0C8E5F7B9D1E2345 /* Views/Components/UndoToastBanner.swift in Sources */,
+				4A0B2D3F9C7E5B22C1F6D8E5 /* Views/Components/FlowLayout.swift in Sources */,
+				411FB5F3E3824817A4909D02 /* Views/Email/EmailDetailView.swift in Sources */,
+				C543C24F6A504509B345B919 /* Views/Email/EmailListView.swift in Sources */,
+				23E7B306C65E4F21A0AEB90C /* Views/Home/HomeShellView.swift in Sources */,
+				D2E3F4A5B6C7478990ABCD05 /* Views/Home/FolderTabBar.swift in Sources */,
+				5369F800D7D2405DBBF9A789 /* Views/RootView.swift in Sources */,
+				4E114F70C529443291821DA5 /* Views/Search/SearchView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD01 /* Services/SwipeActionPreferences.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD02 /* Services/EmailActionExecutor.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD03 /* Views/Settings/SettingsSheetView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD06 /* Views/PreviewSupport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1149A85F68A1424D9E958638 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = B6X6773H7F;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		29D2485683094239A72E09B3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = B6X6773H7F;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		2F08F70CC3BF4FC3866A8685 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = Inboxies/Inboxies.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Inboxies/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Inboxies;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.inboxies.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		51B219445FFF45EBBA45DD05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = Inboxies/Inboxies.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Inboxies/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Inboxies;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.inboxies.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0B245440D3704210BD80D3F3 /* Build configuration list for PBXProject "Inboxies" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				29D2485683094239A72E09B3 /* Debug */,
+				1149A85F68A1424D9E958638 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9A8DC015703545A8A4CE5BFB /* Build configuration list for PBXNativeTarget "Inboxies" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F08F70CC3BF4FC3866A8685 /* Debug */,
+				51B219445FFF45EBBA45DD05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 9BB052F9A81F42B8830069B2 /* Project object */;
+}

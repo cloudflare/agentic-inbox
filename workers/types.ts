@@ -5,4 +5,8 @@
 export interface Env extends Cloudflare.Env {
 	POLICY_AUD: string;
 	TEAM_DOMAIN: string;
+	/** HS256 secret used to sign/verify iOS mobile session JWTs after Apple Sign In. */
+	MOBILE_JWT_SECRET?: string;
+	/** iOS app bundle ID — Apple identity token `aud` (e.g. com.example.AgenticInbox). */
+	APPLE_CLIENT_ID?: string;
 }
