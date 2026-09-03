@@ -12,6 +12,8 @@ struct EmailBodyView: View {
 
     @State private var htmlWithImages: String?
     @State private var webHeight: CGFloat = 1
+    @State private var isWebLoading = true
+    @State private var isResolvingImages = false
 
     private var isHTML: Bool {
         htmlOrText.range(of: #"</?[a-zA-Z][^>]*>"#, options: .regularExpression) != nil
@@ -21,12 +23,34 @@ struct EmailBodyView: View {
         htmlWithImages ?? htmlOrText
     }
 
+    private var showLoading: Bool {
+        isHTML && (isWebLoading || webHeight <= 1)
+    }
+
     var body: some View {
         Group {
             if isHTML {
-                HTMLWebView(html: wrappedHTML, contentHeight: $webHeight)
-                    .frame(maxWidth: .infinity, alignment: .top)
-                    .frame(height: webHeight)
+                VStack(alignment: .leading, spacing: 8) {
+                    if isResolvingImages && !showLoading {
+                        inlineImageLoadingBar
+                    }
+
+                    ZStack(alignment: .topLeading) {
+                        HTMLWebView(
+                            html: wrappedHTML,
+                            contentHeight: $webHeight,
+                            isLoading: $isWebLoading
+                        )
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .frame(height: max(webHeight, 1))
+                        .opacity(showLoading ? 0 : 1)
+
+                        if showLoading {
+                            bodySkeleton
+                                .transition(.opacity)
+                        }
+                    }
+                }
             } else {
                 Text(htmlOrText)
                     .font(.system(size: 14))
@@ -38,6 +62,51 @@ struct EmailBodyView: View {
         .task(id: resolveTaskID) {
             await resolveInlineImages()
         }
+    }
+
+    private var inlineImageLoadingBar: some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Loading inline images...")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(AppTheme.muted)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(AppTheme.pillFill)
+        .clipShape(Capsule())
+    }
+
+    private var bodySkeleton: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(isResolvingImages ? "Loading inline images..." : "Loading content...")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(AppTheme.muted)
+            }
+            .padding(.bottom, 2)
+
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(AppTheme.line)
+                    .frame(height: 14)
+                    .frame(maxWidth: .infinity)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(AppTheme.line)
+                    .frame(height: 14)
+                    .frame(width: 260)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(AppTheme.line)
+                    .frame(height: 14)
+                    .frame(width: 180)
+            }
+            .skeletonPulse(true)
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var resolveTaskID: String {
@@ -106,6 +175,9 @@ struct EmailBodyView: View {
         let targets = attachments.filter { $0.normalizedContentId != nil }
         guard !targets.isEmpty else { return }
 
+        isResolvingImages = true
+        defer { isResolvingImages = false }
+
         var replacements: [String: String] = [:]
         await withTaskGroup(of: (String, String)?.self) { group in
             for attachment in targets {
@@ -161,9 +233,10 @@ struct EmailBodyView: View {
 private struct HTMLWebView: UIViewRepresentable {
     let html: String
     @Binding var contentHeight: CGFloat
+    @Binding var isLoading: Bool
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(height: $contentHeight)
+        Coordinator(height: $contentHeight, isLoading: $isLoading)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -182,8 +255,12 @@ private struct HTMLWebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.height = $contentHeight
+        context.coordinator.isLoading = $isLoading
         guard context.coordinator.loadedHTML != html else { return }
         context.coordinator.loadedHTML = html
+        DispatchQueue.main.async {
+            self.isLoading = true
+        }
         // A real https origin lets remote images load. Do not use the API host —
         // email HTML is unsanitized and must not be same-origin with the backend.
         webView.loadHTMLString(html, baseURL: URL(string: "https://inboxies.invalid/"))
@@ -195,10 +272,12 @@ private struct HTMLWebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var height: Binding<CGFloat>
+        var isLoading: Binding<Bool>
         var loadedHTML: String?
 
-        init(height: Binding<CGFloat>) {
+        init(height: Binding<CGFloat>, isLoading: Binding<Bool>) {
             self.height = height
+            self.isLoading = isLoading
         }
 
         func userContentController(
@@ -214,6 +293,21 @@ private struct HTMLWebView: UIViewRepresentable {
                 "Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)"
             ) { [weak self] result, _ in
                 self?.applyHeight(result)
+                DispatchQueue.main.async {
+                    self?.isLoading.wrappedValue = false
+                }
+            }
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            DispatchQueue.main.async { [weak self] in
+                self?.isLoading.wrappedValue = false
+            }
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            DispatchQueue.main.async { [weak self] in
+                self?.isLoading.wrappedValue = false
             }
         }
 
@@ -233,7 +327,9 @@ private struct HTMLWebView: UIViewRepresentable {
                 if abs(self.height.wrappedValue - next) > 1 {
                     self.height.wrappedValue = next
                 }
+                self.isLoading.wrappedValue = false
             }
         }
     }
 }
+

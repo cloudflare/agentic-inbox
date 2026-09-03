@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Notion-inspired light palette. CSS variables → SwiftUI Color constants.
 enum AppTheme {
@@ -36,6 +37,56 @@ extension View {
     /// Gentle opacity pulse used while skeleton placeholders are on screen.
     func skeletonPulse(_ active: Bool) -> some View {
         modifier(SkeletonPulseModifier(active: active))
+    }
+}
+
+/// Shrinks this screen's large navigation title so more of the subject stays visible.
+struct DetailNavigationTitleFont: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        Controller()
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+
+    private final class Controller: UIViewController {
+        private var didApply = false
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            apply()
+        }
+
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            apply()
+        }
+
+        private func apply() {
+            guard !didApply, let bar = navigationController?.navigationBar else { return }
+            didApply = true
+            let largeFont = UIFont.systemFont(ofSize: AppTheme.FontSize.largeTitle, weight: .bold)
+            let inlineFont = UIFont.systemFont(ofSize: AppTheme.FontSize.inlineTitle, weight: .semibold)
+            let ink = UIColor(AppTheme.ink)
+
+            func styled(_ existing: UINavigationBarAppearance) -> UINavigationBarAppearance {
+                let appearance = existing.copy() as? UINavigationBarAppearance ?? existing
+                appearance.largeTitleTextAttributes[.font] = largeFont
+                appearance.largeTitleTextAttributes[.foregroundColor] = ink
+                appearance.titleTextAttributes[.font] = inlineFont
+                appearance.titleTextAttributes[.foregroundColor] = ink
+                return appearance
+            }
+
+            bar.standardAppearance = styled(bar.standardAppearance)
+            if let scrollEdge = bar.scrollEdgeAppearance {
+                bar.scrollEdgeAppearance = styled(scrollEdge)
+            } else {
+                bar.scrollEdgeAppearance = styled(bar.standardAppearance)
+            }
+            if let compact = bar.compactAppearance {
+                bar.compactAppearance = styled(compact)
+            }
+        }
     }
 }
 

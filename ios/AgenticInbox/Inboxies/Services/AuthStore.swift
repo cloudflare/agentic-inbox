@@ -14,6 +14,8 @@ final class AuthStore {
     var isAuthenticated: Bool { token != nil && !(token?.isEmpty ?? true) }
     var isBusy = false
     var errorMessage: String?
+    /// Preview hosts keep session in memory so Canvas cannot wipe the real Keychain.
+    var persistsSession = true
 
     init() {
         token = KeychainStore.read(tokenKey)
@@ -62,6 +64,7 @@ final class AuthStore {
     func signOut() {
         token = nil
         userEmail = nil
+        guard persistsSession else { return }
         KeychainStore.delete(tokenKey)
         UserDefaults.standard.removeObject(forKey: emailKey)
     }
@@ -69,6 +72,7 @@ final class AuthStore {
     private func persist(token: String, email: String?) {
         self.token = token
         self.userEmail = email
+        guard persistsSession else { return }
         KeychainStore.write(tokenKey, value: token)
         if let email {
             UserDefaults.standard.set(email, forKey: emailKey)

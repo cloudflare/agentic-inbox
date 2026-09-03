@@ -235,9 +235,7 @@ export default function EmailListRoute() {
 	// Thread-aware helpers
 	const hasUnread = (email: Email): boolean => {
 		if (email.folder_id === Folders.DRAFT) return false;
-		if (email.thread_unread_count !== undefined) {
-			return email.thread_unread_count > 0;
-		}
+		if ((email.thread_unread_count ?? 0) > 0) return true;
 		return !email.read;
 	};
 

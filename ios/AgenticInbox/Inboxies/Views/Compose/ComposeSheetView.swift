@@ -9,6 +9,9 @@ struct ComposeSheetView: View {
     @State private var showCloseActions = false
     @State private var showFromPicker = false
     @State private var recipientFocus: Field?
+    @State private var viewportHeight: CGFloat = 0
+    @State private var headerHeight: CGFloat = 0
+    @State private var showQuotedOriginal = false
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -27,19 +30,19 @@ struct ComposeSheetView: View {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        titleRow
-                        fromRow
-                        toRow
-                        if form.showCcBcc {
-                            ccRow
-                            bccRow
-                        }
-                        subjectRow
-                        divider
+                        composeHeader
+                            .onGeometryChange(for: CGFloat.self) { proxy in
+                                proxy.size.height
+                            } action: { headerHeight = $0 }
+
                         bodyEditor
-                            .frame(minHeight: 280)
+                            .frame(minHeight: editorMinHeight, alignment: .top)
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { viewportHeight = $0 }
+
                 if let error = form.errorMessage {
                     Text(error)
                         .font(.footnote)
@@ -48,11 +51,21 @@ struct ComposeSheetView: View {
                         .padding(.bottom, 8)
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let quoted = form.quotedOriginal, !showQuotedOriginal {
+                    quotedOriginalDock(quoted)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: showQuotedOriginal)
             .background(AppTheme.background)
-            .navigationBarTitleDisplayMode(.inline)
+            .background(DetailNavigationTitleFont())
+            .navigationTitle(form.displayTitle)
+            .navigationBarTitleDisplayMode(.large)
             .onChange(of: focusedField) { _, new in
                 if new == .subject || new == .body {
                     recipientFocus = nil
+                    form.commitPendingTokens()
                 }
             }
             .toolbar {
@@ -81,13 +94,23 @@ struct ComposeSheetView: View {
                 }
                 Button("Save Draft") {
                     Task {
-                        if await form.saveDraft() {
+                        if await form.saveDraft(explicit: true) {
+                            app.showToast("Draft saved")
                             app.minimizeCompose()
                         }
                     }
                 }
                 Button("Minimize") { app.minimizeCompose() }
                 Button("Cancel", role: .cancel) {}
+            }
+            .background {
+                Button {
+                    Task { await form.saveDraft(explicit: true) }
+                } label: {
+                    EmptyView()
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .opacity(0)
             }
             .confirmationDialog("From", isPresented: $showFromPicker, titleVisibility: .visible) {
                 ForEach(app.mailboxes) { mailbox in
@@ -97,16 +120,54 @@ struct ComposeSheetView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             }
+            .sheet(isPresented: $showQuotedOriginal) {
+                if let quoted = form.quotedOriginal {
+                    quotedOriginalSheet(quoted)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let toast = form.toast {
+                    HStack(spacing: 8) {
+                        Image(systemName: toast.isError ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(toast.isError ? .red : AppTheme.ink)
+
+                        Text(toast.message)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppTheme.ink)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(AppTheme.line.opacity(0.6), lineWidth: 0.5)
+                    }
+                    .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: form.toast?.id)
         }
     }
 
-    private var titleRow: some View {
-        Text(form.displayTitle)
-            .font(.system(size: AppTheme.FontSize.largeTitle, weight: .bold))
-            .foregroundStyle(AppTheme.ink)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 12)
+    private var editorMinHeight: CGFloat {
+        max(0, viewportHeight - headerHeight)
+    }
+
+    private var composeHeader: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            fromRow
+            toRow
+            if form.showCcBcc {
+                ccRow
+                bccRow
+            }
+            subjectRow
+            divider
+        }
+        .padding(.top, 8)
     }
 
     private var fromRow: some View {
@@ -128,7 +189,8 @@ struct ComposeSheetView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -170,6 +232,67 @@ struct ComposeSheetView: View {
         .scrollContentBackground(.hidden)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    private func quotedOriginalDock(_ quoted: QuotedOriginal) -> some View {
+        Button {
+            focusedField = nil
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                showQuotedOriginal = true
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "text.quote")
+                    .font(.system(size: AppTheme.FontSize.meta, weight: .semibold))
+                Text(quoted.header)
+                    .font(.system(size: AppTheme.FontSize.body, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 8)
+            }
+            .foregroundStyle(AppTheme.ink)
+            .padding(.horizontal, 18)
+            .frame(height: 48)
+            .frame(maxWidth: .infinity)
+            .background(AppTheme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
+        .accessibilityLabel("Show original email")
+        .accessibilityHint("Opens the original message. Swipe down to close.")
+    }
+
+    private func quotedOriginalSheet(_ quoted: QuotedOriginal) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(quoted.header)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(AppTheme.ink)
+
+                Text(quoted.text)
+                    .font(.system(size: AppTheme.FontSize.body))
+                    .foregroundStyle(AppTheme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 12)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(AppTheme.muted.opacity(0.35))
+                            .frame(width: 2)
+                    }
+                    .textSelection(.enabled)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+            .padding(.bottom, 28)
+        }
+        .background(AppTheme.background)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(AppTheme.background)
     }
 
     private var divider: some View {
@@ -306,6 +429,7 @@ struct ComposeSheetView: View {
     private func handleClose() {
         form.commitPendingTokens()
         if form.isEmpty {
+            form.cancelAutoSave()
             app.closeCompose()
         } else {
             showCloseActions = true
@@ -313,6 +437,7 @@ struct ComposeSheetView: View {
     }
 
     private func send() async {
+        form.cancelAutoSave()
         if await form.send() {
             app.closeCompose()
             await app.loadEmailsForCurrentTab()
@@ -320,8 +445,10 @@ struct ComposeSheetView: View {
     }
 
     private func deleteAndClose() async {
+        form.cancelAutoSave()
         if let draftId = form.draftId {
             try? await APIClient.shared.deleteEmail(mailboxId: form.fromMailboxId, id: draftId)
+            form.onDraftDeleted?(draftId, form.threadId, form.originalEmailId)
             await app.loadEmailsForCurrentTab()
         }
         app.closeCompose()

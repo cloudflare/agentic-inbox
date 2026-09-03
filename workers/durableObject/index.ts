@@ -26,6 +26,14 @@ const NORMALIZED_SUBJECT_SQL = `LOWER(TRIM(
 		're: ', ''), 'fwd: ', ''), 'fw: ', '')
 ))`;
 
+/** Resolve a system folder by id or name. `name = 'draft'` does not match the
+ *  stored display name `'Drafts'`; looking up `id` as well is the same pattern
+ *  used for the folder filter (`name = ?1 OR id = ?1`). */
+const folderIdSql = (id: string) =>
+	`(SELECT id FROM folders WHERE name = '${id}' OR id = '${id}' LIMIT 1)`;
+const DRAFT_FOLDER_ID_SQL = folderIdSql(Folders.DRAFT);
+const SENT_FOLDER_ID_SQL = folderIdSql(Folders.SENT);
+
 const ALLOWED_SORT_COLUMNS = [
 	"id",
 	"subject",
@@ -425,10 +433,10 @@ export class MailboxDO extends DurableObject<Env> {
 				SELECT
 					conversation_id,
 					COUNT(*) as thread_count,
-					SUM(CASE WHEN read = 0 AND folder_id != (SELECT id FROM folders WHERE name = 'draft' LIMIT 1) THEN 1 ELSE 0 END) as thread_unread_count,
+					SUM(CASE WHEN read = 0 AND folder_id != ${DRAFT_FOLDER_ID_SQL} THEN 1 ELSE 0 END) as thread_unread_count,
 					SUM(CASE WHEN read = 1 THEN 1 ELSE 0 END) as thread_read_count,
 					GROUP_CONCAT(DISTINCT COALESCE(NULLIF(TRIM(sender_name), ''), sender)) as participants,
-					SUM(CASE WHEN folder_id = (SELECT id FROM folders WHERE name = 'draft' LIMIT 1) THEN 1 ELSE 0 END) as has_draft
+					SUM(CASE WHEN folder_id = ${DRAFT_FOLDER_ID_SQL} THEN 1 ELSE 0 END) as has_draft
 				FROM all_emails_with_conversation
 				WHERE conversation_id IN (
 					SELECT DISTINCT conversation_id FROM all_emails_with_conversation
@@ -461,8 +469,8 @@ export class MailboxDO extends DurableObject<Env> {
 				lif.in_reply_to, lif.email_references,
 				SUBSTR(lif.body, 1, 300) as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
-				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
-					AND lmc.folder_id != (SELECT id FROM folders WHERE name = 'draft' LIMIT 1)
+				CASE WHEN lmc.folder_id != ${SENT_FOLDER_ID_SQL}
+					AND lmc.folder_id != ${DRAFT_FOLDER_ID_SQL}
 					AND cs.thread_read_count > 0
 					THEN 1 ELSE 0 END as needs_reply,
 				CASE WHEN cs.has_draft > 0 THEN 1 ELSE 0 END as has_draft

@@ -230,6 +230,7 @@ export function useMoveEmail() {
 }
 
 export function useSaveDraft() {
+	const queryClient = useQueryClient();
 	const invalidate = useInvalidateEmailData();
 	return useMutation({
 		mutationFn: ({
@@ -248,6 +249,31 @@ export function useSaveDraft() {
 				draft_id?: string;
 			};
 		}) => api.saveDraft(mailboxId, draft),
+		onMutate: async ({ mailboxId, draft }) => {
+			if (draft.in_reply_to || draft.thread_id) {
+				queryClient.setQueriesData<{ emails: Email[]; totalCount: number }>(
+					{ queryKey: ["emails", mailboxId] },
+					(old) => {
+						if (!old || !old.emails) return old;
+						return {
+							...old,
+							emails: old.emails.map((e) => {
+								const matchesThread =
+									draft.thread_id && (e.thread_id === draft.thread_id || e.id === draft.thread_id);
+								const matchesOriginal =
+									draft.in_reply_to && (e.id === draft.in_reply_to || e.thread_id === draft.in_reply_to);
+								if (matchesThread || matchesOriginal) {
+									const wasDraft = e.has_draft === true;
+									const newCount = !wasDraft ? (e.thread_count || 1) + 1 : e.thread_count;
+									return { ...e, has_draft: true, thread_count: newCount };
+								}
+								return e;
+							}),
+						};
+					},
+				);
+			}
+		},
 		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
 	});
 }

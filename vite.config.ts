@@ -19,6 +19,7 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   server: {
+    host: true,
     watch: {
       // Xcode user-state files otherwise reload the web app while iOS is open.
       ignored: ["**/ios/**"],

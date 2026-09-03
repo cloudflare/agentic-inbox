@@ -1,14 +1,28 @@
 import SwiftUI
 
-/// Medium sheet of email actions, opened from the detail ellipsis.
+/// Medium sheet of email actions, opened from the detail ellipsis or list swipe More.
 struct EmailActionsSheet: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
 
     let email: Email
+    var onRemoveFromList: ((String) -> Void)? = nil
+
+    @State private var selectedDetent: PresentationDetent = .medium
 
     private var source: Email {
-        app.actionSourceEmail ?? email
+        if app.selectedEmail?.id == email.id {
+            return app.actionSourceEmail ?? email
+        }
+        return email
+    }
+
+    private var availability: EmailActionAvailability {
+        EmailActionAvailability(email: source)
+    }
+
+    private var fromList: Bool {
+        app.selectedEmail?.id != email.id
     }
 
     private var moveTargets: [Folder] {
@@ -16,47 +30,19 @@ struct EmailActionsSheet: View {
         return app.folders.filter { $0.id != current }
     }
 
+    private var previewLine: String {
+        source.previewText.isEmpty ? "(no preview)" : source.previewText
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(source.displaySender)
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(AppTheme.ink)
-                        Text(source.previewText.isEmpty ? "(no preview)" : source.previewText)
-                            .font(.system(size: 14))
-                            .foregroundStyle(AppTheme.muted)
-                            .lineLimit(1)
-                    }
-                    .padding(.vertical, 4)
-                    .listRowBackground(Color.clear)
-                }
-
-                Section {
-                    actionRow("Reply", systemImage: "arrowshape.turn.up.left") {
-                        Task {
-                            dismiss()
-                            await app.startCompose(mode: .reply, original: source)
-                        }
-                    }
-                    actionRow("Reply All", systemImage: "arrowshape.turn.up.left.2") {
-                        Task {
-                            dismiss()
-                            await app.startCompose(mode: .replyAll, original: source)
-                        }
-                    }
-                    actionRow("Forward", systemImage: "arrowshape.turn.up.right") {
-                        Task {
-                            dismiss()
-                            await app.startCompose(mode: .forward, original: source)
-                        }
-                    }
-                    actionRow("Archive", systemImage: "archivebox") {
-                        Task {
-                            dismiss()
-                            await app.archiveCurrentEmail()
-                        }
+                if availability.showsReplyActions {
+                    Section {
+                        quickActionsRow
+                            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                     }
                 }
 
@@ -75,44 +61,114 @@ struct EmailActionsSheet: View {
                         Task { await app.toggleRead(on: source) }
                     }
 
-                    NavigationLink {
-                        MoveToFolderView(folders: moveTargets) { folderId in
-                            Task {
-                                dismiss()
-                                await app.moveCurrentEmail(to: folderId)
+                    if !moveTargets.isEmpty {
+                        NavigationLink {
+                            MoveToFolderView(folders: moveTargets, onClose: dismissSheet) { folderId in
+                                Task {
+                                    dismiss()
+                                    await app.moveEmail(source, to: folderId, fromList: fromList)
+                                    if fromList { onRemoveFromList?(source.id) }
+                                }
                             }
+                        } label: {
+                            Label("Move to Folder", systemImage: "folder")
                         }
-                    } label: {
-                        Label("Move to Folder", systemImage: "folder")
                     }
 
                     NavigationLink {
-                        EmailSourceView(email: source)
+                        EmailSourceView(email: source, onClose: dismissSheet)
                     } label: {
                         Label("View Source", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
 
-                    Menu {
-                        Button("Delete Message", role: .destructive) {
-                            Task {
-                                dismiss()
-                                await app.deleteCurrentEmail()
+                    if availability.showsDelete {
+                        Menu {
+                            Button("Delete Message", role: .destructive) {
+                                Task {
+                                    dismiss()
+                                    await app.deleteEmail(source, fromList: fromList)
+                                    if fromList { onRemoveFromList?(source.id) }
+                                }
                             }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                                .foregroundStyle(.red)
                         }
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                            .foregroundStyle(.red)
                     }
                 }
             }
-            .navigationTitle("Actions")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+            .listSectionSpacing(.compact)
+            .navigationTitle(source.displaySender)
+            .navigationBarBackButtonHidden(true)
+            .modifier(ActionsSheetSubtitle(subtitle: previewLine))
+            .actionsSheetChrome(onClose: dismissSheet)
+        }
+        .tint(AppTheme.ink)
+        .presentationDetents([.medium, .large], selection: $selectedDetent)
+        .presentationDragIndicator(.visible)
+        .presentationContentInteraction(.resizes)
+        .presentationBackground(AppTheme.background)
+    }
+
+    private func dismissSheet() {
+        dismiss()
+    }
+
+    private var quickActionsRow: some View {
+        HStack(spacing: 8) {
+            quickActionButton("Reply", systemImage: "arrowshape.turn.up.left") {
+                Task {
+                    dismiss()
+                    await app.startCompose(mode: .reply, original: source)
+                }
+            }
+            quickActionButton("Reply All", systemImage: "arrowshape.turn.up.left.2") {
+                Task {
+                    dismiss()
+                    await app.startCompose(mode: .replyAll, original: source)
+                }
+            }
+            quickActionButton("Forward", systemImage: "arrowshape.turn.up.right") {
+                Task {
+                    dismiss()
+                    await app.startCompose(mode: .forward, original: source)
+                }
+            }
+            if availability.showsArchive {
+                quickActionButton("Archive", systemImage: "archivebox") {
+                    Task {
+                        dismiss()
+                        await app.archiveEmail(source, fromList: fromList)
+                        if fromList { onRemoveFromList?(source.id) }
+                    }
                 }
             }
         }
+    }
+
+    private func quickActionButton(
+        _ title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(AppTheme.ink)
+                    .frame(width: 52, height: 52)
+                    .background(AppTheme.pillFill)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(AppTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     private func actionRow(
@@ -129,6 +185,7 @@ struct EmailActionsSheet: View {
 
 private struct MoveToFolderView: View {
     let folders: [Folder]
+    var onClose: () -> Void
     var onMove: (String) -> Void
 
     var body: some View {
@@ -139,12 +196,13 @@ private struct MoveToFolderView: View {
             .foregroundStyle(AppTheme.ink)
         }
         .navigationTitle("Move to")
-        .navigationBarTitleDisplayMode(.inline)
+        .actionsSheetChrome(onClose: onClose)
     }
 }
 
 private struct EmailSourceView: View {
     let email: Email
+    var onClose: () -> Void
 
     var body: some View {
         List {
@@ -162,6 +220,54 @@ private struct EmailSourceView: View {
             }
         }
         .navigationTitle("Source")
-        .navigationBarTitleDisplayMode(.inline)
+        .actionsSheetChrome(onClose: onClose)
+    }
+}
+
+private struct ActionsSheetSubtitle: ViewModifier {
+    var subtitle: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.navigationSubtitle(Text(subtitle))
+        } else {
+            content
+        }
+    }
+}
+
+private struct ActionsSheetChrome: ViewModifier {
+    var onClose: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(.hidden)
+            .contentMargins(.top, 20, for: .scrollContent)
+            .background(AppTheme.background)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarRole(.editor)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Close")
+                }
+            }
+    }
+}
+
+private extension View {
+    func actionsSheetChrome(onClose: @escaping () -> Void) -> some View {
+        modifier(ActionsSheetChrome(onClose: onClose))
+    }
+}
+
+#Preview("Actions sheet") {
+    PreviewHost {
+        EmailActionsSheet(email: PreviewSupport.emails[0])
     }
 }

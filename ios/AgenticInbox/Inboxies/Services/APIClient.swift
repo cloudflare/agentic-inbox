@@ -143,6 +143,16 @@ final class APIClient: @unchecked Sendable {
         try await request(path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)")
     }
 
+    func updateMailbox(mailboxId: String, settings: MailboxSettings) async throws -> Mailbox {
+        let settingsData = try JSONEncoder().encode(settings)
+        let settingsObject = try JSONSerialization.jsonObject(with: settingsData) as? [String: Any] ?? [:]
+        return try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)",
+            method: "PUT",
+            body: ["settings": settingsObject]
+        )
+    }
+
     func listFolders(mailboxId: String) async throws -> [Folder] {
         try await request(path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/folders")
     }

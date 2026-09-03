@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 /// App-owned compose session so minimize docks instead of destroying the draft.
 @Observable
@@ -21,6 +22,19 @@ final class ComposeSession {
     func minimize() { presentation = ComposePresentation.minimized }
 }
 
+enum DraftSaveStatus: Equatable {
+    case idle
+    case saving
+    case saved(Date)
+    case failed(String)
+}
+
+struct ComposeToast: Equatable {
+    let message: String
+    var isError: Bool = false
+    let id = UUID()
+}
+
 @Observable
 @MainActor
 final class ComposeFormModel {
@@ -29,15 +43,36 @@ final class ComposeFormModel {
     var fromEmail: String
     var fromName: String?
 
-    var toTokens: [MailAddress] = []
-    var ccTokens: [MailAddress] = []
-    var bccTokens: [MailAddress] = []
+    var toTokens: [MailAddress] = [] {
+        didSet {
+            if toTokens != oldValue { scheduleAutoSave() }
+        }
+    }
+    var ccTokens: [MailAddress] = [] {
+        didSet {
+            if ccTokens != oldValue { scheduleAutoSave() }
+        }
+    }
+    var bccTokens: [MailAddress] = [] {
+        didSet {
+            if bccTokens != oldValue { scheduleAutoSave() }
+        }
+    }
     var toDraft = ""
     var ccDraft = ""
     var bccDraft = ""
     var showCcBcc = false
-    var subject = ""
-    var body = ""
+    var subject = "" {
+        didSet {
+            if subject != oldValue { scheduleAutoSave() }
+        }
+    }
+    var body = "" {
+        didSet {
+            if body != oldValue { scheduleAutoSave() }
+        }
+    }
+    let quotedOriginal: QuotedOriginal?
 
     var originalEmailId: String?
     var threadId: String?
@@ -45,9 +80,19 @@ final class ComposeFormModel {
 
     var isSending = false
     var isSavingDraft = false
+    var saveStatus: DraftSaveStatus = .idle
+    var toast: ComposeToast?
     var errorMessage: String?
 
     private let initialSnapshot: String
+    private var lastSavedSnapshot: String
+    private var autoSaveTask: Task<Void, Never>?
+    private var toastDismissTask: Task<Void, Never>?
+    private var consecutiveFailures = 0
+    private let continuousFailureThreshold = 3
+
+    var onDraftSaved: ((_ draftId: String, _ threadId: String?, _ originalEmailId: String?, _ subject: String?, _ body: String?) -> Void)?
+    var onDraftDeleted: ((_ draftId: String, _ threadId: String?, _ originalEmailId: String?) -> Void)?
 
     init(
         mode: ComposeMode,
@@ -63,7 +108,7 @@ final class ComposeFormModel {
         self.fromEmail = mailboxEmail
         self.fromName = mailboxFromName
 
-        let signature = ComposeHTML.signatureLine(fromName: mailboxFromName)
+        let signature = ComposeHTML.signatureText(settings: mailbox.settings, fromName: mailboxFromName)
 
         var nextTo: [MailAddress] = []
         var nextCc: [MailAddress] = []
@@ -71,9 +116,14 @@ final class ComposeFormModel {
         var nextShowCcBcc = false
         var nextSubject = ""
         var nextBody = ""
+        var nextQuoted: QuotedOriginal?
         var nextOriginalId: String?
         var nextThreadId: String?
         var nextDraftId: String?
+
+        if mode == .reply || mode == .replyAll, let original {
+            nextQuoted = ComposeHTML.quotedOriginal(from: original)
+        }
 
         if let draft {
             nextDraftId = draft.id
@@ -84,7 +134,10 @@ final class ComposeFormModel {
             nextBcc = MailAddress.parseList(draft.bcc)
             nextShowCcBcc = !nextCc.isEmpty || !nextBcc.isEmpty
             nextSubject = draft.subject
-            nextBody = ComposeHTML.htmlToEditableText(draft.body ?? "")
+            nextBody = ComposeHTML.editableReply(
+                fromDraftHTML: draft.body ?? "",
+                quotedHeader: nextQuoted?.header
+            )
         } else if let original {
             nextOriginalId = original.id
             nextThreadId = original.threadId ?? original.id
@@ -92,14 +145,14 @@ final class ComposeFormModel {
             case .reply:
                 nextTo = [original.fromAddress]
                 nextSubject = ComposeHTML.prefixedSubject(original.subject, prefix: "Re")
-                nextBody = ComposeHTML.replyBody(original: original, signature: signature)
+                nextBody = ComposeHTML.replyBody(signature: signature)
             case .replyAll:
                 let fields = ComposeHTML.replyAllFields(original: original, selfAddress: mailboxEmail)
                 nextTo = fields.to
                 nextCc = fields.cc
                 nextShowCcBcc = !fields.cc.isEmpty
                 nextSubject = ComposeHTML.prefixedSubject(original.subject, prefix: "Re")
-                nextBody = ComposeHTML.replyBody(original: original, signature: signature)
+                nextBody = ComposeHTML.replyBody(signature: signature)
             case .forward:
                 nextSubject = ComposeHTML.prefixedSubject(original.subject, prefix: "Fwd")
                 nextBody = ComposeHTML.forwardBody(original: original, signature: signature)
@@ -116,13 +169,16 @@ final class ComposeFormModel {
         self.showCcBcc = nextShowCcBcc
         self.subject = nextSubject
         self.body = nextBody
+        self.quotedOriginal = nextQuoted
         self.originalEmailId = nextOriginalId
         self.threadId = nextThreadId
         self.draftId = nextDraftId
-        self.initialSnapshot = Self.snapshot(
+        let initial = Self.snapshot(
             to: nextTo, cc: nextCc, bcc: nextBcc,
             subject: nextSubject, body: nextBody, from: mailboxEmail
         )
+        self.initialSnapshot = initial
+        self.lastSavedSnapshot = initial
     }
 
     var title: String {
@@ -149,12 +205,56 @@ final class ComposeFormModel {
             && body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    var isDirty: Bool {
-        let current = Self.snapshot(
+    var currentSnapshot: String {
+        Self.snapshot(
             to: toTokens, cc: ccTokens, bcc: bccTokens,
             subject: subject, body: body, from: fromEmail
         )
-        return current != initialSnapshot || draftId != nil && !isEmpty
+    }
+
+    var hasUnsavedChanges: Bool {
+        let hasPendingRecipients = !toDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !ccDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !bccDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return currentSnapshot != lastSavedSnapshot || hasPendingRecipients
+    }
+
+    var isDirty: Bool {
+        return currentSnapshot != initialSnapshot || (draftId != nil && !isEmpty)
+    }
+
+    func scheduleAutoSave(debounceSeconds: Double = 3.0) {
+        guard !isSending else { return }
+        autoSaveTask?.cancel()
+        autoSaveTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(debounceSeconds))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            guard !isEmpty && hasUnsavedChanges else { return }
+            _ = await performSaveDraft(explicit: false)
+        }
+    }
+
+    func cancelAutoSave() {
+        autoSaveTask?.cancel()
+        autoSaveTask = nil
+    }
+
+    func showToast(_ message: String, isError: Bool = false) {
+        toastDismissTask?.cancel()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+            toast = ComposeToast(message: message, isError: isError)
+        }
+        toastDismissTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                toast = nil
+            }
+        }
     }
 
     func commitPendingTokens() {
@@ -174,14 +274,51 @@ final class ComposeFormModel {
     }
 
     @discardableResult
-    func saveDraft() async -> Bool {
+    func saveDraft(explicit: Bool = true) async -> Bool {
+        cancelAutoSave()
+        return await performSaveDraft(explicit: explicit)
+    }
+
+    @discardableResult
+    private func performSaveDraft(explicit: Bool) async -> Bool {
         commitPendingTokens()
+
+        guard !isEmpty else {
+            return true
+        }
+        guard hasUnsavedChanges || draftId == nil else {
+            if explicit {
+                showToast("Draft saved")
+            }
+            return true
+        }
+        guard !isSavingDraft else {
+            return false
+        }
+
+        // Preview support: simulate successful draft save in Xcode Previews / canvas mock fixtures
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" || fromMailboxId.hasPrefix("mb-") {
+            try? await Task.sleep(for: .milliseconds(300))
+            if draftId == nil { draftId = UUID().uuidString }
+            lastSavedSnapshot = currentSnapshot
+            saveStatus = .saved(Date())
+            consecutiveFailures = 0
+            if explicit {
+                showToast("Draft saved")
+            }
+            if let draftId {
+                onDraftSaved?(draftId, threadId, originalEmailId, subject, outgoingHTML())
+            }
+            return true
+        }
+
         isSavingDraft = true
+        saveStatus = .saving
         errorMessage = nil
         defer { isSavingDraft = false }
         do {
             var payload: [String: Any] = [
-                "body": ComposeHTML.textToHTML(body),
+                "body": outgoingHTML(),
             ]
             if !toTokens.isEmpty { payload["to"] = toTokens.map(\.email).joined(separator: ", ") }
             if !ccTokens.isEmpty { payload["cc"] = ccTokens.map(\.email).joined(separator: ", ") }
@@ -192,16 +329,32 @@ final class ComposeFormModel {
             if let draftId { payload["draft_id"] = draftId }
 
             let saved = try await APIClient.shared.saveDraft(mailboxId: fromMailboxId, draft: payload)
-            draftId = saved.id
+            draftId = saved.resolvedId.isEmpty ? (draftId ?? saved.id) : saved.resolvedId
+            lastSavedSnapshot = currentSnapshot
+            saveStatus = .saved(Date())
+            consecutiveFailures = 0
+            if explicit {
+                showToast("Draft saved")
+            }
+            if let draftId {
+                onDraftSaved?(draftId, threadId, originalEmailId, subject, outgoingHTML())
+            }
             return true
         } catch {
+            print("[ComposeFormModel] saveDraft error: \(error)")
             errorMessage = error.localizedDescription
+            saveStatus = .failed(error.localizedDescription)
+            consecutiveFailures += 1
+            if explicit || consecutiveFailures >= continuousFailureThreshold {
+                showToast("Failed to save draft", isError: true)
+            }
             return false
         }
     }
 
     @discardableResult
     func send() async -> Bool {
+        cancelAutoSave()
         commitPendingTokens()
         guard !toTokens.isEmpty else {
             errorMessage = "Add at least one recipient."
@@ -211,8 +364,8 @@ final class ComposeFormModel {
         errorMessage = nil
         defer { isSending = false }
 
-        let html = ComposeHTML.textToHTML(body)
-        let text = body
+        let html = outgoingHTML()
+        let text = outgoingPlainText()
         var payload: [String: Any] = [
             "subject": subject,
             "html": html,
@@ -262,12 +415,29 @@ final class ComposeFormModel {
 
             if let draftId {
                 try? await APIClient.shared.deleteEmail(mailboxId: fromMailboxId, id: draftId)
+                onDraftDeleted?(draftId, threadId, originalEmailId)
             }
             return true
         } catch {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    private func outgoingHTML() -> String {
+        var html = ComposeHTML.textToHTML(body)
+        if let quotedOriginal {
+            html += ComposeHTML.quotedHTML(from: quotedOriginal)
+        }
+        return html
+    }
+
+    private func outgoingPlainText() -> String {
+        guard let quotedOriginal else { return body }
+        let quotedLines = quotedOriginal.text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { "> \($0)" }
+        return ([body, "", quotedOriginal.header] + quotedLines).joined(separator: "\n")
     }
 
     private func commit(_ draft: inout String, into tokens: inout [MailAddress]) {
@@ -294,6 +464,11 @@ final class ComposeFormModel {
     }
 }
 
+struct QuotedOriginal: Equatable {
+    var header: String
+    var text: String
+}
+
 enum ComposeHTML {
     static func splitAddresses(_ raw: String?) -> [String] {
         guard let raw, !raw.isEmpty else { return [] }
@@ -311,6 +486,20 @@ enum ComposeHTML {
     static func signatureLine(fromName: String?) -> String {
         guard let fromName, !fromName.isEmpty else { return "" }
         return fromName
+    }
+
+    /// Signature inserted into compose when mailbox signature is enabled.
+    static func signatureText(settings: MailboxSettings?, fromName: String?) -> String {
+        guard settings?.signature?.enabled == true else { return "" }
+        if let html = settings?.signature?.html?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !html.isEmpty {
+            return stripHTML(html)
+        }
+        if let text = settings?.signature?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !text.isEmpty {
+            return text
+        }
+        return signatureLine(fromName: fromName)
     }
 
     static func stripHTML(_ html: String) -> String {
@@ -346,15 +535,43 @@ enum ComposeHTML {
         return "<p>\(withBreaks)</p>"
     }
 
-    static func replyBody(original: Email, signature: String) -> String {
-        let quoted = stripHTML(original.body ?? "")
-        let header = "On \(formatDate(original.date)), \(original.formattedFrom) wrote:"
+    static func replyBody(signature: String) -> String {
         var parts: [String] = [""]
         if !signature.isEmpty { parts.append(signature) }
-        parts.append("")
-        parts.append(header)
-        parts.append(contentsOf: quoted.split(separator: "\n", omittingEmptySubsequences: false).map { "> \($0)" })
         return parts.joined(separator: "\n")
+    }
+
+    static func quotedOriginal(from original: Email) -> QuotedOriginal? {
+        let text = stripHTML(original.body ?? original.snippet ?? "")
+        guard !text.isEmpty else { return nil }
+        return QuotedOriginal(
+            header: "On \(formatDate(original.date)), \(original.formattedFrom) wrote:",
+            text: text
+        )
+    }
+
+    static func quotedHTML(from quoted: QuotedOriginal) -> String {
+        let header = escapeHTML(quoted.header)
+        let bodyToQuote = escapeHTML(quoted.text).replacingOccurrences(of: "\n", with: "<br>")
+        return "<br><blockquote style=\"border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;\">\(header)<br><br>\(bodyToQuote)</blockquote>"
+    }
+
+    /// Pull the user's reply out of a saved draft, dropping the inlined original.
+    static func editableReply(fromDraftHTML html: String, quotedHeader: String?) -> String {
+        var text = htmlToEditableText(html)
+        if let quotedHeader, let range = text.range(of: quotedHeader, options: .backwards) {
+            text = String(text[..<range.lowerBound])
+        } else if let regex = try? NSRegularExpression(
+            pattern: #"^On .+ wrote:\s*$"#,
+            options: .anchorsMatchLines
+        ) {
+            let nsRange = NSRange(text.startIndex..., in: text)
+            if let match = regex.matches(in: text, range: nsRange).last,
+               let range = Range(match.range, in: text) {
+                text = String(text[..<range.lowerBound])
+            }
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func forwardBody(original: Email, signature: String) -> String {

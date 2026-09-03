@@ -121,7 +121,7 @@ struct SearchView: View {
             searchField
             cancelButton
         }
-        .searchGlassContainer(spacing: 10)
+        .liquidGlassContainer(spacing: 10)
     }
 
     private var searchField: some View {
@@ -146,7 +146,7 @@ struct SearchView: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 52)
-        .searchGlass(in: RoundedRectangle(cornerRadius: 50, style: .continuous))
+        .liquidGlass(in: RoundedRectangle(cornerRadius: 50, style: .continuous))
     }
 
     private var cancelButton: some View {
@@ -161,7 +161,7 @@ struct SearchView: View {
                 .frame(alignment: .center)
         }
         .buttonStyle(.plain)
-        .searchGlass(in: Capsule())
+        .liquidGlass(in: Capsule())
         .accessibilityLabel("Cancel")
     }
 
@@ -185,31 +185,6 @@ struct SearchView: View {
             // ignore
         } catch {
             errorMessage = error.localizedDescription
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func searchGlass<S: Shape>(in shape: S) -> some View {
-        if #available(iOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: shape)
-        } else {
-            self
-                .background(.ultraThinMaterial, in: shape)
-                .overlay {
-                    shape.stroke(Color.white.opacity(0.45), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
-        }
-    }
-
-    @ViewBuilder
-    func searchGlassContainer(spacing: CGFloat) -> some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) { self }
-        } else {
-            self
         }
     }
 }

@@ -1,66 +1,201 @@
 import SwiftUI
 
+private struct ActionsSheetEmail: Identifiable {
+    let email: Email
+    var id: String { email.id }
+}
+
 /// Email rows styled like a mail client:
 /// unread dot · sender + time · bold subject · 1-line preview.
 struct EmailListView: View {
+    @Environment(AppModel.self) private var app
+
     let emails: [Email]
     var highlightQuery: String = ""
     var isLoading: Bool = false
+    var fallbackFolderId: String? = nil
+    var bottomInset: CGFloat = HomeChromeMetrics.listBottomInset(hasMinimizedCompose: false)
     var onRefresh: (() async -> Void)? = nil
+    var isSelectMode: Bool = false
+    var selectedEmailIDs: Binding<Set<String>> = .constant([])
+    var isFiltered: Bool = false
+    var onClearFilters: (() -> Void)? = nil
+    var filterChipsBar: AnyView? = nil
     let onSelect: (Email) -> Void
+
+    @State private var hiddenEmailIDs: Set<String> = []
+    @State private var actionsSheetEmail: ActionsSheetEmail?
+
+    private var visibleEmails: [Email] {
+        emails.filter { !hiddenEmailIDs.contains($0.id) }
+    }
 
     var body: some View {
         Group {
             if isLoading {
                 skeletonList
-            } else if emails.isEmpty {
+            } else if visibleEmails.isEmpty {
                 emptyList
             } else {
                 emailList
             }
         }
         .animation(nil, value: isLoading)
+        .sheet(item: $actionsSheetEmail) { item in
+            EmailActionsSheet(email: item.email) { emailId in
+                hiddenEmailIDs.insert(emailId)
+            }
+        }
+        .onChange(of: emails.map(\.id)) { _, _ in
+            hiddenEmailIDs = hiddenEmailIDs.filter { id in
+                emails.contains { $0.id == id }
+            }
+        }
     }
 
     /// Empty folders still need a scroll view so pull-to-refresh works.
     private var emptyList: some View {
-        GeometryReader { proxy in
-            ScrollView {
-                ContentUnavailableView(
-                    "No emails",
-                    systemImage: "tray",
-                    description: Text("This folder is empty.")
-                )
-                .frame(width: proxy.size.width, height: max(proxy.size.height, 1))
+        ScrollView {
+            VStack(spacing: 24) {
+                if let filterChipsBar {
+                    filterChipsBar
+                }
+
+                if isFiltered {
+                    ContentUnavailableView {
+                        Label("No matching emails", systemImage: "line.3.horizontal.decrease.circle")
+                    } description: {
+                        Text("No emails match your active filters.")
+                    } actions: {
+                        if let onClearFilters {
+                            Button("Clear Filters", action: onClearFilters)
+                                .buttonStyle(.borderedProminent)
+                                .tint(AppTheme.ink)
+                        }
+                    }
+                    .padding(.top, 32)
+                } else {
+                    ContentUnavailableView(
+                        "No emails",
+                        systemImage: "tray",
+                        description: Text("This folder is empty.")
+                    )
+                    .padding(.top, 48)
+                }
             }
-            .scrollContentBackground(.hidden)
-            .background(AppTheme.background)
-            .optionalRefreshable(onRefresh)
+            .frame(maxWidth: .infinity)
         }
+        .scrollContentBackground(.hidden)
+        .background(AppTheme.background)
+        .optionalRefreshable(onRefresh)
         .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 76)
+            Color.clear.frame(height: bottomInset)
         }
     }
 
     private var emailList: some View {
         mailList {
-            ForEach(emails) { email in
-                Button { onSelect(email) } label: {
-                    EmailRowView(email: email, highlightQuery: highlightQuery)
+            if let filterChipsBar {
+                Section {
+                    filterChipsBar
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+            }
+
+            ForEach(visibleEmails) { email in
+                let isSelected = selectedEmailIDs.wrappedValue.contains(email.id)
+                Button {
+                    if isSelectMode {
+                        if isSelected {
+                            selectedEmailIDs.wrappedValue.remove(email.id)
+                        } else {
+                            selectedEmailIDs.wrappedValue.insert(email.id)
+                        }
+                    } else {
+                        onSelect(email)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSelectMode {
+                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 20))
+                                .foregroundStyle(isSelected ? AppTheme.ink : AppTheme.muted.opacity(0.6))
+                                .padding(.leading, 12)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                        EmailRowView(email: email, highlightQuery: highlightQuery)
+                    }
                 }
                 .buttonStyle(MailRowButtonStyle())
                 .mailRowChrome()
+                .swipeActions(edge: .trailing, allowsFullSwipe: isSelectMode ? false : trailingFullSwipe(for: email)) {
+                    if !isSelectMode {
+                        ForEach(swipeLayout(for: email).trailingActions) { action in
+                            swipeButton(action, for: email, removesRow: action == .delete || action == .archive)
+                        }
+                    }
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: isSelectMode ? false : leadingFullSwipe(for: email)) {
+                    if !isSelectMode {
+                        let layout = swipeLayout(for: email)
+                        ForEach(layout.leadingActions) { action in
+                            swipeButton(action, for: email, removesRow: action == .delete || action == .archive)
+                        }
+                        if layout.showsMore {
+                            Button {
+                                actionsSheetEmail = ActionsSheetEmail(email: email)
+                            } label: {
+                                Label("More", systemImage: "ellipsis")
+                            }
+                            .tint(AppTheme.muted)
+                        }
+                    }
+                }
             }
         }
     }
 
-    /// Placeholder rows use the same `EmailRowView` metrics so the list does
-    /// not jump when real messages replace the skeleton.
+    private func swipeLayout(for email: Email) -> EmailSwipeLayout {
+        EmailSwipeLayout.resolve(
+            for: email,
+            fallbackFolderId: fallbackFolderId,
+            preferences: app.swipePreferences
+        )
+    }
+
+    private func trailingFullSwipe(for email: Email) -> Bool {
+        swipeLayout(for: email).trailingAllowsFullSwipe
+    }
+
+    private func leadingFullSwipe(for email: Email) -> Bool {
+        swipeLayout(for: email).leadingAllowsFullSwipe
+    }
+
+    @ViewBuilder
+    private func swipeButton(
+        _ action: SwipeQuickAction,
+        for email: Email,
+        removesRow: Bool
+    ) -> some View {
+        Button {
+            Task {
+                await app.performSwipeAction(action, on: email)
+                if removesRow {
+                    hiddenEmailIDs.insert(email.id)
+                }
+            }
+        } label: {
+            Label(action.label(for: email), systemImage: action.systemImage(for: email))
+        }
+        .tint(action.swipeTint)
+    }
+
     private var skeletonList: some View {
         mailList {
             ForEach(0..<Self.skeletonCount, id: \.self) { index in
-                EmailRowView(email: Self.placeholder(at: index))
-                    .redacted(reason: .placeholder)
+                EmailRowSkeleton(index: index)
                     .mailRowChrome()
                     .allowsHitTesting(false)
             }
@@ -81,38 +216,42 @@ struct EmailListView: View {
         .scrollDisabled(isLoading)
         .optionalRefreshable(isLoading ? nil : onRefresh)
         .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 76)
+            Color.clear.frame(height: bottomInset)
         }
     }
 
     private static let skeletonCount = 9
+}
 
-    private static func placeholder(at index: Int) -> Email {
-        let seed = placeholderSeeds[index % placeholderSeeds.count]
-        return Email(
-            id: "skeleton-\(index)",
-            subject: seed.subject,
-            sender: seed.sender,
-            senderName: seed.sender,
-            recipient: "",
-            date: "2026-03-15T14:30:00.000Z",
-            read: !seed.unread,
-            starred: false,
-            snippet: seed.preview
-        )
+/// Loading placeholder with no unread dot and taller bars than a real row.
+private struct EmailRowSkeleton: View {
+    let index: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                bar(width: senderWidth, height: 16)
+                Spacer(minLength: 8)
+                bar(width: 44, height: 14)
+            }
+            bar(width: subjectWidth, height: 16)
+            bar(width: previewWidth, height: 16)
+        }
+        .padding(.vertical, 20)
+        .padding(.leading, 16)
+        .padding(.trailing, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private static let placeholderSeeds: [(sender: String, subject: String, preview: String, unread: Bool)] = [
-        ("Jordan Hale", "Quarterly planning notes", "Can we move Thursday's sync to the morning instead?", true),
-        ("Alex Rivera", "Re: Invoice for March", "Attached is the updated PDF for last month's work.", false),
-        ("Sam Chen", "Design review tomorrow", "Posting the latest frames in the shared folder now.", true),
-        ("Taylor Brooks", "Flight confirmation", "Your itinerary for next week's trip is ready to view.", false),
-        ("Morgan Lee", "Offer details", "Sharing the revised timeline and next steps below.", true),
-        ("Casey Nguyen", "Weekend photos", "A few shots from the hike if you want them for the album.", false),
-        ("Riley Patel", "Contract countersigned", "We are all set on our side and can kick off Monday.", false),
-        ("Jamie Ortiz", "Lunch next week?", "I am free Wednesday or Friday if either still works.", true),
-        ("Drew Collins", "Project kickoff deck", "Added speaker notes and the customer quotes we discussed.", false),
-    ]
+    private var senderWidth: CGFloat { [128, 156, 112, 140, 168, 120, 148, 104, 136][index % 9] }
+    private var subjectWidth: CGFloat { [220, 176, 248, 196, 164, 232, 188, 210, 154][index % 9] }
+    private var previewWidth: CGFloat { [260, 210, 284, 198, 246, 172, 268, 224, 190][index % 9] }
+
+    private func bar(width: CGFloat, height: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(AppTheme.pillActive)
+            .frame(width: width, height: height)
+    }
 }
 
 private struct MailRowButtonStyle: ButtonStyle {
@@ -148,7 +287,7 @@ struct EmailRowView: View {
     var folderLabel: String?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 8) {
             unreadDot
 
             VStack(alignment: .leading, spacing: 3) {
@@ -164,7 +303,7 @@ struct EmailRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 14)
-        .padding(.leading, 8)
+        .padding(.leading, 6)
         .padding(.trailing, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -308,4 +447,31 @@ struct EmailRowView: View {
         }
         return result
     }
+}
+
+#Preview("Inbox") {
+    PreviewHost {
+        EmailListView(
+            emails: PreviewSupport.emails,
+            fallbackFolderId: "inbox"
+        ) { _ in }
+    }
+}
+
+#Preview("Loading") {
+    PreviewHost {
+        EmailListView(emails: [], isLoading: true) { _ in }
+    }
+}
+
+#Preview("Empty") {
+    PreviewHost {
+        EmailListView(emails: []) { _ in }
+    }
+}
+
+#Preview("Row") {
+    EmailRowView(email: PreviewSupport.emails[0])
+        .padding(.horizontal, 8)
+        .background(AppTheme.background)
 }

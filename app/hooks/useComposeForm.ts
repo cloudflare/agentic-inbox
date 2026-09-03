@@ -168,6 +168,8 @@ function buildInitialComposeFields(
 	};
 }
 
+export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
+
 export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const toastManager = useKumoToastManager();
 	const { composeOptions, closePanel, closeCompose } = useUIStore();
@@ -187,7 +189,10 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const [error, setError] = useState<string | null>(null);
 	const [isSavingDraft, setIsSavingDraft] = useState(false);
 	const [isSending, setIsSending] = useState(false);
+	const [saveStatus, setSaveStatus] = useState<DraftSaveStatus>("idle");
+	const [savedDraftId, setSavedDraftId] = useState<string | undefined>(composeOptions.draftEmail?.id);
 	const lastInitializedOptionsRef = useRef<typeof composeOptions | null>(null);
+	const lastSavedSnapshotRef = useRef<string>("");
 	const isDraftEdit = !!composeOptions.draftEmail;
 
 	const formTitle = useMemo(() => {
@@ -213,29 +218,102 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setShowCcBcc(initialFields.showCcBcc);
 		setSubject(initialFields.subject);
 		setBody(initialFields.body);
+		setSavedDraftId(composeOptions.draftEmail?.id);
+		lastSavedSnapshotRef.current = `${initialFields.to}|${initialFields.cc}|${initialFields.bcc}|${initialFields.subject}|${initialFields.body}`;
+		setSaveStatus("idle");
 	}, [composeOptions, currentMailbox?.email, sigBlock]);
 
-	const handleSaveDraft = async () => {
-		if (!mailboxId || isSending) return; setIsSavingDraft(true); setError(null);
-		try {
-			await saveDraftMutation.mutateAsync({ mailboxId, draft: {
-				to,
-				cc: cc || undefined,
-				bcc: bcc || undefined,
-				subject,
-				body,
-				in_reply_to: composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to || undefined,
-				thread_id: composeOptions.originalEmail?.thread_id || composeOptions.draftEmail?.thread_id || undefined,
-				draft_id: composeOptions.draftEmail?.id || undefined,
-			} });
-			toastManager.add({ title: "Draft saved!" });
+	// Debounced auto-save effect (3.0s)
+	const consecutiveFailuresRef = useRef(0);
+
+	useEffect(() => {
+		if (!mailboxId || isSending) return;
+		const currentSnapshot = `${to}|${cc}|${bcc}|${subject}|${body}`;
+		const isEmpty = !to.trim() && !cc.trim() && !bcc.trim() && !subject.trim() && !body.trim();
+
+		if (isEmpty || currentSnapshot === lastSavedSnapshotRef.current) {
+			return;
 		}
-		catch (err: unknown) {
+
+		const timer = setTimeout(async () => {
+			setIsSavingDraft(true);
+			setSaveStatus("saving");
+			try {
+				const res = await saveDraftMutation.mutateAsync({
+					mailboxId,
+					draft: {
+						to: to || undefined,
+						cc: cc || undefined,
+						bcc: bcc || undefined,
+						subject: subject || undefined,
+						body,
+						in_reply_to: composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to || undefined,
+						thread_id: composeOptions.originalEmail?.thread_id || composeOptions.draftEmail?.thread_id || undefined,
+						draft_id: savedDraftId || composeOptions.draftEmail?.id || undefined,
+					},
+				});
+				lastSavedSnapshotRef.current = currentSnapshot;
+				if (res?.draft_id) {
+					setSavedDraftId(res.draft_id);
+				}
+				consecutiveFailuresRef.current = 0;
+				setSaveStatus("saved");
+			} catch {
+				consecutiveFailuresRef.current += 1;
+				setSaveStatus("error");
+				if (consecutiveFailuresRef.current >= 3) {
+					toastManager.add({ title: "Failed to save draft.", variant: "error" });
+				}
+			} finally {
+				setIsSavingDraft(false);
+			}
+		}, 3000);
+
+		return () => clearTimeout(timer);
+	}, [to, cc, bcc, subject, body, mailboxId, isSending, savedDraftId, composeOptions, saveDraftMutation]);
+
+	const handleSaveDraft = async () => {
+		if (!mailboxId || isSending) return;
+		setIsSavingDraft(true);
+		setSaveStatus("saving");
+		setError(null);
+		const currentSnapshot = `${to}|${cc}|${bcc}|${subject}|${body}`;
+		try {
+			const res = await saveDraftMutation.mutateAsync({
+				mailboxId,
+				draft: {
+					to: to || undefined,
+					cc: cc || undefined,
+					bcc: bcc || undefined,
+					subject,
+					body,
+					in_reply_to: composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to || undefined,
+					thread_id: composeOptions.originalEmail?.thread_id || composeOptions.draftEmail?.thread_id || undefined,
+					draft_id: savedDraftId || composeOptions.draftEmail?.id || undefined,
+				},
+			});
+			lastSavedSnapshotRef.current = currentSnapshot;
+			if (res?.draft_id) {
+				setSavedDraftId(res.draft_id);
+			}
+			setSaveStatus("saved");
+			toastManager.add({ title: "Draft saved!" });
+		} catch (err: unknown) {
 			const message = (err instanceof Error ? err.message : null) || "Failed to save draft.";
 			setError(message);
+			setSaveStatus("error");
 			toastManager.add({ title: message, variant: "error" });
+		} finally {
+			setIsSavingDraft(false);
 		}
-		finally { setIsSavingDraft(false); }
+	};
+
+	const handleDiscard = (onClose: () => void) => {
+		const draftId = savedDraftId || composeOptions.draftEmail?.id;
+		if (draftId && mailboxId) {
+			deleteEmailMutation.mutate({ mailboxId, id: draftId });
+		}
+		onClose();
 	};
 
 	const handleSend = async (e: FormEvent, onClose: () => void) => {
@@ -255,7 +333,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			html: body,
 			text: htmlToPlainText(body),
 		};
-		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
+		const draftId = savedDraftId || composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		setIsSending(true); toastManager.add({ title: "Sending email..." });
 		try {
 			if ((mode === "reply" || mode === "reply-all") && originalId) await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
@@ -268,5 +346,29 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		finally { setIsSending(false); }
 	};
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel };
+	return {
+		to,
+		setTo,
+		cc,
+		setCc,
+		bcc,
+		setBcc,
+		showCcBcc,
+		setShowCcBcc,
+		subject,
+		setSubject,
+		body,
+		setBody,
+		error,
+		setError,
+		isSavingDraft,
+		isSending,
+		saveStatus,
+		formTitle,
+		handleSaveDraft,
+		handleDiscard,
+		handleSend,
+		closeCompose,
+		closePanel,
+	};
 }

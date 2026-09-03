@@ -9,8 +9,10 @@
 /* Begin PBXBuildFile section */
 		12FD0B712C114D8F82E0825F /* Services/AgentChatClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2153D18D975F436E94786CB2 /* Services/AgentChatClient.swift */; };
 		18F25040136B47988CE9E925 /* Theme/AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */; };
+		C1D2E3F4A5B6478990ABCD04 /* Theme/LiquidGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7478990ABCD04 /* Theme/LiquidGlass.swift */; };
 		219CF0985CEB43F58D0A6180 /* Views/Chat/ChatSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D339D5F9D3E646D58813D854 /* Views/Chat/ChatSheetView.swift */; };
 		23E7B306C65E4F21A0AEB90C /* Views/Home/HomeShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74318D3C6D954DCA9AE3A5EF /* Views/Home/HomeShellView.swift */; };
+		D2E3F4A5B6C7478990ABCD05 /* Views/Home/FolderTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F4A5B6C7D8478990ABCD05 /* Views/Home/FolderTabBar.swift */; };
 		2EC70370129F423785536DB2 /* Services/AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010262344D5842BD893A671C /* Services/AppModel.swift */; };
 		340C18C527B44FD1B96E612C /* Services/AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43432D294A6A4E8886288B5C /* Services/AuthStore.swift */; };
 		36FD2CCDC03848B0B12D0871 /* InboxiesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA5A54FAAA74727A76C3CC2 /* InboxiesApp.swift */; };
@@ -30,6 +32,12 @@
 		6AE0059EAD914AD79D02011F /* Views/Email/EmailActionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B6D0BA36EC4EE7BEC367D7 /* Views/Email/EmailActionsSheet.swift */; };
 		D9F52B3A0C8E5F7B9D1E2345 /* Views/Components/UndoToastBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E41A2F9B7D4E6A8C0F1234 /* Views/Components/UndoToastBanner.swift */; };
 		4A0B2D3F9C7E5B22C1F6D8E5 /* Views/Components/FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9A1C2E8B6D4A11B0E5C7D4 /* Views/Components/FlowLayout.swift */; };
+		B1C2D3E4F5A6478990ABCD01 /* Services/SwipeActionPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD01 /* Services/SwipeActionPreferences.swift */; };
+		B1C2D3E4F5A6478990ABCD02 /* Services/EmailActionExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD02 /* Services/EmailActionExecutor.swift */; };
+		B1C2D3E4F5A6478990ABCD03 /* Views/Settings/SettingsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD03 /* Views/Settings/SettingsSheetView.swift */; };
+		B1C2D3E4F5A6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */; };
+		B1C2D3E4F5A6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */; };
+		B1C2D3E4F5A6478990ABCD06 /* Views/PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,9 +49,11 @@
 		2153D18D975F436E94786CB2 /* Services/AgentChatClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AgentChatClient.swift; sourceTree = "<group>"; };
 		21CCC0BA3ECA48D3ACAAD064 /* Config/AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config/AppConfig.swift; sourceTree = "<group>"; };
 		28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/AppTheme.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7478990ABCD04 /* Theme/LiquidGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme/LiquidGlass.swift; sourceTree = "<group>"; };
 		43432D294A6A4E8886288B5C /* Services/AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AuthStore.swift; sourceTree = "<group>"; };
 		68CBCACD0F1941F796F4F461 /* Views/Email/EmailDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailDetailView.swift; sourceTree = "<group>"; };
 		74318D3C6D954DCA9AE3A5EF /* Views/Home/HomeShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Home/HomeShellView.swift; sourceTree = "<group>"; };
+		E3F4A5B6C7D8478990ABCD05 /* Views/Home/FolderTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Home/FolderTabBar.swift; sourceTree = "<group>"; };
 		83D37F469E5F418DB189BA76 /* Views/Search/SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Search/SearchView.swift; sourceTree = "<group>"; };
 		84F2F99145F3443BBB8E283E /* Inboxies.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Inboxies.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7BDA4C7494146D8B2557D10 /* Views/Auth/SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Auth/SignInView.swift; sourceTree = "<group>"; };
@@ -59,6 +69,12 @@
 		A6B6D0BA36EC4EE7BEC367D7 /* Views/Email/EmailActionsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Email/EmailActionsSheet.swift; sourceTree = "<group>"; };
 		C8E41A2F9B7D4E6A8C0F1234 /* Views/Components/UndoToastBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/UndoToastBanner.swift; sourceTree = "<group>"; };
 		3F9A1C2E8B6D4A11B0E5C7D4 /* Views/Components/FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/FlowLayout.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD01 /* Services/SwipeActionPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/SwipeActionPreferences.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD02 /* Services/EmailActionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/EmailActionExecutor.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD03 /* Views/Settings/SettingsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/SettingsSheetView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/AgentPromptSettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/SwipeSettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/PreviewSupport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,7 +115,10 @@
 				010262344D5842BD893A671C /* Services/AppModel.swift */,
 				43432D294A6A4E8886288B5C /* Services/AuthStore.swift */,
 				09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */,
+				A1B2C3D4E5F6478990ABCD01 /* Services/SwipeActionPreferences.swift */,
+				A1B2C3D4E5F6478990ABCD02 /* Services/EmailActionExecutor.swift */,
 				28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */,
+				B2C3D4E5F6A7478990ABCD04 /* Theme/LiquidGlass.swift */,
 				B7BDA4C7494146D8B2557D10 /* Views/Auth/SignInView.swift */,
 				D339D5F9D3E646D58813D854 /* Views/Chat/ChatSheetView.swift */,
 				276C8945F603459A8A0C1FBE /* Views/Compose/ComposeDockBar.swift */,
@@ -112,6 +131,11 @@
 				68CBCACD0F1941F796F4F461 /* Views/Email/EmailDetailView.swift */,
 				FAA619084E624222B919A7C4 /* Views/Email/EmailListView.swift */,
 				74318D3C6D954DCA9AE3A5EF /* Views/Home/HomeShellView.swift */,
+				E3F4A5B6C7D8478990ABCD05 /* Views/Home/FolderTabBar.swift */,
+				A1B2C3D4E5F6478990ABCD03 /* Views/Settings/SettingsSheetView.swift */,
+				A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */,
+				A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */,
+				A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */,
 				063B7A93C3B6424791462165 /* Views/RootView.swift */,
 				83D37F469E5F418DB189BA76 /* Views/Search/SearchView.swift */,
 				1ADA91EDA69A47BA95EB9514 /* Info.plist */,
@@ -192,6 +216,7 @@
 				340C18C527B44FD1B96E612C /* Services/AuthStore.swift in Sources */,
 				7E8CC069F60B4F6283899600 /* Services/ComposeFormModel.swift in Sources */,
 				18F25040136B47988CE9E925 /* Theme/AppTheme.swift in Sources */,
+				C1D2E3F4A5B6478990ABCD04 /* Theme/LiquidGlass.swift in Sources */,
 				83101517849E451C9A64357A /* Views/Auth/SignInView.swift in Sources */,
 				219CF0985CEB43F58D0A6180 /* Views/Chat/ChatSheetView.swift in Sources */,
 				08C8AEBB61714B47A9B57E95 /* Views/Compose/ComposeDockBar.swift in Sources */,
@@ -204,8 +229,15 @@
 				411FB5F3E3824817A4909D02 /* Views/Email/EmailDetailView.swift in Sources */,
 				C543C24F6A504509B345B919 /* Views/Email/EmailListView.swift in Sources */,
 				23E7B306C65E4F21A0AEB90C /* Views/Home/HomeShellView.swift in Sources */,
+				D2E3F4A5B6C7478990ABCD05 /* Views/Home/FolderTabBar.swift in Sources */,
 				5369F800D7D2405DBBF9A789 /* Views/RootView.swift in Sources */,
 				4E114F70C529443291821DA5 /* Views/Search/SearchView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD01 /* Services/SwipeActionPreferences.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD02 /* Services/EmailActionExecutor.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD03 /* Views/Settings/SettingsSheetView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift in Sources */,
+				B1C2D3E4F5A6478990ABCD06 /* Views/PreviewSupport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

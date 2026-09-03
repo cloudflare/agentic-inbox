@@ -10,7 +10,7 @@ enum AppConfig {
             return url
         }
         #if DEBUG
-        return URL(string: "http://127.0.0.1:5173")!
+        return URL(string: "http://localhost:5173")!
         #else
         return URL(string: "https://inboxies.email")!
         #endif

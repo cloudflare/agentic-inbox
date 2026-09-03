@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConversationsListView: View {
     @Environment(AppModel.self) private var app
+    var bottomInset: CGFloat = HomeChromeMetrics.listBottomInset(hasMinimizedCompose: false)
     let onOpen: (AgentConversation) -> Void
 
     var body: some View {
@@ -49,7 +50,7 @@ struct ConversationsListView: View {
         .scrollContentBackground(.hidden)
         .background(AppTheme.background)
         .refreshable { await app.refreshConversations() }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 76) }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: bottomInset) }
         .task { await app.refreshConversations() }
     }
 }

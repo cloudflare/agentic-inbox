@@ -25,8 +25,50 @@ final class AppModel {
     var archiveUndo: ArchiveUndoOffer?
     private var archiveUndoDismissTask: Task<Void, Never>?
 
+    var toast: AppToast?
+    private var toastDismissTask: Task<Void, Never>?
+
+    /// Observable swipe prefs so list rows refresh when settings change.
+    var swipePreferences = SwipeActionPreferences.current
+    /// Preview hosts skip UserDefaults so Canvas cannot overwrite real swipe prefs.
+    var persistsPreferences = true
+
     var selectedMailbox: Mailbox? {
         mailboxes.first { $0.id == selectedMailboxId }
+    }
+
+    func updateSwipePreferences(_ transform: (inout SwipeActionPreferences) -> Void) {
+        var prefs = swipePreferences
+        transform(&prefs)
+        prefs.leftActions = Array(prefs.leftActions.prefix(SwipeActionPreferences.maxActionsPerEdge))
+        prefs.rightActions = Array(prefs.rightActions.prefix(SwipeActionPreferences.maxActionsPerEdge))
+        if persistsPreferences {
+            prefs.save()
+        }
+        swipePreferences = prefs
+    }
+
+    func unreadCount(forFolderId folderId: String) -> Int {
+        folders.first(where: { $0.id == folderId })?.unreadCount ?? 0
+    }
+
+    func adjustFolderUnread(folderId: String, delta: Int) {
+        guard delta != 0,
+              let index = folders.firstIndex(where: { $0.id == folderId }) else { return }
+        let current = folders[index]
+        let next = max(0, current.unreadCount + delta)
+        guard next != current.unreadCount else { return }
+        folders[index] = Folder(id: current.id, name: current.name, unreadCount: next)
+    }
+
+    private func adjustFolderUnread(for email: Email, wasUnread: Bool, isUnread: Bool) {
+        guard wasUnread != isUnread else { return }
+        let folderId = email.folderId ?? {
+            if case let .folder(id) = selectedTab { return id }
+            return nil
+        }()
+        guard let folderId else { return }
+        adjustFolderUnread(folderId: folderId, delta: isUnread ? 1 : -1)
     }
 
     func bootstrap(authToken: String?) async {
@@ -151,6 +193,7 @@ final class AppModel {
                 }
                 selectedEmail?.read = true
                 selectedEmail?.threadUnreadCount = 0
+                adjustFolderUnread(for: email, wasUnread: true, isUnread: false)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -217,6 +260,26 @@ final class AppModel {
             original: enrichedOriginal ?? original,
             draft: enrichedDraft ?? draft
         )
+        form.onDraftSaved = { [weak self] draftId, threadId, originalEmailId, subject, body in
+            self?.markThreadHasDraft(
+                draftId: draftId,
+                threadId: threadId,
+                originalEmailId: originalEmailId,
+                draftSubject: subject,
+                draftBody: body,
+                hasDraft: true
+            )
+        }
+        form.onDraftDeleted = { [weak self] draftId, threadId, originalEmailId in
+            self?.markThreadHasDraft(
+                draftId: draftId,
+                threadId: threadId,
+                originalEmailId: originalEmailId,
+                draftSubject: nil,
+                draftBody: nil,
+                hasDraft: false
+            )
+        }
         composeSession = ComposeSession(form: form, presentation: .expanded)
         selectedEmail = nil
     }
@@ -262,44 +325,88 @@ final class AppModel {
         }
     }
 
-    func deleteCurrentEmail() async {
-        guard let mailboxId = selectedMailboxId,
-              let email = selectedEmail ?? threadEmails.last else { return }
-        do {
-            try await APIClient.shared.deleteEmail(mailboxId: mailboxId, id: email.id)
-            selectedEmail = nil
-            threadEmails = []
-            await loadEmailsForCurrentTab()
-        } catch {
-            errorMessage = error.localizedDescription
+    func markThreadHasDraft(
+        draftId: String,
+        threadId: String?,
+        originalEmailId: String?,
+        draftSubject: String? = nil,
+        draftBody: String? = nil,
+        hasDraft: Bool
+    ) {
+        // 1. Update emails in the current tab list (e.g. Inbox)
+        for i in emails.indices {
+            let e = emails[i]
+            let matchesThread = threadId != nil && !threadId!.isEmpty && (e.threadId == threadId || e.id == threadId)
+            let matchesOriginal = originalEmailId != nil && !originalEmailId!.isEmpty && (e.id == originalEmailId || e.threadId == originalEmailId)
+            if matchesThread || matchesOriginal {
+                let wasDraft = emails[i].hasDraft == true
+                if hasDraft && !wasDraft {
+                    emails[i].threadCount = (emails[i].threadCount ?? 1) + 1
+                } else if !hasDraft && wasDraft {
+                    emails[i].threadCount = max(1, (emails[i].threadCount ?? 2) - 1)
+                }
+                emails[i].hasDraft = hasDraft
+            }
         }
-    }
 
-    func archiveCurrentEmail() async {
-        guard let mailboxId = selectedMailboxId,
-              let email = selectedEmail ?? threadEmails.last else { return }
+        // 2. Update selectedEmail if open
+        if let selected = selectedEmail {
+            let matchesThread = threadId != nil && !threadId!.isEmpty && (selected.threadId == threadId || selected.id == threadId)
+            let matchesOriginal = originalEmailId != nil && !originalEmailId!.isEmpty && (selected.id == originalEmailId || selected.threadId == originalEmailId)
+            if matchesThread || matchesOriginal {
+                let wasDraft = selectedEmail?.hasDraft == true
+                if hasDraft && !wasDraft {
+                    selectedEmail?.threadCount = (selectedEmail?.threadCount ?? 1) + 1
+                } else if !hasDraft && wasDraft {
+                    selectedEmail?.threadCount = max(1, (selectedEmail?.threadCount ?? 2) - 1)
+                }
+                selectedEmail?.hasDraft = hasDraft
+            }
+        }
 
-        let previousFolderId = archiveRestoreFolder(for: email)
-        do {
-            try await APIClient.shared.moveEmail(
-                mailboxId: mailboxId,
-                id: email.id,
-                folderId: "archive"
-            )
-            selectedEmail = nil
-            threadEmails = []
-            await loadEmailsForCurrentTab()
-            presentArchiveUndo(
-                ArchiveUndoOffer(
-                    emailId: email.id,
-                    mailboxId: mailboxId,
-                    previousFolderId: previousFolderId
+        // 3. Update thread messages if active
+        for i in threadEmails.indices {
+            let e = threadEmails[i]
+            let matchesThread = threadId != nil && !threadId!.isEmpty && (e.threadId == threadId || e.id == threadId)
+            let matchesOriginal = originalEmailId != nil && !originalEmailId!.isEmpty && (e.id == originalEmailId || e.threadId == originalEmailId)
+            if matchesThread || matchesOriginal {
+                let wasDraft = threadEmails[i].hasDraft == true
+                if hasDraft && !wasDraft {
+                    threadEmails[i].threadCount = (threadEmails[i].threadCount ?? 1) + 1
+                } else if !hasDraft && wasDraft {
+                    threadEmails[i].threadCount = max(1, (threadEmails[i].threadCount ?? 2) - 1)
+                }
+                threadEmails[i].hasDraft = hasDraft
+            }
+        }
+
+        // Keep threadEmails in sync if viewing this thread
+        if hasDraft {
+            if let idx = threadEmails.firstIndex(where: { $0.id == draftId }) {
+                if let draftSubject { threadEmails[idx].subject = draftSubject }
+                if let draftBody { threadEmails[idx].body = draftBody }
+            } else if let threadId, threadEmails.contains(where: { $0.threadId == threadId || $0.id == threadId }) {
+                let draftEmail = Email(
+                    id: draftId,
+                    threadId: threadId,
+                    folderId: "draft",
+                    subject: draftSubject ?? "",
+                    sender: selectedMailbox?.email ?? "",
+                    senderName: selectedMailbox?.name,
+                    recipient: "",
+                    date: ISO8601DateFormatter().string(from: Date()),
+                    read: true,
+                    starred: false,
+                    body: draftBody,
+                    inReplyTo: originalEmailId
                 )
-            )
-        } catch {
-            errorMessage = error.localizedDescription
+                threadEmails.append(draftEmail)
+            }
+        } else {
+            threadEmails.removeAll { $0.id == draftId }
         }
     }
+
 
     func undoArchive(_ offer: ArchiveUndoOffer) async {
         guard archiveUndo?.id == offer.id else { return }
@@ -322,7 +429,7 @@ final class AppModel {
         archiveUndo = nil
     }
 
-    private func presentArchiveUndo(_ offer: ArchiveUndoOffer) {
+    func presentArchiveUndo(_ offer: ArchiveUndoOffer) {
         archiveUndoDismissTask?.cancel()
         archiveUndo = offer
         archiveUndoDismissTask = Task { @MainActor in
@@ -333,7 +440,18 @@ final class AppModel {
         }
     }
 
-    private func archiveRestoreFolder(for email: Email) -> String {
+    func showToast(_ message: String, isError: Bool = false) {
+        toastDismissTask?.cancel()
+        toast = AppToast(message: message, isError: isError)
+        toastDismissTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            toast = nil
+            toastDismissTask = nil
+        }
+    }
+
+    func archiveRestoreFolder(for email: Email) -> String {
         if let folderId = email.folderId, !folderId.isEmpty, folderId != "archive" {
             return folderId
         }
@@ -341,19 +459,6 @@ final class AppModel {
             return folderId
         }
         return "inbox"
-    }
-
-    func moveCurrentEmail(to folderId: String) async {
-        guard let mailboxId = selectedMailboxId,
-              let email = selectedEmail ?? threadEmails.last else { return }
-        do {
-            try await APIClient.shared.moveEmail(mailboxId: mailboxId, id: email.id, folderId: folderId)
-            selectedEmail = nil
-            threadEmails = []
-            await loadEmailsForCurrentTab()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 
     func toggleStar(on email: Email? = nil) async {
@@ -390,7 +495,8 @@ final class AppModel {
         }
     }
 
-    private func applyEmailUpdate(_ updated: Email) {
+    func applyEmailUpdate(_ updated: Email) {
+        let previous = emails.first(where: { $0.id == updated.id })
         if selectedEmail?.id == updated.id {
             selectedEmail = updated
         }
@@ -404,10 +510,18 @@ final class AppModel {
                 emails[idx].threadUnreadCount = 0
             }
         }
+        if let previous {
+            adjustFolderUnread(for: previous, wasUnread: !previous.read, isUnread: !updated.read)
+        }
     }
 
     func minimizeCompose() {
         composeSession?.minimize()
+        if let form = composeSession?.form, !form.isEmpty && form.hasUnsavedChanges {
+            Task { @MainActor in
+                await form.saveDraft(explicit: false)
+            }
+        }
     }
 
     func expandCompose() {
@@ -415,6 +529,7 @@ final class AppModel {
     }
 
     func closeCompose() {
+        composeSession?.form.cancelAutoSave()
         composeSession = nil
     }
 
@@ -445,6 +560,12 @@ struct ArchiveUndoOffer: Identifiable, Equatable {
     let emailId: String
     let mailboxId: String
     let previousFolderId: String
+}
+
+struct AppToast: Identifiable, Equatable {
+    let id = UUID()
+    let message: String
+    var isError: Bool = false
 }
 
 enum HomeTab: Hashable {

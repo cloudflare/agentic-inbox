@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Minimized compose dock — Notion floating chrome, Mail interaction.
+/// Minimized compose dock — Mail-style full-bleed bar flush to the screen bottom.
 struct ComposeDockBar: View {
     @Environment(AppModel.self) private var app
     let session: ComposeSession
@@ -11,24 +11,34 @@ struct ComposeDockBar: View {
                 app.expandCompose()
             }
         } label: {
-            HStack {
-                Image(systemName: "pencil.and.scribble")
-                    .font(.system(size: 14, weight: .semibold))
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
                 Text(session.dockTitle)
                     .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
-                Spacer(minLength: 8)
+                if session.form.saveStatus == .saving {
+                    ProgressView()
+                        .controlSize(.mini)
+                }
+                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
             .foregroundStyle(AppTheme.ink)
-            .padding(.horizontal, 18)
-            .frame(height: 48)
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
-            .background(AppTheme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+                .background(AppTheme.surface)
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 18,
+                        topTrailingRadius: 18,
+                        style: .continuous
+                    )
+                )
+                .shadow(color: .black.opacity(0.12), radius: 16, y: -4)
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 }

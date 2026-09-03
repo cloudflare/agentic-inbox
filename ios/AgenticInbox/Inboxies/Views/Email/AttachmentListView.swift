@@ -50,13 +50,13 @@ struct AttachmentListView: View {
             HStack(spacing: 8) {
                 fileTypeIcon(for: attachment)
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(attachment.filename)
-                        .font(.system(size: 12, weight: .regular))
+                        .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(AppTheme.ink)
                         .lineLimit(1)
                     Text(byteString(attachment.size))
-                        .font(.system(size: 11))
+                        .font(.system(size: 9))
                         .foregroundStyle(AppTheme.muted)
                         .lineLimit(1)
                 }

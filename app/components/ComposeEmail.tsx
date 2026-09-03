@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Banner, Button, Dialog, Input, Text } from "@cloudflare/kumo";
-import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, CheckIcon, FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
@@ -33,8 +33,10 @@ export default function ComposeEmail() {
 		error,
 		isSavingDraft,
 		isSending,
+		saveStatus,
 		formTitle,
 		handleSaveDraft,
+		handleDiscard,
 		handleSend,
 	} = useComposeForm(mailboxId, folder);
 
@@ -107,15 +109,32 @@ export default function ComposeEmail() {
 						<RichTextEditor value={body} onChange={setBody} />
 					</div>
 					<div className="flex justify-between items-center pt-2">
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={closeComposeModal}
-							disabled={isSending}
-						>
-							Discard
-						</Button>
+						<div className="flex items-center gap-3">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => handleDiscard(closeComposeModal)}
+								disabled={isSending}
+							>
+								Discard
+							</Button>
+							{saveStatus === "saving" && (
+								<span className="text-xs text-kumo-subtle flex items-center gap-1.5">
+									<ArrowsClockwiseIcon size={12} className="animate-spin" /> Saving draft...
+								</span>
+							)}
+							{saveStatus === "saved" && (
+								<span className="text-xs text-kumo-subtle flex items-center gap-1">
+									<CheckIcon size={12} /> Draft saved
+								</span>
+							)}
+							{saveStatus === "error" && (
+								<span className="text-xs text-red-500">
+									Failed to save draft
+								</span>
+							)}
+						</div>
 						<div className="flex items-center gap-2">
 							<Button
 								type="button"

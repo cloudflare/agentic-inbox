@@ -9,6 +9,27 @@ struct Mailbox: Identifiable, Codable, Hashable {
 
 struct MailboxSettings: Codable, Hashable {
     var fromName: String?
+    var agentSystemPrompt: String?
+    var forwarding: ForwardingSettings?
+    var signature: SignatureSettings?
+    var autoReply: AutoReplySettings?
+}
+
+struct ForwardingSettings: Codable, Hashable {
+    var enabled: Bool?
+    var email: String?
+}
+
+struct SignatureSettings: Codable, Hashable {
+    var enabled: Bool?
+    var text: String?
+    var html: String?
+}
+
+struct AutoReplySettings: Codable, Hashable {
+    var enabled: Bool?
+    var subject: String?
+    var message: String?
 }
 
 struct Folder: Identifiable, Codable, Hashable {
@@ -371,7 +392,7 @@ struct Email: Identifiable, Codable, Hashable {
 
     var isUnread: Bool {
         if isDraft { return false }
-        if let threadUnreadCount { return threadUnreadCount > 0 }
+        if let threadUnreadCount, threadUnreadCount > 0 { return true }
         return !read
     }
 
@@ -449,6 +470,118 @@ struct Email: Identifiable, Codable, Hashable {
         }
         return result
     }
+
+    var parsedDate: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = formatter.date(from: date) { return d }
+        let fallback = ISO8601DateFormatter()
+        return fallback.date(from: date)
+    }
+}
+
+enum EmailDateFilter: String, CaseIterable, Equatable, Hashable {
+    case any = "Any time"
+    case today = "Today"
+    case lastThreeDays = "Last 3 days"
+    case thisWeek = "This week"
+}
+
+struct EmailFilterState: Equatable {
+    var unreadOnly: Bool = false
+    var starredOnly: Bool = false
+    var toMeOnly: Bool = false
+    var ccOrBccMeOnly: Bool = false
+    var withAttachmentsOnly: Bool = false
+    var dateFilter: EmailDateFilter = .any
+    var needsReplyOnly: Bool = false
+
+    var isActive: Bool {
+        unreadOnly || starredOnly || toMeOnly || ccOrBccMeOnly ||
+        withAttachmentsOnly || dateFilter != .any || needsReplyOnly
+    }
+
+    var activeCount: Int {
+        var count = 0
+        if unreadOnly { count += 1 }
+        if starredOnly { count += 1 }
+        if toMeOnly { count += 1 }
+        if ccOrBccMeOnly { count += 1 }
+        if withAttachmentsOnly { count += 1 }
+        if dateFilter != .any { count += 1 }
+        if needsReplyOnly { count += 1 }
+        return count
+    }
+
+    mutating func reset() {
+        unreadOnly = false
+        starredOnly = false
+        toMeOnly = false
+        ccOrBccMeOnly = false
+        withAttachmentsOnly = false
+        dateFilter = .any
+        needsReplyOnly = false
+    }
+
+    func matches(_ email: Email, userEmail: String, calendar: Calendar = .current, now: Date = Date()) -> Bool {
+        if unreadOnly && !email.isUnread {
+            return false
+        }
+        if starredOnly && !email.starred {
+            return false
+        }
+        if withAttachmentsOnly && !email.hasFileAttachment {
+            return false
+        }
+        if needsReplyOnly && email.needsReply != true {
+            return false
+        }
+
+        let normalizedUser = userEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !normalizedUser.isEmpty {
+            if toMeOnly {
+                let inTo = email.toAddresses.contains { $0.email.lowercased() == normalizedUser }
+                let inRecip = email.recipient.lowercased().contains(normalizedUser)
+                if !inTo && !inRecip {
+                    return false
+                }
+            }
+            if ccOrBccMeOnly {
+                let inCc = email.ccAddresses.contains { $0.email.lowercased() == normalizedUser }
+                let inBcc = email.bccAddresses.contains { $0.email.lowercased() == normalizedUser }
+                let inCcRaw = email.cc?.lowercased().contains(normalizedUser) ?? false
+                let inBccRaw = email.bcc?.lowercased().contains(normalizedUser) ?? false
+                if !inCc && !inBcc && !inCcRaw && !inBccRaw {
+                    return false
+                }
+            }
+        }
+
+        if dateFilter != .any {
+            guard let date = email.parsedDate else { return false }
+            switch dateFilter {
+            case .any:
+                break
+            case .today:
+                if !calendar.isDateInToday(date) { return false }
+            case .lastThreeDays:
+                let threeDaysAgo = calendar.date(byAdding: .day, value: -3, to: now) ?? now
+                let start = calendar.startOfDay(for: threeDaysAgo)
+                if date < start { return false }
+            case .thisWeek:
+                if !calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear) { return false }
+            }
+        }
+
+        return true
+    }
+
+    func filter(_ list: [Email], userEmail: String) -> [Email] {
+        guard isActive else { return list }
+        let cal = Calendar.current
+        let now = Date()
+        return list.filter { matches($0, userEmail: userEmail, calendar: cal, now: now) }
+    }
 }
 
 struct EmailListResponse: Codable {
@@ -462,11 +595,25 @@ struct SendEmailResponse: Codable {
 }
 
 struct DraftSaveResponse: Codable {
-    let id: String
-    let status: String
+    let id: String?
+    let draftId: String?
+    let status: String?
     let subject: String?
     let recipient: String?
     let date: String?
+
+    var resolvedId: String {
+        id ?? draftId ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case draftId = "draft_id"
+        case status
+        case subject
+        case recipient
+        case date
+    }
 }
 
 struct AgentConversation: Identifiable, Codable, Hashable {
