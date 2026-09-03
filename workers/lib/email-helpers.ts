@@ -77,6 +77,55 @@ export class SenderValidationError extends Error {
 	}
 }
 
+// ── Inbound Recipient Resolution ───────────────────────────────────
+
+/**
+ * Decide which mailbox an inbound message belongs to.
+ *
+ * The envelope recipient (SMTP RCPT TO) is authoritative: it is the address Email
+ * Routing actually delivered to. Header addresses are not — with several domains in
+ * play the To: header may list another domain first, may omit our address entirely
+ * (Bcc), or may simply be forged. Headers are therefore only a fallback for events
+ * that carry no envelope (local dev, replayed messages).
+ *
+ * Returns the mailbox address, or null when the message should be ignored.
+ *
+ * @param envelopeTo         Envelope recipient, if the runtime supplied one.
+ * @param headerRecipients   To/Cc/Bcc addresses, in preference order.
+ * @param allowedAddresses   EMAIL_ADDRESSES allow-list; empty means "no restriction".
+ * @param configuredDomains  Parsed DOMAINS list; empty means "no restriction".
+ */
+export function resolveMailboxId(
+	envelopeTo: string | undefined,
+	headerRecipients: string[],
+	allowedAddresses: string[],
+	configuredDomains: string[],
+): string | null {
+	const allowed = allowedAddresses.map((a) => a.trim().toLowerCase()).filter(Boolean);
+	const domains = configuredDomains.map((d) => d.trim().toLowerCase()).filter(Boolean);
+	const isAllowed = (addr: string) => allowed.length === 0 || allowed.includes(addr);
+	const onConfiguredDomain = (addr: string) => {
+		if (domains.length === 0) return true;
+		const domain = addr.split("@")[1];
+		return !!domain && domains.includes(domain);
+	};
+
+	const envelope = envelopeTo?.trim().toLowerCase();
+	if (envelope) {
+		// Deliberately not filtered by DOMAINS: a stale DOMAINS value must not silently drop
+		// mail that Email Routing was configured to deliver here. Mailbox existence in R2 is
+		// the real gate, and the caller checks it.
+		return isAllowed(envelope) ? envelope : null;
+	}
+
+	const candidates = headerRecipients.map((a) => a.trim().toLowerCase()).filter(Boolean);
+	return (
+		candidates.find((addr) => isAllowed(addr) && onConfiguredDomain(addr)) ??
+		candidates.find((addr) => isAllowed(addr)) ??
+		null
+	);
+}
+
 // ── Message ID ─────────────────────────────────────────────────────
 
 /**

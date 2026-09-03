@@ -19,7 +19,7 @@ https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 
 ### To set up
 
-1. Deploy to Cloudflare. The deploy flow will automatically provision R2, Durable Objects, and Workers AI. You'll be prompted for **DOMAINS**, which is the domain (yourdomain.com) you want to receive emails for (email@yourdomain.com).
+1. Deploy to Cloudflare. The deploy flow will automatically provision R2, Durable Objects, and Workers AI. You'll be prompted for **DOMAINS**, which is the domain (yourdomain.com) you want to receive emails for (email@yourdomain.com). To serve more than one domain from a single instance, pass a comma-separated list (e.g. `yourdomain.com,anotherdomain.com`) — see [Using multiple domains](#using-multiple-domains).
 
      [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agentic-inbox)
 
@@ -59,8 +59,28 @@ npm run dev
 
 ### Configuration
 
-1. Set your domain in `wrangler.jsonc`
+1. Set your domain (or domains) in `wrangler.jsonc` via the `DOMAINS` var
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
+
+### Using multiple domains
+
+A single instance can serve multiple domains. Set `DOMAINS` to a comma-separated list:
+
+```jsonc
+"DOMAINS": "example.com,another.com"
+```
+
+Then, for **each** domain:
+
+- Add a catch-all [Email Routing](https://developers.cloudflare.com/email-routing/) rule that forwards to this Worker (for receiving)
+- Verify the domain for [Email Service](https://developers.cloudflare.com/email-service/) (for sending)
+
+Notes:
+
+- The **New Mailbox** dialog shows a domain picker automatically once more than one domain is configured; mailbox creation is restricted to the configured domains.
+- If you set `EMAIL_ADDRESSES` to restrict mailbox creation, it may list addresses across any of the configured domains (e.g. `["hello@example.com", "hi@another.com"]`).
+- Incoming mail is filed by the **envelope recipient** -- the address Email Routing delivered to -- not by the `To:` header. This is what keeps domains apart when a message is addressed to several people at once, arrives via Bcc, or carries a forged `To:`.
+- Adding a domain to `DOMAINS` does not by itself divert any mail. A domain only starts delivering here once you add its Email Routing catch-all rule, so you can configure a domain ahead of cutting its MX over.
 
 ### Deploy
 

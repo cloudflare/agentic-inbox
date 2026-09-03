@@ -13,7 +13,13 @@
 		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
+		//
+		// DOMAINS accepts a single domain or a comma-separated list to serve multiple
+		// domains from one instance, e.g. "example.com,another.com". Each domain needs its
+		// own Email Routing catch-all rule, and must be verified for outbound sending.
 		"DOMAINS": "example.com",
+		// EMAIL_ADDRESSES optionally restricts mailbox creation to specific addresses, and
+		// may span the configured domains, e.g. ["hello@example.com", "hi@another.com"].
 		"EMAIL_ADDRESSES": []
 	},
 	"send_email": [

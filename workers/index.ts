@@ -14,11 +14,12 @@ import {
 	generateMessageId,
 	buildThreadingHeaders,
 	listMailboxes,
+	resolveMailboxId,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
-import type { Env } from "./types";
+import type { Env, IncomingEmailEvent } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 
 type AppContext = Context<MailboxContext>;
@@ -48,6 +49,12 @@ function slugify(text: string) { // can return "" for non-alphanumeric input
 	return text.toString().toLowerCase()
 		.replace(/\s+/g, "-").replace(/[^\w-]+/g, "")
 		.replace(/--+/g, "-").replace(/^-+/, "").replace(/-+$/, "");
+}
+
+// Parse the comma-separated DOMAINS var into a trimmed, non-empty list.
+// Supports multiple domains on one instance, e.g. "example.com,another.com".
+function parseDomains(raw: string | undefined): string[] {
+	return (raw || "").split(",").map((d) => d.trim()).filter(Boolean);
 }
 
 function intQuery(c: AppContext, key: string): number | undefined {
@@ -86,8 +93,7 @@ app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 // -- Config ---------------------------------------------------------
 
 app.get("/api/v1/config", (c) => {
-	const domainsRaw = c.env.DOMAINS || "";
-	const domains = domainsRaw.split(",").map((d) => d.trim()).filter(Boolean);
+	const domains = parseDomains(c.env.DOMAINS);
 	const emailAddresses = c.env.EMAIL_ADDRESSES ?? [];
 	return c.json({ domains, emailAddresses });
 });
@@ -103,8 +109,17 @@ app.post("/api/v1/mailboxes", async (c) => {
 	const { name, settings, email: rawEmail } = CreateMailboxBody.parse(await c.req.json());
 	const email = rawEmail.toLowerCase();
 	const allowedAddresses = (c.env.EMAIL_ADDRESSES ?? []) as string[];
-	if (allowedAddresses.length > 0 && !allowedAddresses.map((a) => a.toLowerCase()).includes(email)) {
+	const isExplicitlyAllowed = allowedAddresses.map((a) => a.toLowerCase()).includes(email);
+	if (allowedAddresses.length > 0 && !isExplicitlyAllowed) {
 		return c.json({ error: "Mailbox creation is restricted to configured EMAIL_ADDRESSES" }, 403);
+	}
+	// When DOMAINS is configured, mailboxes must be on one of those domains — this mirrors the
+	// front-end domain picker. Explicit EMAIL_ADDRESSES entries bypass the check (they are the
+	// authoritative allow-list and may legitimately span domains).
+	const domains = parseDomains(c.env.DOMAINS);
+	const domain = email.split("@")[1];
+	if (!isExplicitlyAllowed && domains.length > 0 && (!domain || !domains.some((d) => d.toLowerCase() === domain))) {
+		return c.json({ error: "Mailbox domain must be one of the configured DOMAINS" }, 400);
 	}
 	const key = `mailboxes/${email}.json`;
 	if (await c.env.BUCKET.head(key)) return c.json({ error: "Mailbox already exists" }, 409);
@@ -345,23 +360,23 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	return result;
 }
 
-async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
+async function receiveEmail(event: IncomingEmailEvent, env: Env, ctx: ExecutionContext) {
 	const rawEmail = await streamToArrayBuffer(event.raw, event.rawSize);
 	const parsedEmail = await new PostalMime().parse(rawEmail);
 
-	if (!parsedEmail.to?.length || !parsedEmail.to[0].address) throw new Error("received email with empty to");
-
 	const allowedAddresses = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
-	const allRecipients = parsedEmail.to.map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
+	const configuredDomains = parseDomains(env.DOMAINS).map((d) => d.toLowerCase());
+	const allRecipients = (parsedEmail.to || []).map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
 	const ccRecipients = (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
 	const bccRecipients = (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
 
-	let mailboxId: string | undefined;
-	if (allowedAddresses.length > 0) {
-		mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
-		if (!mailboxId) { console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`); return; }
-	} else { mailboxId = allRecipients[0]; }
-	if (!mailboxId) throw new Error("received email with no valid recipient address");
+	const mailboxId = resolveMailboxId(
+		event.to,
+		[...allRecipients, ...ccRecipients, ...bccRecipients],
+		allowedAddresses,
+		configuredDomains,
+	);
+	if (!mailboxId) { console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES or DOMAINS.`); return; }
 
 	const messageId = crypto.randomUUID();
 	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
@@ -394,7 +409,7 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 
 	await stub.createEmail(Folders.INBOX, {
 		id: messageId, subject: parsedEmail.subject || "",
-		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", "),
+		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", ") || mailboxId,
 		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
 		date: new Date().toISOString(), // uses receive time, not the email's Date header
 		body: parsedEmail.html || parsedEmail.text || "",
