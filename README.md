@@ -79,6 +79,8 @@ Notes:
 
 - The **New Mailbox** dialog shows a domain picker automatically once more than one domain is configured; mailbox creation is restricted to the configured domains.
 - If you set `EMAIL_ADDRESSES` to restrict mailbox creation, it may list addresses across any of the configured domains (e.g. `["hello@example.com", "hi@another.com"]`).
+- Incoming mail is filed by the **envelope recipient** -- the address Email Routing delivered to -- not by the `To:` header. This is what keeps domains apart when a message is addressed to several people at once, arrives via Bcc, or carries a forged `To:`.
+- Adding a domain to `DOMAINS` does not by itself divert any mail. A domain only starts delivering here once you add its Email Routing catch-all rule, so you can configure a domain ahead of cutting its MX over.
 
 ### Deploy
 
