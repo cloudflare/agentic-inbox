@@ -282,6 +282,21 @@ final class APIClient: @unchecked Sendable {
             method: "DELETE"
         )
     }
+
+    func registerDeviceToken(mailboxId: String, token: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/device-token",
+            method: "POST",
+            body: ["token": token, "platform": "ios"]
+        )
+    }
+
+    func unregisterDeviceToken(mailboxId: String, token: String) async throws {
+        let _: EmptyResponse = try await request(
+            path: "/api/v1/mailboxes/\(mailboxId.urlPathEncoded)/device-token/\(token.urlPathEncoded)",
+            method: "DELETE"
+        )
+    }
 }
 
 struct EmptyResponse: Decodable {}

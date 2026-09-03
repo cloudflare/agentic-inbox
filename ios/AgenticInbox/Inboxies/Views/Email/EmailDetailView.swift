@@ -56,7 +56,7 @@ struct EmailDetailView: View {
                         .padding(.top, 8)
                         .padding(.bottom, 12)
 
-                    if app.isEmailDetailLoading {
+                    if app.isEmailDetailLoading && app.threadEmails.isEmpty {
                         detailSkeleton
                     } else {
                         messagesList
@@ -85,7 +85,7 @@ struct EmailDetailView: View {
                     } label: {
                         Image(systemName: "chevron.up")
                     }
-                    .disabled(!app.canOpenPreviousEmail || app.isEmailDetailLoading)
+                    .disabled(!app.canOpenPreviousEmail)
                     .accessibilityLabel("Previous email")
 
                     Button {
@@ -93,7 +93,7 @@ struct EmailDetailView: View {
                     } label: {
                         Image(systemName: "chevron.down")
                     }
-                    .disabled(!app.canOpenNextEmail || app.isEmailDetailLoading)
+                    .disabled(!app.canOpenNextEmail)
                     .accessibilityLabel("Next email")
                 }
 

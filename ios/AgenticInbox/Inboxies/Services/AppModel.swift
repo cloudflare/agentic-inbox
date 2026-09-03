@@ -13,10 +13,13 @@ final class AppModel {
     var conversations: [AgentConversation] = []
     /// True until the first mailbox identity is available (top bar skeleton).
     var isMailboxLoading = true
-    /// True while the current folder's email list is fetching.
+    /// True while the current folder's email list is fetching with no cached data.
     var isLoading = true
-    /// True while the open email's body/thread is fetching.
+    /// True while the open email's body/thread is fetching with no cached body.
     var isEmailDetailLoading = false
+    /// Non-intrusive background sync state (does not hide emails).
+    var isSyncing = false
+    var lastSyncedAt: Date?
     var errorMessage: String?
     var selectedEmail: Email?
     var threadEmails: [Email] = []
@@ -27,6 +30,11 @@ final class AppModel {
 
     var toast: AppToast?
     private var toastDismissTask: Task<Void, Never>?
+
+    private let db = DatabaseService.shared
+    private let syncService = MailboxSyncService.shared
+    private let outbox = OutboxQueueWorker.shared
+    private let streamClient = RealTimeStreamClient.shared
 
     /// Observable swipe prefs so list rows refresh when settings change.
     var swipePreferences = SwipeActionPreferences.current
@@ -59,9 +67,12 @@ final class AppModel {
         let next = max(0, current.unreadCount + delta)
         guard next != current.unreadCount else { return }
         folders[index] = Folder(id: current.id, name: current.name, unreadCount: next)
+        if let mailboxId = selectedMailboxId {
+            db.updateFolderUnread(mailboxId: mailboxId, folderId: folderId, delta: delta)
+        }
     }
 
-    private func adjustFolderUnread(for email: Email, wasUnread: Bool, isUnread: Bool) {
+    func adjustFolderUnread(for email: Email, wasUnread: Bool, isUnread: Bool) {
         guard wasUnread != isUnread else { return }
         let folderId = email.folderId ?? {
             if case let .folder(id) = selectedTab { return id }
@@ -74,23 +85,83 @@ final class AppModel {
     func bootstrap(authToken: String?) async {
         let token = authToken
         APIClient.shared.authTokenProvider = { token }
-        await refreshMailboxes()
+
+        // 1. Instant local read (0ms) — eliminate cold start spinners
+        let cachedMailboxes = db.getMailboxes()
+        if !cachedMailboxes.isEmpty {
+            mailboxes = cachedMailboxes
+            if selectedMailboxId == nil {
+                selectedMailboxId = cachedMailboxes.first?.id
+            }
+            isMailboxLoading = false
+            if let id = selectedMailboxId {
+                let cachedFolders = db.getFolders(mailboxId: id)
+                if !cachedFolders.isEmpty {
+                    folders = cachedFolders
+                }
+                if case let .folder(folderId) = selectedTab {
+                    let cachedEmails = db.getEmails(mailboxId: id, folderId: folderId, limit: 50)
+                    if !cachedEmails.isEmpty {
+                        emails = cachedEmails
+                        isLoading = false
+                    }
+                }
+            }
+        }
+
+        setupRealTimeStream()
+
+        // 2. Silent background sync
+        await refreshMailboxes(showLoading: emails.isEmpty)
     }
 
-    func refreshMailboxes() async {
-        isMailboxLoading = selectedMailbox == nil
-        isLoading = true
+    private func setupRealTimeStream() {
+        guard let mailboxId = selectedMailboxId else { return }
+        streamClient.onNewEmailReceived = { [weak self] newEmail in
+            Task { @MainActor in
+                self?.handleIncomingRealTimeEmail(newEmail)
+            }
+        }
+        streamClient.onSyncRequested = { [weak self] in
+            Task { @MainActor in
+                await self?.refreshCurrentTabSilently()
+            }
+        }
+        streamClient.start(mailboxId: mailboxId)
+        PushNotificationManager.shared.requestPermissionAndRegister(mailboxId: mailboxId)
+    }
+
+    private func handleIncomingRealTimeEmail(_ email: Email) {
+        // If email matches current tab folder, insert at top with smooth animation
+        if case let .folder(currentFolder) = selectedTab {
+            let targetFolder = email.folderId ?? "inbox"
+            if targetFolder.caseInsensitiveCompare(currentFolder) == .orderedSame {
+                if !emails.contains(where: { $0.id == email.id }) {
+                    emails.insert(email, at: 0)
+                }
+            }
+        }
+        if email.isUnread {
+            adjustFolderUnread(folderId: email.folderId ?? "inbox", delta: 1)
+        }
+    }
+
+    func refreshMailboxes(showLoading: Bool = true) async {
+        if showLoading {
+            isMailboxLoading = selectedMailbox == nil
+            isLoading = emails.isEmpty
+        }
         errorMessage = nil
         do {
             mailboxes = try await APIClient.shared.listMailboxes()
+            db.upsertMailboxes(mailboxes)
             if selectedMailboxId == nil {
                 selectedMailboxId = mailboxes.first?.id
             }
-            isMailboxLoading = selectedMailbox == nil
+            isMailboxLoading = false
             if let id = selectedMailboxId {
                 await loadMailbox(id)
             } else {
-                isMailboxLoading = false
                 isLoading = false
             }
         } catch {
@@ -102,19 +173,36 @@ final class AppModel {
 
     func loadMailbox(_ id: String) async {
         selectedMailboxId = id
-        isMailboxLoading = selectedMailbox == nil
-        isLoading = true
+        setupRealTimeStream()
+
+        // Instant local read
+        let cachedFolders = db.getFolders(mailboxId: id)
+        if !cachedFolders.isEmpty {
+            folders = cachedFolders
+            isMailboxLoading = false
+        }
+        if case let .folder(folderId) = selectedTab {
+            let cachedEmails = db.getEmails(mailboxId: id, folderId: folderId, limit: 50)
+            if !cachedEmails.isEmpty {
+                emails = cachedEmails
+                isLoading = false
+            }
+        }
+
+        isSyncing = true
+        defer { isSyncing = false }
         do {
             if let detailed = try? await APIClient.shared.getMailbox(mailboxId: id),
                let idx = mailboxes.firstIndex(where: { $0.id == detailed.id }) {
                 mailboxes[idx] = detailed
+                db.upsertMailboxes([detailed])
             }
             isMailboxLoading = false
-            async let foldersTask = APIClient.shared.listFolders(mailboxId: id)
+            async let foldersTask = syncService.syncMailbox(mailboxId: id)
             async let conversationsTask = APIClient.shared.listConversations(mailboxId: id)
             folders = try await foldersTask
-            conversations = try await conversationsTask
-            await loadEmailsForCurrentTab()
+            conversations = (try? await conversationsTask) ?? conversations
+            await loadEmailsForCurrentTab(showLoading: emails.isEmpty)
         } catch {
             errorMessage = error.localizedDescription
             isMailboxLoading = false
@@ -125,10 +213,18 @@ final class AppModel {
     func selectTab(_ tab: HomeTab) async {
         selectedTab = tab
         selectedEmail = nil
-        if case .folder = tab {
-            isLoading = true
+
+        // Instant local query for folder (< 2ms)
+        if case let .folder(folderId) = tab, let mailboxId = selectedMailboxId {
+            let cached = db.getEmails(mailboxId: mailboxId, folderId: folderId, limit: 50)
+            if !cached.isEmpty {
+                emails = cached
+                isLoading = false
+            } else {
+                isLoading = true
+            }
         }
-        await loadEmailsForCurrentTab()
+        await loadEmailsForCurrentTab(showLoading: emails.isEmpty)
     }
 
     func loadEmailsForCurrentTab(showLoading: Bool = true) async {
@@ -141,15 +237,29 @@ final class AppModel {
             isLoading = false
             return
         }
-        if showLoading {
+
+        let cached = db.getEmails(mailboxId: mailboxId, folderId: folderId, limit: 50)
+        if !cached.isEmpty {
+            emails = cached
+            isLoading = false
+        } else if showLoading {
             isLoading = true
         }
-        defer { isLoading = false }
+
+        isSyncing = true
+        defer {
+            isLoading = false
+            isSyncing = false
+        }
+
         do {
-            let response = try await APIClient.shared.listEmails(mailboxId: mailboxId, folder: folderId)
-            emails = response.emails
+            let synced = try await syncService.syncFolder(mailboxId: mailboxId, folderId: folderId)
+            emails = synced
+            lastSyncedAt = Date()
         } catch {
-            errorMessage = error.localizedDescription
+            if emails.isEmpty {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -163,6 +273,15 @@ final class AppModel {
         }
     }
 
+    func refreshCurrentTabSilently() async {
+        if case let .folder(folderId) = selectedTab, let mailboxId = selectedMailboxId {
+            if let synced = try? await syncService.syncFolder(mailboxId: mailboxId, folderId: folderId) {
+                emails = synced
+                lastSyncedAt = Date()
+            }
+        }
+    }
+
     func openEmail(_ email: Email) async {
         // Drafts open in compose, not read-only detail
         if email.isDraft || (selectedTab == .folder("draft")) {
@@ -171,32 +290,59 @@ final class AppModel {
         }
 
         guard let mailboxId = selectedMailboxId else { return }
-        selectedEmail = email
-        threadEmails = []
-        isEmailDetailLoading = true
-        defer { isEmailDetailLoading = false }
-        do {
-            let shouldLoadThread = email.hasDraft == true || (email.threadCount ?? 1) > 1
-            if let threadId = email.threadId, shouldLoadThread {
-                threadEmails = try await APIClient.shared.getThread(mailboxId: mailboxId, threadId: threadId)
-            } else {
-                let full = try await APIClient.shared.getEmail(mailboxId: mailboxId, id: email.id)
-                threadEmails = [full]
-                // Keep list-row metadata (folder, flags) while adopting fetched body fields.
-                selectedEmail = mergeListMetadata(email, with: full)
+
+        // 1. Instant local read: check if body and thread are cached
+        let localEmail = db.getEmail(id: email.id) ?? email
+        let localThread = localEmail.threadId.map { db.getThreadEmails(mailboxId: mailboxId, threadId: $0) } ?? []
+
+        selectedEmail = localEmail
+        if !localThread.isEmpty {
+            threadEmails = localThread
+        } else {
+            threadEmails = [localEmail]
+        }
+
+        // If body is already cached, zero skeleton delay!
+        let hasBody = (localEmail.body != nil && !(localEmail.body?.isEmpty ?? true))
+        isEmailDetailLoading = !hasBody
+
+        // 2. Optimistic mark read
+        if email.isUnread {
+            db.updateEmailFlags(id: email.id, read: true)
+            db.enqueueMutation(mailboxId: mailboxId, emailId: email.id, actionType: "mark_read", payload: ["read": true])
+            outbox.trigger()
+
+            if let idx = emails.firstIndex(where: { $0.id == email.id }) {
+                emails[idx].read = true
+                emails[idx].threadUnreadCount = 0
             }
-            if email.isUnread {
-                _ = try? await APIClient.shared.markRead(mailboxId: mailboxId, id: email.id)
-                if let idx = emails.firstIndex(where: { $0.id == email.id }) {
-                    emails[idx].read = true
-                    emails[idx].threadUnreadCount = 0
+            selectedEmail?.read = true
+            selectedEmail?.threadUnreadCount = 0
+            adjustFolderUnread(for: email, wasUnread: true, isUnread: false)
+        }
+
+        // 3. Silent fetch of full thread / body if needed
+        let shouldLoadThread = email.hasDraft == true || (email.threadCount ?? 1) > 1
+        Task {
+            do {
+                if let threadId = email.threadId, shouldLoadThread {
+                    let remoteThread = try await APIClient.shared.getThread(mailboxId: mailboxId, threadId: threadId)
+                    db.upsertEmails(mailboxId: mailboxId, emails: remoteThread, defaultFolder: email.folderId)
+                    if selectedEmail?.id == email.id || selectedEmail?.threadId == threadId {
+                        threadEmails = remoteThread
+                    }
+                } else if !hasBody {
+                    let full = try await APIClient.shared.getEmail(mailboxId: mailboxId, id: email.id)
+                    db.upsertEmails(mailboxId: mailboxId, emails: [full], defaultFolder: email.folderId)
+                    if selectedEmail?.id == email.id {
+                        selectedEmail = mergeListMetadata(email, with: full)
+                        threadEmails = [full]
+                    }
                 }
-                selectedEmail?.read = true
-                selectedEmail?.threadUnreadCount = 0
-                adjustFolderUnread(for: email, wasUnread: true, isUnread: false)
+            } catch {
+                // Ignore background detail fetch error
             }
-        } catch {
-            errorMessage = error.localizedDescription
+            isEmailDetailLoading = false
         }
     }
 
@@ -466,16 +612,15 @@ final class AppModel {
         let target = email ?? selectedEmail ?? threadEmails.last
         guard let target else { return }
         let next = !target.starred
-        do {
-            let updated = try await APIClient.shared.updateEmail(
-                mailboxId: mailboxId,
-                id: target.id,
-                starred: next
-            )
-            applyEmailUpdate(updated)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+
+        // 1. Instant local optimistic update (<1ms)
+        db.updateEmailFlags(id: target.id, starred: next)
+        db.enqueueMutation(mailboxId: mailboxId, emailId: target.id, actionType: "star", payload: ["starred": next])
+        outbox.trigger()
+
+        var updated = target
+        updated.starred = next
+        applyEmailUpdate(updated)
     }
 
     func toggleRead(on email: Email? = nil) async {
@@ -483,16 +628,15 @@ final class AppModel {
         let target = email ?? selectedEmail ?? threadEmails.last
         guard let target else { return }
         let next = !target.read
-        do {
-            let updated = try await APIClient.shared.updateEmail(
-                mailboxId: mailboxId,
-                id: target.id,
-                read: next
-            )
-            applyEmailUpdate(updated)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+
+        // 1. Instant local optimistic update (<1ms)
+        db.updateEmailFlags(id: target.id, read: next)
+        db.enqueueMutation(mailboxId: mailboxId, emailId: target.id, actionType: "mark_read", payload: ["read": next])
+        outbox.trigger()
+
+        var updated = target
+        updated.read = next
+        applyEmailUpdate(updated)
     }
 
     func applyEmailUpdate(_ updated: Email) {

@@ -5,6 +5,7 @@ import SwiftUI
 
 @main
 struct InboxiesApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var authStore = AuthStore()
     @State private var appModel = AppModel()
 

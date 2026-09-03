@@ -32,7 +32,7 @@ struct EmailListView: View {
 
     var body: some View {
         Group {
-            if isLoading {
+            if isLoading && visibleEmails.isEmpty {
                 skeletonList
             } else if visibleEmails.isEmpty {
                 emptyList
@@ -213,8 +213,8 @@ struct EmailListView: View {
         .contentMargins(.top, 12, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(AppTheme.background)
-        .scrollDisabled(isLoading)
-        .optionalRefreshable(isLoading ? nil : onRefresh)
+        .scrollDisabled(isLoading && visibleEmails.isEmpty)
+        .optionalRefreshable(onRefresh)
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: bottomInset)
         }

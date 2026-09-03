@@ -33,6 +33,7 @@ import {
 	issueMobileSessionToken,
 	verifyAppleIdentityToken,
 } from "./lib/apple-auth";
+import { sendAPNsPush } from "./lib/apns";
 
 type AppContext = Context<MailboxContext>;
 
@@ -197,6 +198,21 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	if (rateLimitError) return c.json({ error: rateLimitError }, 429);
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
+	let resolvedThreadId = thread_id;
+	if (!resolvedThreadId && (in_reply_to || (references && references.length > 0))) {
+		const refs: string[] = [];
+		if (in_reply_to) refs.push(in_reply_to);
+		if (references) {
+			for (let i = references.length - 1; i >= 0; i--) {
+				if (references[i] && !refs.includes(references[i])) refs.push(references[i]);
+			}
+		}
+		resolvedThreadId = (await (stub as any).findThreadIdByReferences(refs)) || null;
+	}
+	if (!resolvedThreadId) {
+		resolvedThreadId = messageId;
+	}
+
 	await stub.createEmail(Folders.SENT, {
 		id: messageId, subject, sender: fromEmail,
 		sender_name: displayNameFromAddressField(from),
@@ -205,7 +221,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 		bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
 		date: new Date().toISOString(), body: html || text || "",
 		in_reply_to: in_reply_to || null, email_references: references ? JSON.stringify(references) : null,
-		thread_id: thread_id || in_reply_to || messageId, message_id: outgoingMessageId,
+		thread_id: resolvedThreadId, message_id: outgoingMessageId,
 		raw_headers: JSON.stringify([
 			{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
 			{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
@@ -233,11 +249,20 @@ app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
 	if (draft_id) await stub.deleteEmail(draft_id); // not atomic — create-then-delete would be safer
 	const messageId = crypto.randomUUID();
 	const now = new Date().toISOString();
+
+	let resolvedThreadId = thread_id;
+	if (!resolvedThreadId && in_reply_to) {
+		resolvedThreadId = (await (stub as any).findThreadIdByReferences([in_reply_to])) || null;
+	}
+	if (!resolvedThreadId) {
+		resolvedThreadId = messageId;
+	}
+
 	await stub.createEmail(Folders.DRAFT, {
 		id: messageId, subject: subject || "", sender: mailboxId.toLowerCase(),
 		recipient: (to || "").toLowerCase(), cc: cc?.toLowerCase() || null, bcc: bcc?.toLowerCase() || null,
 		date: now, body, in_reply_to: in_reply_to || null, email_references: null,
-		thread_id: thread_id || in_reply_to || messageId,
+		thread_id: resolvedThreadId,
 	}, []);
 	return c.json({ id: messageId, status: "draft", subject: subject || "", recipient: to || "", date: now }, 201);
 });
@@ -279,6 +304,62 @@ app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) 
 app.post("/api/v1/mailboxes/:mailboxId/threads/:threadId/read", async (c: AppContext) => {
 	await c.var.mailboxStub.markThreadRead(c.req.param("threadId")!);
 	return c.json({ status: "marked_read" });
+});
+
+// -- Real-Time Events Stream (SSE) ----------------------------------
+
+app.get("/api/v1/mailboxes/:mailboxId/events", async (c: AppContext) => {
+	const stream = await (c.var.mailboxStub as any).subscribeEvents();
+	return new Response(stream, {
+		headers: {
+			"Content-Type": "text/event-stream",
+			"Cache-Control": "no-cache",
+			"Connection": "keep-alive",
+		},
+	});
+});
+
+// -- Push Notification Device Tokens --------------------------------
+
+app.post("/api/v1/mailboxes/:mailboxId/device-token", async (c: AppContext) => {
+	const { token, platform } = (await c.req.json()) as { token: string; platform?: string };
+	if (!token) return c.json({ error: "Missing token" }, 400);
+	await (c.var.mailboxStub as any).registerDeviceToken(token, platform || "ios");
+	return c.json({ status: "registered" });
+});
+
+app.delete("/api/v1/mailboxes/:mailboxId/device-token/:token", async (c: AppContext) => {
+	const token = c.req.param("token");
+	if (!token) return c.json({ error: "Missing token" }, 400);
+	await (c.var.mailboxStub as any).unregisterDeviceToken(token);
+	return c.json({ status: "unregistered" });
+});
+
+app.post("/api/v1/mailboxes/:mailboxId/test-push", async (c: AppContext) => {
+	const mailboxId = c.req.param("mailboxId");
+	const deviceTokens = await (c.var.mailboxStub as any).getDeviceTokens();
+	console.log(`[APNs Test] Found ${deviceTokens?.length ?? 0} token(s) for ${mailboxId}`);
+	if (!deviceTokens || deviceTokens.length === 0) {
+		return c.json({
+			status: "no_devices",
+			message: `No device tokens registered for mailbox "${mailboxId}". Launch the Inboxies iOS app and grant notification permission.`,
+			deviceTokens: [],
+		});
+	}
+
+	const result = await sendAPNsPush(c.env, deviceTokens, {
+		title: "Inboxies Push Test",
+		body: "Your APNs push notification pipeline is working live! 🚀",
+		mailboxId,
+		emailId: "test-push-" + Date.now(),
+		folderId: "inbox",
+	});
+
+	return c.json({
+		status: "completed",
+		deviceCount: deviceTokens.length,
+		result,
+	});
 });
 
 // -- Reply / Forward ------------------------------------------------
@@ -521,16 +602,35 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	}
 
 	const extractMsgId = (s: string) => { const m = s.match(/<([^>]+)>/); return m ? m[1] : s.trim().split(/\s+/)[0]; };
+	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
 	const inReplyTo = parsedEmail.inReplyTo ? extractMsgId(parsedEmail.inReplyTo) : null;
 	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId) : [];
-	let threadId = emailReferences[0] || inReplyTo || messageId;
 
-	if (!inReplyTo && emailReferences.length === 0) {
-		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
-		if (subjectThread) threadId = subjectThread;
+	// Build candidate message IDs to find an existing thread (newest to oldest)
+	const candidateReferences: string[] = [];
+	if (inReplyTo) candidateReferences.push(inReplyTo);
+	for (let i = emailReferences.length - 1; i >= 0; i--) {
+		const ref = emailReferences[i];
+		if (ref && !candidateReferences.includes(ref)) {
+			candidateReferences.push(ref);
+		}
 	}
 
-	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
+	let threadId: string | null = null;
+	if (candidateReferences.length > 0) {
+		threadId = await (stub as any).findThreadIdByReferences(candidateReferences);
+	}
+
+	if (!threadId) {
+		threadId = await (stub as any).findThreadBySubject(
+			parsedEmail.subject || "",
+			parsedEmail.from?.address || undefined,
+		);
+	}
+
+	if (!threadId) {
+		threadId = messageId;
+	}
 
 	const fromAddress = (parsedEmail.from?.address || "").toLowerCase();
 	const fromHeaders = JSON.stringify(parsedEmail.headers);
@@ -571,6 +671,30 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 			);
 		})().catch((e) =>
 			console.error("Auto-draft trigger failed:", (e as Error).message),
+		),
+	);
+
+	// Send Apple Push Notification (APNs) to all registered iOS devices
+	ctx.waitUntil(
+		(async () => {
+			const deviceTokens = await (stub as any).getDeviceTokens();
+			console.log(`[APNs] Inbound email for "${mailboxId}". Registered device tokens: ${deviceTokens?.length ?? 0}`);
+			if (deviceTokens && deviceTokens.length > 0) {
+				const { successCount, failureCount, staleTokens } = await sendAPNsPush(env, deviceTokens, {
+					title: senderName || fromAddress,
+					body: parsedEmail.subject || "(No subject)",
+					mailboxId,
+					emailId: messageId,
+					folderId: Folders.INBOX,
+				});
+				console.log(`[APNs] Push results for "${mailboxId}": ${successCount} delivered, ${failureCount} failed.`);
+				for (const stale of staleTokens) {
+					console.log(`[APNs] Pruning stale token: ${stale.slice(0, 8)}...`);
+					await (stub as any).unregisterDeviceToken(stale);
+				}
+			}
+		})().catch((e) =>
+			console.error("[APNs] Push notification trigger failed:", (e as Error).message),
 		),
 	);
 }

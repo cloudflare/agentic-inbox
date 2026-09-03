@@ -7,12 +7,22 @@
         "enabled": true,
     },
     "compatibility_flags": ["nodejs_compat"],
+    "routes": [
+        {
+            "pattern": "inboxies.email",
+            "custom_domain": true,
+            "enabled": true,
+            "previews_enabled": false,
+        },
+    ],
     "vars": {
         // Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
         // TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
         // The worker now fails closed outside local development if Access is not configured.
         "DOMAINS": "inboxies.email",
         "EMAIL_ADDRESSES": [],
+        "APNS_SANDBOX": "true",
+        "APNS_TOPIC": "co.inboxies.app",
     },
     "send_email": [
         {
@@ -30,6 +40,8 @@
     "ai": {
         "binding": "AI",
     },
+    "workers_dev": true,
+    "preview_urls": true,
     "durable_objects": {
         "bindings": [
             {

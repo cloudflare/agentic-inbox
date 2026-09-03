@@ -191,4 +191,79 @@ export const mailboxMigrations: Migration[] = [
 		name: "11_mark_draft_emails_as_read",
 		sql: txn(`UPDATE emails SET read = 1 WHERE folder_id = 'draft' AND read = 0;`),
 	},
+	{
+		name: "12_add_device_tokens",
+		sql: txn(`
+            CREATE TABLE IF NOT EXISTS device_tokens (
+                token TEXT PRIMARY KEY,
+                platform TEXT NOT NULL DEFAULT 'ios',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+        `),
+	},
+	{
+		name: "13_fix_thread_ids_and_index_message_id",
+		sql: txn(`
+            CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);
+
+            -- Fix child emails whose in_reply_to matches an existing email's message_id or id
+            UPDATE emails
+            SET thread_id = (
+                SELECT parent.thread_id
+                FROM emails parent
+                WHERE (parent.message_id = emails.in_reply_to OR parent.id = emails.in_reply_to)
+                  AND parent.id != emails.id
+                ORDER BY parent.date ASC
+                LIMIT 1
+            )
+            WHERE in_reply_to IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM emails parent
+                WHERE (parent.message_id = emails.in_reply_to OR parent.id = emails.in_reply_to)
+                  AND parent.id != emails.id
+                  AND parent.thread_id IS NOT NULL
+                  AND parent.thread_id != emails.thread_id
+              );
+
+            -- Fix emails whose thread_id was set directly to a parent email's RFC message_id
+            UPDATE emails
+            SET thread_id = (
+                SELECT target.thread_id
+                FROM emails target
+                WHERE target.message_id = emails.thread_id
+                  AND target.id != emails.id
+                ORDER BY target.date ASC
+                LIMIT 1
+            )
+            WHERE thread_id IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM emails target
+                WHERE target.message_id = emails.thread_id
+                  AND target.id != emails.id
+                  AND target.thread_id IS NOT NULL
+                  AND target.thread_id != emails.thread_id
+              );
+
+            -- Second pass for chained replies (A -> B -> C)
+            UPDATE emails
+            SET thread_id = (
+                SELECT parent.thread_id
+                FROM emails parent
+                WHERE (parent.message_id = emails.in_reply_to OR parent.id = emails.in_reply_to)
+                  AND parent.id != emails.id
+                ORDER BY parent.date ASC
+                LIMIT 1
+            )
+            WHERE in_reply_to IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM emails parent
+                WHERE (parent.message_id = emails.in_reply_to OR parent.id = emails.in_reply_to)
+                  AND parent.id != emails.id
+                  AND parent.thread_id IS NOT NULL
+                  AND parent.thread_id != emails.thread_id
+              );
+        `),
+	},
 ];
+

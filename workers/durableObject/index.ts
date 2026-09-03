@@ -114,6 +114,35 @@ interface AttachmentData {
 export class MailboxDO extends DurableObject<Env> {
 	declare __DURABLE_OBJECT_BRAND: never;
 	db: ReturnType<typeof drizzle>;
+	#subscribers: Set<ReadableStreamDefaultController> = new Set();
+
+	subscribeEvents(): ReadableStream {
+		let controller: ReadableStreamDefaultController;
+		return new ReadableStream({
+			start: (c) => {
+				controller = c;
+				this.#subscribers.add(c);
+				c.enqueue(new TextEncoder().encode("event: connected\ndata: {}\n\n"));
+			},
+			cancel: () => {
+				if (controller) {
+					this.#subscribers.delete(controller);
+				}
+			},
+		});
+	}
+
+	broadcastEvent(event: string, data: any) {
+		const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+		const encoded = new TextEncoder().encode(payload);
+		for (const controller of this.#subscribers) {
+			try {
+				controller.enqueue(encoded);
+			} catch {
+				this.#subscribers.delete(controller);
+			}
+		}
+	}
 
 	constructor(state: DurableObjectState, env: Env) {
 		super(state, env);
@@ -637,6 +666,7 @@ export class MailboxDO extends DurableObject<Env> {
 			.where(eq(schema.emails.id, id))
 			.run();
 
+		this.broadcastEvent("email_updated", { id, read, starred });
 		return this.getEmail(id);
 	}
 
@@ -645,6 +675,7 @@ export class MailboxDO extends DurableObject<Env> {
 			`UPDATE emails SET read = 1 WHERE thread_id = ? AND read = 0`,
 			threadId,
 		);
+		this.broadcastEvent("thread_read", { threadId });
 		return { threadId, markedRead: true };
 	}
 
@@ -671,6 +702,7 @@ export class MailboxDO extends DurableObject<Env> {
 			.where(eq(schema.emails.id, id))
 			.run();
 
+		this.broadcastEvent("email_deleted", { id });
 		return emailAttachments;
 	}
 
@@ -874,6 +906,7 @@ export class MailboxDO extends DurableObject<Env> {
 			.where(eq(schema.emails.id, id))
 			.run();
 
+		this.broadcastEvent("email_moved", { id, folder_id: folderId });
 		return true;
 	}
 
@@ -970,6 +1003,40 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Threading helpers (raw SQL) ────────────────────────────────
 
+	/**
+	 * Find an existing thread_id by searching for any referenced RFC message-id or internal email id.
+	 */
+	async findThreadIdByReferences(references: string[]): Promise<string | null> {
+		const cleaned = references
+			.map((r) => r.trim().replace(/^<|>$/g, ""))
+			.filter(Boolean);
+
+		if (cleaned.length === 0) return null;
+
+		// Limit to 50 candidate references to avoid SQLite query limit
+		const refs = cleaned.slice(0, 50);
+		const n = refs.length;
+		const p1 = refs.map((_, i) => `?${i + 1}`).join(",");
+		const p2 = refs.map((_, i) => `?${n + i + 1}`).join(",");
+
+		const result = [
+			...this.ctx.storage.sql.exec(
+				`SELECT thread_id, id FROM emails
+				 WHERE message_id IN (${p1}) OR id IN (${p2})
+				 ORDER BY date DESC
+				 LIMIT 1`,
+				...refs,
+				...refs,
+			),
+		] as { thread_id: string | null; id: string }[];
+
+		if (result.length > 0 && result[0]) {
+			return result[0].thread_id || result[0].id;
+		}
+
+		return null;
+	}
+
 	async findThreadBySubject(subject: string, senderAddress?: string): Promise<string | null> {
 		const normalized = subject
 			.replace(/^(?:(?:re|fwd?|fw|aw|wg|r[eé]f|sv)\s*:\s*)+/i, "")
@@ -984,7 +1051,6 @@ export class MailboxDO extends DurableObject<Env> {
 			        GROUP_CONCAT(DISTINCT LOWER(recipient)) as recipients
 			 FROM emails
 			 WHERE thread_id IS NOT NULL
-			   AND thread_id != id
 			   AND date >= datetime('now', '-7 days')
 			 GROUP BY thread_id
 			 ORDER BY MAX(date) DESC
@@ -1101,5 +1167,45 @@ export class MailboxDO extends DurableObject<Env> {
 		if (attachments.length > 0) {
 			this.db.insert(schema.attachments).values(attachments).run();
 		}
+
+		this.broadcastEvent("new_email", {
+			id: email.id,
+			folder_id: folderId,
+			subject: email.subject,
+			sender: email.sender,
+			sender_name: email.sender_name ?? null,
+			recipient: email.recipient,
+			date: email.date,
+			read: isOwnComposition ? true : !!email.read,
+			starred: !!email.starred,
+			body: email.body,
+			thread_id: email.thread_id ?? null,
+		});
+	}
+
+	// ── Push Notification Device Tokens ────────────────────────────
+
+	async registerDeviceToken(token: string, platform = "ios") {
+		this.ctx.storage.sql.exec(
+			`INSERT INTO device_tokens (token, platform, updated_at)
+			 VALUES (?, ?, datetime('now'))
+			 ON CONFLICT(token) DO UPDATE SET updated_at = datetime('now');`,
+			token,
+			platform,
+		);
+		return { status: "registered" };
+	}
+
+	async unregisterDeviceToken(token: string) {
+		this.ctx.storage.sql.exec(
+			`DELETE FROM device_tokens WHERE token = ?;`,
+			token,
+		);
+		return { status: "unregistered" };
+	}
+
+	async getDeviceTokens(): Promise<string[]> {
+		const rows = [...this.ctx.storage.sql.exec(`SELECT token FROM device_tokens;`)];
+		return rows.map((r: any) => r.token as string);
 	}
 }

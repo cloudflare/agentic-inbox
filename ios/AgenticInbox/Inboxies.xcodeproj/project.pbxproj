@@ -38,6 +38,12 @@
 		B1C2D3E4F5A6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */; };
 		B1C2D3E4F5A6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */; };
 		B1C2D3E4F5A6478990ABCD06 /* Views/PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */; };
+		F2A1B2C3D4E5478990ABCD01 /* Services/DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A1B2C3D4E5478990ABCD01 /* Services/DatabaseService.swift */; };
+		F2A1B2C3D4E5478990ABCD02 /* Services/MailboxSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A1B2C3D4E5478990ABCD02 /* Services/MailboxSyncService.swift */; };
+		F2A1B2C3D4E5478990ABCD03 /* Services/OutboxQueueWorker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A1B2C3D4E5478990ABCD03 /* Services/OutboxQueueWorker.swift */; };
+		F2A1B2C3D4E5478990ABCD04 /* Services/RealTimeStreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A1B2C3D4E5478990ABCD04 /* Services/RealTimeStreamClient.swift */; };
+		F2A1B2C3D4E5478990ABCD05 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A1B2C3D4E5478990ABCD05 /* AppDelegate.swift */; };
+		F2A1B2C3D4E5478990ABCD06 /* Services/PushNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A1B2C3D4E5478990ABCD06 /* Services/PushNotificationManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -75,6 +81,12 @@
 		A1B2C3D4E5F6478990ABCD04 /* Views/Settings/AgentPromptSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/AgentPromptSettingsView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6478990ABCD05 /* Views/Settings/SwipeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/SwipeSettingsView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6478990ABCD06 /* Views/PreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/PreviewSupport.swift; sourceTree = "<group>"; };
+		F1A1B2C3D4E5478990ABCD01 /* Services/DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/DatabaseService.swift; sourceTree = "<group>"; };
+		F1A1B2C3D4E5478990ABCD02 /* Services/MailboxSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/MailboxSyncService.swift; sourceTree = "<group>"; };
+		F1A1B2C3D4E5478990ABCD03 /* Services/OutboxQueueWorker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/OutboxQueueWorker.swift; sourceTree = "<group>"; };
+		F1A1B2C3D4E5478990ABCD04 /* Services/RealTimeStreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/RealTimeStreamClient.swift; sourceTree = "<group>"; };
+		F1A1B2C3D4E5478990ABCD05 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		F1A1B2C3D4E5478990ABCD06 /* Services/PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/PushNotificationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -107,6 +119,7 @@
 		D3E3E6419B804E808C731975 /* Inboxies */ = {
 			isa = PBXGroup;
 			children = (
+				F1A1B2C3D4E5478990ABCD05 /* AppDelegate.swift */,
 				1CA5A54FAAA74727A76C3CC2 /* InboxiesApp.swift */,
 				21CCC0BA3ECA48D3ACAAD064 /* Config/AppConfig.swift */,
 				D81A66857B664AEE886504D3 /* Models/Models.swift */,
@@ -115,6 +128,11 @@
 				010262344D5842BD893A671C /* Services/AppModel.swift */,
 				43432D294A6A4E8886288B5C /* Services/AuthStore.swift */,
 				09C42367266B46FF855AE6E5 /* Services/ComposeFormModel.swift */,
+				F1A1B2C3D4E5478990ABCD01 /* Services/DatabaseService.swift */,
+				F1A1B2C3D4E5478990ABCD02 /* Services/MailboxSyncService.swift */,
+				F1A1B2C3D4E5478990ABCD03 /* Services/OutboxQueueWorker.swift */,
+				F1A1B2C3D4E5478990ABCD04 /* Services/RealTimeStreamClient.swift */,
+				F1A1B2C3D4E5478990ABCD06 /* Services/PushNotificationManager.swift */,
 				A1B2C3D4E5F6478990ABCD01 /* Services/SwipeActionPreferences.swift */,
 				A1B2C3D4E5F6478990ABCD02 /* Services/EmailActionExecutor.swift */,
 				28CDA4BA87F547B6A4A0DD65 /* Theme/AppTheme.swift */,
@@ -207,6 +225,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F2A1B2C3D4E5478990ABCD05 /* AppDelegate.swift in Sources */,
 				36FD2CCDC03848B0B12D0871 /* InboxiesApp.swift in Sources */,
 				61D0A24CAA2F48D88FF6EB52 /* Config/AppConfig.swift in Sources */,
 				657FD1C8E2A34619AC81A913 /* Models/Models.swift in Sources */,
@@ -215,6 +234,11 @@
 				2EC70370129F423785536DB2 /* Services/AppModel.swift in Sources */,
 				340C18C527B44FD1B96E612C /* Services/AuthStore.swift in Sources */,
 				7E8CC069F60B4F6283899600 /* Services/ComposeFormModel.swift in Sources */,
+				F2A1B2C3D4E5478990ABCD01 /* Services/DatabaseService.swift in Sources */,
+				F2A1B2C3D4E5478990ABCD02 /* Services/MailboxSyncService.swift in Sources */,
+				F2A1B2C3D4E5478990ABCD03 /* Services/OutboxQueueWorker.swift in Sources */,
+				F2A1B2C3D4E5478990ABCD04 /* Services/RealTimeStreamClient.swift in Sources */,
+				F2A1B2C3D4E5478990ABCD06 /* Services/PushNotificationManager.swift in Sources */,
 				18F25040136B47988CE9E925 /* Theme/AppTheme.swift in Sources */,
 				C1D2E3F4A5B6478990ABCD04 /* Theme/LiquidGlass.swift in Sources */,
 				83101517849E451C9A64357A /* Views/Auth/SignInView.swift in Sources */,

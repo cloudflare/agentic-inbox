@@ -173,18 +173,28 @@ struct SearchView: View {
             errorMessage = nil
             return
         }
+
+        // 1. Instant local FTS5 search (0ms)
+        let localMatches = DatabaseService.shared.searchEmails(mailboxId: mailboxId, query: q, limit: 30)
+        if !localMatches.isEmpty {
+            results = localMatches
+        }
+
         isSearching = true
         errorMessage = nil
         defer { isSearching = false }
         do {
-            try await Task.sleep(nanoseconds: 250_000_000)
+            try await Task.sleep(nanoseconds: 200_000_000)
             guard !Task.isCancelled else { return }
             let response = try await APIClient.shared.searchEmails(mailboxId: mailboxId, query: q)
             results = response.emails
+            DatabaseService.shared.upsertEmails(mailboxId: mailboxId, emails: response.emails)
         } catch is CancellationError {
             // ignore
         } catch {
-            errorMessage = error.localizedDescription
+            if results.isEmpty {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }

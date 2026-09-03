@@ -19,64 +19,63 @@ extension AppModel {
 
     func deleteEmail(_ email: Email, fromList: Bool = false) async {
         guard let mailboxId = selectedMailboxId else { return }
-        do {
-            try await APIClient.shared.deleteEmail(mailboxId: mailboxId, id: email.id)
-            if selectedEmail?.id == email.id {
-                selectedEmail = nil
-                threadEmails = []
-            }
-            emails.removeAll { $0.id == email.id }
-            if !fromList {
-                await loadEmailsForCurrentTab(showLoading: false)
-            }
-        } catch {
-            errorMessage = error.localizedDescription
+
+        // 1. Instant local optimistic delete (<1ms)
+        DatabaseService.shared.deleteEmail(id: email.id)
+        DatabaseService.shared.enqueueMutation(mailboxId: mailboxId, emailId: email.id, actionType: "delete", payload: [:])
+        OutboxQueueWorker.shared.trigger()
+
+        if selectedEmail?.id == email.id {
+            selectedEmail = nil
+            threadEmails = []
+        }
+        emails.removeAll { $0.id == email.id }
+        if email.isUnread {
+            adjustFolderUnread(for: email, wasUnread: true, isUnread: false)
         }
     }
 
     func archiveEmail(_ email: Email, fromList: Bool = false) async {
         guard let mailboxId = selectedMailboxId else { return }
         let previousFolderId = archiveRestoreFolder(for: email)
-        do {
-            try await APIClient.shared.moveEmail(
-                mailboxId: mailboxId,
-                id: email.id,
-                folderId: "archive"
-            )
-            if selectedEmail?.id == email.id {
-                selectedEmail = nil
-                threadEmails = []
-            }
-            emails.removeAll { $0.id == email.id }
-            if !fromList {
-                await loadEmailsForCurrentTab(showLoading: false)
-            }
-            presentArchiveUndo(
-                ArchiveUndoOffer(
-                    emailId: email.id,
-                    mailboxId: mailboxId,
-                    previousFolderId: previousFolderId
-                )
-            )
-        } catch {
-            errorMessage = error.localizedDescription
+
+        // 1. Instant local optimistic move (<1ms)
+        DatabaseService.shared.moveEmail(id: email.id, toFolderId: "archive")
+        DatabaseService.shared.enqueueMutation(mailboxId: mailboxId, emailId: email.id, actionType: "move", payload: ["folderId": "archive"])
+        OutboxQueueWorker.shared.trigger()
+
+        if selectedEmail?.id == email.id {
+            selectedEmail = nil
+            threadEmails = []
         }
+        emails.removeAll { $0.id == email.id }
+        if email.isUnread {
+            adjustFolderUnread(for: email, wasUnread: true, isUnread: false)
+        }
+        presentArchiveUndo(
+            ArchiveUndoOffer(
+                emailId: email.id,
+                mailboxId: mailboxId,
+                previousFolderId: previousFolderId
+            )
+        )
     }
 
     func moveEmail(_ email: Email, to folderId: String, fromList: Bool = false) async {
         guard let mailboxId = selectedMailboxId else { return }
-        do {
-            try await APIClient.shared.moveEmail(mailboxId: mailboxId, id: email.id, folderId: folderId)
-            if selectedEmail?.id == email.id {
-                selectedEmail = nil
-                threadEmails = []
-            }
-            emails.removeAll { $0.id == email.id }
-            if !fromList {
-                await loadEmailsForCurrentTab(showLoading: false)
-            }
-        } catch {
-            errorMessage = error.localizedDescription
+
+        // 1. Instant local optimistic move (<1ms)
+        DatabaseService.shared.moveEmail(id: email.id, toFolderId: folderId)
+        DatabaseService.shared.enqueueMutation(mailboxId: mailboxId, emailId: email.id, actionType: "move", payload: ["folderId": folderId])
+        OutboxQueueWorker.shared.trigger()
+
+        if selectedEmail?.id == email.id {
+            selectedEmail = nil
+            threadEmails = []
+        }
+        emails.removeAll { $0.id == email.id }
+        if email.isUnread {
+            adjustFolderUnread(for: email, wasUnread: true, isUnread: false)
         }
     }
 
@@ -98,25 +97,29 @@ extension AppModel {
     func deleteEmails(_ emailIDs: Set<String>) async {
         guard let mailboxId = selectedMailboxId, !emailIDs.isEmpty else { return }
         for id in emailIDs {
-            try? await APIClient.shared.deleteEmail(mailboxId: mailboxId, id: id)
+            DatabaseService.shared.deleteEmail(id: id)
+            DatabaseService.shared.enqueueMutation(mailboxId: mailboxId, emailId: id, actionType: "delete", payload: [:])
             if selectedEmail?.id == id {
                 selectedEmail = nil
                 threadEmails = []
             }
             emails.removeAll { $0.id == id }
         }
+        OutboxQueueWorker.shared.trigger()
     }
 
     func archiveEmails(_ emailIDs: Set<String>) async {
         guard let mailboxId = selectedMailboxId, !emailIDs.isEmpty else { return }
         for id in emailIDs {
-            try? await APIClient.shared.moveEmail(mailboxId: mailboxId, id: id, folderId: "archive")
+            DatabaseService.shared.moveEmail(id: id, toFolderId: "archive")
+            DatabaseService.shared.enqueueMutation(mailboxId: mailboxId, emailId: id, actionType: "move", payload: ["folderId": "archive"])
             if selectedEmail?.id == id {
                 selectedEmail = nil
                 threadEmails = []
             }
             emails.removeAll { $0.id == id }
         }
+        OutboxQueueWorker.shared.trigger()
     }
 
     func markEmailsRead(_ emailIDs: Set<String>, read: Bool) async {

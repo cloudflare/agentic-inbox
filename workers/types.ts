@@ -9,4 +9,10 @@ export interface Env extends Cloudflare.Env {
 	MOBILE_JWT_SECRET?: string;
 	/** iOS app bundle ID — Apple identity token `aud` (e.g. com.example.AgenticInbox). */
 	APPLE_CLIENT_ID?: string;
+	/** Apple Push Notification Service (APNs) credentials */
+	APNS_KEY_ID?: string;
+	APNS_TEAM_ID?: string;
+	APNS_PRIVATE_KEY?: string;
+	APNS_TOPIC?: string;
+	APNS_SANDBOX?: string;
 }
