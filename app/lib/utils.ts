@@ -10,6 +10,7 @@
  */
 import DOMPurify from "dompurify";
 import { formatQuotedDate } from "shared/dates";
+import { renderFooterContent } from "shared/signature";
 import type { Attachment } from "~/types";
 
 export {
@@ -140,10 +141,10 @@ export function getSignatureBlock(settings?: {
 		// Sanitize HTML signatures with DOMPurify to allow safe formatting
 		// (bold, italic, links, etc.) while stripping scripts and event handlers.
 		// Text signatures are HTML-escaped since they have no formatting.
-		const content = sig.html
-			? DOMPurify.sanitize(sig.html)
-			: escapeHtml(sig.text || "");
-		return `<div style="border-top: 1px solid #ccc; margin-top: 16px; padding-top: 12px;">${content}</div>`;
+			const content = sig.html
+				? DOMPurify.sanitize(sig.html)
+				: renderFooterContent(sig.text || "");
+			return `<div style="border-top: 1px solid #ccc; margin-top: 32px; padding-top: 12px; color: #666; font-size: 12px; line-height: 1.45; font-style: italic;">${content}</div>`;
 	}
 	return "";
 }

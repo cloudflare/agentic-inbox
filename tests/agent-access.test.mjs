@@ -113,9 +113,13 @@ test("footer choice is required, custom footer is escaped and mailbox settings a
 	const f=await fixture({sendMode:"direct"});
 	const input=message();delete input.footer;
 	assert.equal((await f.call("send_email",input)).status,400);
-	await f.call("send_email",{...message(),bodyHtml:`<p>Hello</p>${renderFooter(f.footer)}`,footer:{enabled:true,text:"Custom & <script>bad</script>"}});
+	await f.call("send_email",{...message(),bodyHtml:`<p>Hello</p>${renderFooter(f.footer)}`,footer:{enabled:true,text:"Custom & <script>bad</script>\nmmarw.com"}});
 	assert.equal((f.deliveries[0].html.match(/data-agentic-signature/g)||[]).length,1);
 	assert.ok(f.deliveries[0].html.includes("&lt;script&gt;"));
+	assert.match(f.deliveries[0].html,/margin-top:32px/);
+	assert.match(f.deliveries[0].html,/font-size:12px/);
+	assert.match(f.deliveries[0].html,/href="https:\/\/mmarw\.com"/);
+	assert.match(f.deliveries[0].html,/color:#666666;text-decoration:none/);
 	assert.equal(f.objects.get(`mailboxes/${mailboxId}.json`).value.signature.text,f.footer);
 });
 test("test mode and recipient restrictions apply before any AI or send work",async()=>{

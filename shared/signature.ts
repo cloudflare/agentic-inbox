@@ -104,9 +104,39 @@ export function detachFooter(html: string, defaultText = "") {
 	return { body, choice: saved ?? (extracted !== undefined ? { enabled: true, text: extracted } : undefined) };
 }
 
+function escapeFooterText(text: string): string {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Render footer text with email-client-friendly, neutral URL styling. */
+export function renderFooterContent(text: string): string {
+	const value = text.trim();
+	if (!value) return "";
+	const urlPattern = /(?:https?:\/\/|www\.)[^\s<]+|(?<![@\w])(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<]*)?/gi;
+	let content = "";
+	let cursor = 0;
+	for (const match of value.matchAll(urlPattern)) {
+		const index = match.index ?? 0;
+		const original = match[0];
+		if (index < cursor || (index > 0 && /[\w@]/.test(value[index - 1]))) continue;
+		let visible = original;
+		let trailing = "";
+		while (/[.,!?;:)\]}]$/.test(visible)) {
+			trailing = visible.slice(-1) + trailing;
+			visible = visible.slice(0, -1);
+		}
+		content += escapeFooterText(value.slice(cursor, index));
+		const href = /^https?:\/\//i.test(visible) ? visible : `https://${visible}`;
+		content += `<a href="${escapeFooterText(href)}" style="color:#666666;text-decoration:none">${escapeFooterText(visible)}</a>${escapeFooterText(trailing)}`;
+		cursor = index + original.length;
+	}
+	content += escapeFooterText(value.slice(cursor));
+	return content.replace(/\r?\n/g, "<br>");
+}
+
 export function renderFooter(text: string): string {
-	const escaped = text.trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/\r?\n/g, "<br>");
-	return escaped ? `<div data-agentic-signature="true" style="border-top:1px solid #ccc;margin-top:16px;padding-top:12px;color:#555;font-style:italic"><i>${escaped}</i></div>` : "";
+	const content = renderFooterContent(text);
+	return content ? `<div data-agentic-signature="true" style="border-top:1px solid #ccc;margin-top:32px;padding-top:12px;color:#666;font-size:12px;line-height:1.45;font-style:italic"><i>${content}</i></div>` : "";
 }
 
 export function attachFooter(body: string, choice: FooterChoice, draft = false): string {
