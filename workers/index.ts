@@ -4,6 +4,7 @@
 
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
+import { getAgentByName } from "agents";
 import PostalMime from "postal-mime";
 import { z } from "zod";
 import { sendEmail } from "./email-sender";
@@ -402,11 +403,10 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
 	}, attachmentData);
 
-	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
-	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
+	ctx.waitUntil(getAgentByName(env.EMAIL_AGENT, mailboxId).then((agentStub) => agentStub.fetch(new Request("https://agents/onNewEmail", {
 		method: "POST", headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
-	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+	}))).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
 }
 
 export { app, receiveEmail };
