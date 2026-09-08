@@ -40,8 +40,49 @@ https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 - **Full email client** — Send and receive emails via Cloudflare Email Routing with a rich text composer, reply/forward threading, folder organization, search, and attachments
 - **Per-mailbox isolation** — Each mailbox runs in its own Durable Object with SQLite storage and R2 for attachments
 - **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
+- **Scoped remote agent access** — Per-mailbox MCP and REST access with explicit permissions, send modes, recipient restrictions, and daily limits
 - **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
 - **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
+
+## Scoped Agent Access
+
+Agentic Inbox can expose a dedicated `/agent/*` namespace for external
+automation clients. Access is created per named agent key and can be scoped to
+specific mailboxes and permissions.
+
+Supported permissions:
+
+- `read` — read emails, threads, and search results
+- `draft` — create drafts and generate reply drafts
+- `send` — submit new messages, replies, or existing drafts
+
+Each key can be configured with:
+
+- allowed mailboxes
+- draft-only or direct-send mode
+- test-recipient restrictions
+- recipient allowlists
+- daily send and AI-generation limits
+
+The remote MCP endpoint is:
+
+```text
+https://<your-worker-host>/agent/mcp
+```
+
+Clients authenticate with:
+
+```http
+Authorization: Bearer <agent-key>
+```
+
+The key is shown only once when created and is stored as a hash. The dashboard
+and legacy `/mcp` endpoints remain protected by the existing Cloudflare Access
+configuration. The `/agent/*` namespace must be protected separately with a
+path-specific Cloudflare Access policy or Service Auth configuration.
+
+All write operations require a stable `requestId` for idempotent retries.
+Send operations explicitly select whether the saved mailbox footer is included.
 
 ## Stack
 
@@ -76,7 +117,11 @@ npm run deploy
 - [Workers AI](https://developers.cloudflare.com/workers-ai/) enabled (for the agent)
 - [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) configured for deployed/shared environments (required in production)
 
-Any user who passes the shared Cloudflare Access policy can access all mailboxes in this app by design. This includes the MCP server at `/mcp` -- external AI tools (Claude Code, Cursor, etc.) connected via MCP can operate on any mailbox by passing a `mailboxId` parameter. There is no per-mailbox authorization; the Cloudflare Access policy is the single trust boundary.
+The dashboard and legacy `/mcp` endpoint continue to use the shared Cloudflare
+Access policy. External clients using `/agent/*` must additionally present a
+scoped Agent Access key, which is checked against the key's allowed mailboxes
+and permissions on every request. The legacy `/mcp` endpoint does not use these
+scoped keys and retains its existing shared-access behavior.
 
 ## Architecture
 

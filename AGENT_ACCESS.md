@@ -128,9 +128,14 @@ login. The dedicated `/agent/*` namespace uses the scoped key validator in the
 Worker and rejects requests without a valid key even when a browser is logged in.
 
 When Cloudflare Access covers the entire hostname, add a **more specific** Access
-application for the same hostname's `/agent/*` path, with a Bypass policy. This
-only bypasses the interactive edge login; the Worker still requires the scoped
-key on every request. Do not bypass the hostname root, `/api/*`, or `/mcp`.
+application for the same hostname's `/agent/*` path. For headless clients,
+prefer a Service Auth policy with a Cloudflare Service Token and send its
+`CF-Access-Client-Id` and `CF-Access-Client-Secret` headers in addition to the
+scoped Agent Access `Authorization` header. If Service Auth is not available to
+the client, a narrowly scoped Bypass policy for `/agent/*` can be used as a
+fallback; the Worker still requires the scoped key on every request. Do not
+bypass the hostname root, `/api/*`, or `/mcp`.
+
 Deploy and verify the key validator before enabling this path exception.
 
 No new R2 bucket, Durable Object class, or SQL migration is required. Credentials
