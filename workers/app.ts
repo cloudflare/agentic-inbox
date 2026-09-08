@@ -9,6 +9,7 @@ import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
 import type { Env } from "./types";
+import { agentAdminRoutes, handleAgentRequest } from "./agent-access/routes";
 
 export { MailboxDO } from "./durableObject";
 export { EmailAgent } from "./agent";
@@ -44,6 +45,8 @@ const app = new Hono<{ Bindings: Env }>();
 
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
+	if (c.req.path.startsWith("/agent/")) return handleAgentRequest(c.req.raw, c.env, c.executionCtx);
+	if (/^Bearer mai_/.test(c.req.header("Authorization") || "")) return c.text("Agent keys can only access /agent/ endpoints", 403);
 	// Skip validation in development
 	if (import.meta.env.DEV) {
 		return next();
@@ -67,10 +70,11 @@ app.use("*", async (c, next) => {
 	try {
 		const { issuer, certsUrl } = getAccessUrls(TEAM_DOMAIN);
 		const JWKS = createRemoteJWKSet(certsUrl);
-		await jwtVerify(token, JWKS, {
+		const { payload } = await jwtVerify(token, JWKS, {
 			issuer,
 			audience: POLICY_AUD,
 		});
+		if (payload.common_name || typeof payload.email !== "string" || !payload.email) return c.text("Human login required; use scoped agent endpoints for automation", 403);
 	} catch {
 		return c.text("Invalid or expired Access token", 403);
 	}
@@ -91,6 +95,7 @@ app.all("/mcp/*", async (c) => {
 });
 
 // Mount the API routes
+app.route("/api/v1/agent-access", agentAdminRoutes);
 app.route("/", apiApp);
 
 // Agent WebSocket routing - must be before React Router catch-all

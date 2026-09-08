@@ -18,11 +18,13 @@
 		"deploy": "npm run build && wrangler deploy",
 		"dev": "react-router dev",
 		"preview": "npm run build && vite preview",
+		"test:agent-access": "node --test tests/agent-access.test.mjs tests/agent-auth.test.mjs",
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
 	},
 	"dependencies": {
 		"@cloudflare/ai-chat": "^0.1.8",
 		"@cloudflare/kumo": "^1.13.0",
+		"@modelcontextprotocol/sdk": "^1.26.0",
 		"@phosphor-icons/react": "^2.1.10",
 		"@tanstack/react-query": "^5.99.0",
 		"@tiptap/extension-color": "3.20.2",
@@ -41,6 +43,7 @@
 		"hono": "^4.7.11",
 		"isbot": "^5.1.27",
 		"jose": "^6.2.1",
+		"parse5": "^7.3.0",
 		"postal-mime": "^2.6.1",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
