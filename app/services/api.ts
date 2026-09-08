@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Email, Folder, Mailbox } from "~/types";
+import type { AgentAccess, AgentActivity, AgentConfig } from "../../shared/agent-access";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -95,6 +96,10 @@ interface EmailListResponse {
 // ---------- API client ----------
 
 const api = {
+	listAgentAccess: () => get<AgentAccess[]>("/api/v1/agent-access"),
+	createAgentAccess: (config: AgentConfig) => post<{ access: AgentAccess; token: string }>("/api/v1/agent-access", config),
+	updateAgentAccess: (id: string, config: AgentConfig, revision: string) => put<AgentAccess>(`/api/v1/agent-access/${id}`, { config, revision }),
+	getAgentActivity: (id: string, mailboxId: string) => get<AgentActivity[]>(`/api/v1/agent-access/${id}/activity`, { params: { mailboxId } }),
 	// Config
 	getConfig: () =>
 		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),

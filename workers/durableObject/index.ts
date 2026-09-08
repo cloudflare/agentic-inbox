@@ -10,6 +10,9 @@ import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
+import { executeAgentOperation } from "../agent-access/operations";
+import type { AgentAction } from "../agent-access/definitions";
+import type { AgentActivity } from "../../shared/agent-access";
 
 /**
  * SQL expression to normalize email subjects by stripping common
@@ -110,6 +113,14 @@ export class MailboxDO extends DurableObject<Env> {
 	}
 
 	// ── Email CRUD (Drizzle) ───────────────────────────────────────
+	async executeAgentAction(accessId: string, tokenHash: string, action: AgentAction, inputJson: string): Promise<string> {
+		return executeAgentOperation(this.env, this.ctx.storage, accessId, tokenHash, action, inputJson);
+	}
+
+	async getAgentActivity(accessId: string): Promise<AgentActivity[]> {
+		const entries = await this.ctx.storage.list<AgentActivity>({ prefix: `agent-activity:${accessId}:`, limit: 50 });
+		return [...entries.values()];
+	}
 
 	async getEmails(options: GetEmailsOptions = {}) {
 		const {
