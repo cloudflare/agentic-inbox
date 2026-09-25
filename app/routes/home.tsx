@@ -22,7 +22,7 @@ import {
 	useDeleteMailbox,
 	useMailboxes,
 } from "~/queries/mailboxes";
-import { queryKeys } from "~/queries/keys";
+import { useConfig } from "~/queries/config";
 
 export function meta() {
 	return [{ title: "Agentic Inbox" }];
@@ -34,11 +34,7 @@ export default function HomeRoute() {
 	const createMailbox = useCreateMailbox();
 	const deleteMailbox = useDeleteMailbox();
 
-	const { data: configData } = useQuery({
-		queryKey: queryKeys.config,
-		queryFn: () => api.getConfig(),
-		staleTime: Infinity, // config rarely changes
-	});
+	const { data: configData } = useConfig();
 
 	const domains = configData?.domains ?? [];
 	const emailAddresses = configData?.emailAddresses ?? [];

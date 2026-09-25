@@ -30,6 +30,7 @@ import {
 	toolDiscardDraft,
 } from "../lib/tools";
 import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "../../shared/folders";
+import { isAgentEnabled } from "../lib/features";
 import type { Env } from "../types";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
@@ -275,6 +276,9 @@ function createEmailTools(env: Env, mailboxId: string) {
 export class EmailAgent extends AIChatAgent<any> {
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
+		if (!isAgentEnabled(env) || !env.AI) {
+			throw new Error("AI Agent is disabled or Workers AI binding is not configured.");
+		}
 		const mailboxId = this.name;
 		const workersai = createWorkersAI({ binding: env.AI });
 		const tools = createEmailTools(env, mailboxId);
@@ -334,6 +338,10 @@ export class EmailAgent extends AIChatAgent<any> {
 		threadId: string;
 	}) {
 		const env = this.env as Env;
+		if (!isAgentEnabled(env) || !env.AI) {
+			console.warn("Skipping handleNewEmail: AI Agent is disabled or Workers AI is not configured");
+			return { skipped: true, reason: "AI Agent is disabled or Workers AI is not configured" };
+		}
 		const workersai = createWorkersAI({ binding: env.AI });
 		const tools = createEmailTools(env, emailData.mailboxId);
 		const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);

@@ -6,6 +6,7 @@ import { Loader } from "@cloudflare/kumo";
 import { PlugsIcon, RobotIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import MCPPanel from "./MCPPanel";
+import { useConfig } from "~/queries/config";
 
 function LazyAgentPanel() {
 	const [AgentChat, setAgentChat] = useState<React.ComponentType | null>(
@@ -41,44 +42,84 @@ function LazyAgentPanel() {
 }
 
 export default function AgentSidebar() {
+	const { data: config } = useConfig();
+	const aiAgentEnabled = config?.features ? config.features.aiAgent : true;
+	const mcpEnabled = config?.features ? config.features.mcp : true;
+
 	const [activeTab, setActiveTab] = useState<"agent" | "mcp">("agent");
+
+	useEffect(() => {
+		if (!aiAgentEnabled && mcpEnabled) {
+			setActiveTab("mcp");
+		} else if (aiAgentEnabled && !mcpEnabled) {
+			setActiveTab("agent");
+		}
+	}, [aiAgentEnabled, mcpEnabled]);
+
+	if (!aiAgentEnabled && !mcpEnabled) {
+		return (
+			<div className="flex flex-col items-center justify-center h-full p-6 text-center text-kumo-subtle text-sm">
+				AI Agent and MCP features are currently disabled.
+			</div>
+		);
+	}
+
+	const showBothTabs = aiAgentEnabled && mcpEnabled;
 
 	return (
 		<div className="flex flex-col h-full">
-			{/* Tab bar */}
-			<div className="flex items-center border-b border-kumo-line shrink-0">
-				<button
-					type="button"
-					onClick={() => setActiveTab("agent")}
-					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
-						activeTab === "agent"
-							? "border-kumo-brand text-kumo-default"
-							: "border-transparent text-kumo-subtle hover:text-kumo-default"
-					}`}
-				>
-					<RobotIcon size={14} weight={activeTab === "agent" ? "fill" : "regular"} />
-					Agent
-				</button>
-				<button
-					type="button"
-					onClick={() => setActiveTab("mcp")}
-					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
-						activeTab === "mcp"
-							? "border-kumo-brand text-kumo-default"
-							: "border-transparent text-kumo-subtle hover:text-kumo-default"
-					}`}
-				>
-					<PlugsIcon size={14} weight={activeTab === "mcp" ? "fill" : "regular"} />
-					MCP
-				</button>
-			</div>
-
-			{/* Tab content — keep agent mounted so chat isn't lost */}
-			<div className="flex-1 min-h-0 overflow-hidden">
-				<div className={activeTab === "agent" ? "h-full" : "hidden"}>
-					<LazyAgentPanel />
+			{/* Tab bar (only when both features are enabled) */}
+			{showBothTabs ? (
+				<div className="flex items-center border-b border-kumo-line shrink-0">
+					<button
+						type="button"
+						onClick={() => setActiveTab("agent")}
+						className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
+							activeTab === "agent"
+								? "border-kumo-brand text-kumo-default"
+								: "border-transparent text-kumo-subtle hover:text-kumo-default"
+						}`}
+					>
+						<RobotIcon size={14} weight={activeTab === "agent" ? "fill" : "regular"} />
+						Agent
+					</button>
+					<button
+						type="button"
+						onClick={() => setActiveTab("mcp")}
+						className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
+							activeTab === "mcp"
+								? "border-kumo-brand text-kumo-default"
+								: "border-transparent text-kumo-subtle hover:text-kumo-default"
+						}`}
+					>
+						<PlugsIcon size={14} weight={activeTab === "mcp" ? "fill" : "regular"} />
+						MCP
+					</button>
 				</div>
-				{activeTab === "mcp" && <MCPPanel />}
+			) : (
+				<div className="flex items-center gap-2 px-4 py-3 border-b border-kumo-line shrink-0 font-medium text-sm text-kumo-default">
+					{aiAgentEnabled ? (
+						<>
+							<RobotIcon size={16} weight="duotone" className="text-kumo-brand" />
+							<span>AI Agent</span>
+						</>
+					) : (
+						<>
+							<PlugsIcon size={16} weight="duotone" className="text-kumo-brand" />
+							<span>MCP Server</span>
+						</>
+					)}
+				</div>
+			)}
+
+			{/* Tab content — keep agent mounted so chat isn't lost if both are enabled */}
+			<div className="flex-1 min-h-0 overflow-hidden">
+				{aiAgentEnabled && (
+					<div className={activeTab === "agent" ? "h-full" : "hidden"}>
+						<LazyAgentPanel />
+					</div>
+				)}
+				{mcpEnabled && activeTab === "mcp" && <MCPPanel />}
 			</div>
 		</div>
 	);

@@ -61,14 +61,14 @@ function mcpResult(result: Record<string, unknown>) {
  * `/mcp` endpoint and can list mailboxes, read/search emails,
  * draft replies, send messages, and manage folders.
  */
-export class EmailMCP extends McpAgent<Env> {
+export class EmailMCP extends McpAgent<any> {
 	server = new McpServer({
 		name: "agentic-inbox",
 		version: "1.0.0",
 	});
 
 	async init() {
-		const env = this.env;
+		const env = this.env as Env;
 
 		/**
 		 * Verify a mailbox exists in R2 before operating on it.
