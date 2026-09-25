@@ -10,6 +10,7 @@ import Header from "~/components/Header";
 import Sidebar from "~/components/Sidebar";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useConfig } from "~/queries/config";
 
 export default function MailboxRoute() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
@@ -23,6 +24,8 @@ export default function MailboxRoute() {
 		closePanel,
 		closeComposeModal,
 	} = useUIStore();
+	const { data: config } = useConfig();
+	const hasAgentOrMcp = (config?.features ? config.features.aiAgent : true) || (config?.features ? config.features.mcp : true);
 
 	useEffect(() => {
 		if (
@@ -70,7 +73,7 @@ export default function MailboxRoute() {
 			</div>
 
 			{/* Agent + MCP sidebar -- togglable on desktop */}
-			{isAgentPanelOpen && (
+			{isAgentPanelOpen && hasAgentOrMcp && (
 				<div className="hidden lg:flex w-[380px] shrink-0 border-l border-kumo-line flex-col bg-kumo-base overflow-hidden">
 					<AgentSidebar />
 				</div>

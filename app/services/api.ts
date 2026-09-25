@@ -92,12 +92,20 @@ interface EmailListResponse {
 	totalCount: number;
 }
 
+import type { AppFeatures } from "../../shared/features";
+
+export interface AppConfig {
+	domains: string[];
+	emailAddresses: string[];
+	features: AppFeatures;
+}
+
 // ---------- API client ----------
 
 const api = {
 	// Config
 	getConfig: () =>
-		get<{ domains: string[]; emailAddresses: string[] }>("/api/v1/config"),
+		get<AppConfig>("/api/v1/config"),
 
 	// Mailboxes
 	listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
@@ -162,4 +170,5 @@ const api = {
 		get<EmailListResponse | Email[]>(`/api/v1/mailboxes/${mailboxId}/search`, { params }),
 };
 
+export { api };
 export default api;

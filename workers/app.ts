@@ -8,6 +8,7 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import { createRequestHandler } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
 import { EmailMCP } from "./mcp";
+import { isAgentEnabled, isMcpEnabled } from "./lib/features";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
@@ -84,9 +85,15 @@ app.use("*", async (c, next) => {
 // Must be before API routes and React Router catch-all
 const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
 app.all("/mcp", async (c) => {
+	if (!isMcpEnabled(c.env)) {
+		return c.text("MCP server is disabled or not configured", 404);
+	}
 	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 app.all("/mcp/*", async (c) => {
+	if (!isMcpEnabled(c.env)) {
+		return c.text("MCP server is disabled or not configured", 404);
+	}
 	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 
@@ -95,6 +102,9 @@ app.route("/", apiApp);
 
 // Agent WebSocket routing - must be before React Router catch-all
 app.all("/agents/*", async (c) => {
+	if (!isAgentEnabled(c.env)) {
+		return c.text("AI Agent is disabled or not configured", 404);
+	}
 	const response = await routeAgentRequest(c.req.raw, c.env);
 	if (response) return response;
 	return c.text("Agent not found", 404);

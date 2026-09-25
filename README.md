@@ -62,6 +62,15 @@ npm run dev
 1. Set your domain in `wrangler.jsonc`
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
 
+#### Feature Flags (Optional)
+
+Both the AI Agent and the Model Context Protocol (MCP) server are optional and can be toggled with environment variables (in `wrangler.jsonc`, `.dev.vars`, or Cloudflare Worker dashboard environment variables):
+
+- `ENABLE_AI_AGENT=false`: Disables the built-in AI chat agent, auto-draft generation on inbound emails, and `/agents/*` WebSocket endpoints.
+- `ENABLE_MCP=false`: Disables the `/mcp` Model Context Protocol endpoint.
+
+When both features are disabled, the sidebar panel and header toggle are hidden in the web interface. If only one feature is enabled, the sidebar renders directly for that feature without unnecessary tab switches.
+
 ### Deploy
 
 ```bash

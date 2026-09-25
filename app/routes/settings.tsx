@@ -7,6 +7,7 @@ import { RobotIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
+import { useConfig } from "~/queries/config";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -16,6 +17,8 @@ export default function SettingsRoute() {
 	const { mailboxId } = useParams<{ mailboxId: string }>();
 	const toastManager = useKumoToastManager();
 	const { data: mailbox } = useMailbox(mailboxId);
+	const { data: config } = useConfig();
+	const aiAgentEnabled = config?.features ? config.features.aiAgent : true;
 	const updateMailboxMutation = useUpdateMailbox();
 
 	const [displayName, setDisplayName] = useState("");
@@ -92,7 +95,9 @@ export default function SettingsRoute() {
 							<span className="text-sm font-medium text-kumo-default">
 								AI Agent Prompt
 							</span>
-							{isCustomPrompt ? (
+							{!aiAgentEnabled ? (
+								<Badge variant="secondary">Disabled</Badge>
+							) : isCustomPrompt ? (
 								<Badge variant="primary">Custom</Badge>
 							) : (
 								<Badge variant="secondary">Default</Badge>
@@ -110,8 +115,9 @@ export default function SettingsRoute() {
 						)}
 					</div>
 					<p className="text-xs text-kumo-subtle mb-3">
-						Customize how the AI agent behaves for this mailbox.
-						Leave empty to use the built-in default prompt.
+						{!aiAgentEnabled
+							? "The AI Agent is currently disabled in your Worker configuration. You can configure custom prompt instructions here; they will take effect if the agent is enabled."
+							: "Customize how the AI agent behaves for this mailbox. Leave empty to use the built-in default prompt."}
 					</p>
 					<textarea
 						value={agentPrompt}

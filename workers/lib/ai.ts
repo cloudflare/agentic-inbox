@@ -21,8 +21,8 @@ Return ONLY "NO" if it is a normal email (even if angry, confused, or containing
 
 Respond with exactly one word: YES or NO.`;
 
-export async function isPromptInjection(ai: Ai, bodyHtml: string | null | undefined): Promise<boolean> {
-	if (!bodyHtml) return false;
+export async function isPromptInjection(ai: Ai | undefined, bodyHtml: string | null | undefined): Promise<boolean> {
+	if (!ai || !bodyHtml) return false;
 	
 	const plainText = stripHtmlToText(bodyHtml).trim();
 	if (plainText.length < 10) return false;
@@ -119,8 +119,8 @@ function splitQuotedBlock(html: string): { reply: string; quoted: string } {
  * Verify and clean a draft email body using AI.
  * Falls back to returning the original body if the AI call fails.
  */
-export async function verifyDraft(ai: Ai, body: string): Promise<string> {
-	if (!body || !body.trim()) return body;
+export async function verifyDraft(ai: Ai | undefined, body: string): Promise<string> {
+	if (!ai || !body || !body.trim()) return body;
 
 	// Separate the quoted reply block so the AI only reviews the user's text
 	const isHtml = /<[a-z][\s\S]*>/i.test(body);
@@ -183,8 +183,8 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
 			? `${cleanedTrimmed}\n\n${quotedBlock}`
 			: cleanedTrimmed;
 	} catch (e) {
-				console.error("AI failed — returns empty body, callers may save blank draft:", (e as Error).message);
-		return "";
+		console.error("AI verifyDraft failed, falling back to original body:", (e as Error).message);
+		return body;
 	}
 }
 
