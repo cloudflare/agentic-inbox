@@ -43,6 +43,17 @@ type RateLimitStub = {
 	checkSendRateLimit: () => Promise<string | null>;
 };
 
+async function getMailboxSender(env: Env, mailboxId: string) {
+	const obj = await env.BUCKET.get(`mailboxes/${mailboxId}.json`);
+	if (!obj) return mailboxId;
+
+	const settings = await obj.json<{ fromName?: unknown }>();
+	const fromName = typeof settings.fromName === "string" ? settings.fromName.trim() : "";
+	return fromName && fromName !== mailboxId
+		? { email: mailboxId, name: fromName }
+		: mailboxId;
+}
+
 // ── list_mailboxes ─────────────────────────────────────────────────
 
 export async function toolListMailboxes(env: Env) {
@@ -420,6 +431,7 @@ export async function toolSendReply(
 	const fromDomain = mailboxId.split("@")[1];
 	if (!fromDomain) throw new Error("Invalid mailbox email address");
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
+	const from = await getMailboxSender(env, mailboxId);
 
 	// Verify and append quoted original message
 	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
@@ -436,7 +448,7 @@ export async function toolSendReply(
 	try {
 		await sendEmail(env.EMAIL, {
 			to: params.to,
-			from: mailboxId,
+			from,
 			subject: params.subject,
 			html: fullBodyHtml,
 			headers: buildThreadingHeaders(originalMsgId, references),
@@ -492,6 +504,7 @@ export async function toolSendEmail(
 	const fromDomain = mailboxId.split("@")[1];
 	if (!fromDomain) throw new Error("Invalid mailbox email address");
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
+	const from = await getMailboxSender(env, mailboxId);
 
 	const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
 	if (!sanitizedBody) {
@@ -501,7 +514,7 @@ export async function toolSendEmail(
 	try {
 		await sendEmail(env.EMAIL, {
 			to: params.to,
-			from: mailboxId,
+			from,
 			subject: params.subject,
 			html: sanitizedBody,
 		});
