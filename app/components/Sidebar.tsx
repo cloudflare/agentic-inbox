@@ -165,7 +165,7 @@ export default function Sidebar() {
 						to={`/mailbox/${mailboxId}/emails/${folder.id}`}
 						icon={FOLDER_ICONS[folder.id]}
 						label={folder.label}
-						unreadCount={getUnreadCount(folder.id)}
+						unreadCount={folder.id === Folders.TRASH ? 0 : getUnreadCount(folder.id)}
 						onClick={handleNavClick}
 					/>
 				))}

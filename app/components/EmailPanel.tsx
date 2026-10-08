@@ -44,7 +44,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const { data: currentMailbox } = useMailbox(mailboxId) as {
 		data?: Mailbox;
 	};
-	const { closePanel, startCompose } = useUIStore();
+	const { closePanel, startCompose, isComposing } = useUIStore();
 	const toastManager = useKumoToastManager();
 	const [isSending, setIsSending] = useState(false);
 	const [sourceViewEmail, setSourceViewEmail] = useState<Email | null>(null);
@@ -52,10 +52,14 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const [previewImage, setPreviewImage] = useState<{ url: string; filename: string } | null>(null);
 	const isDraftFolder = folder === Folders.DRAFT;
 
+	// Trashed messages only show in the thread when viewing Trash itself.
 	const threadReplies = useMemo(() => {
 		if (!threadRepliesRaw || !email) return [];
-		return threadRepliesRaw.filter((e) => e.id !== email.id);
-	}, [threadRepliesRaw, email]);
+		const viewingTrash = (email.folder_id ?? folder) === Folders.TRASH;
+		return threadRepliesRaw.filter(
+			(e) => e.id !== email.id && (viewingTrash || e.folder_id !== Folders.TRASH),
+		);
+	}, [threadRepliesRaw, email, folder]);
 
 	const allMessages = useMemo(() => {
 		if (!email) return [];
@@ -89,7 +93,22 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
 	const toggleStar = () => { if (mailboxId) updateEmail.mutate({ mailboxId, id: email.id, data: { starred: !email.starred } }); };
 	const handleMove = (folderId: string) => { if (mailboxId) { moveEmailMut.mutate({ mailboxId, id: email.id, folderId }); closePanel(); } };
-	const handleDelete = () => { if (mailboxId) { if (!window.confirm("Are you sure you want to delete this email?")) return; deleteEmailMut.mutate({ mailboxId, id: email.id }); closePanel(); } };
+	// Deleting moves to Trash; only Trash and Drafts delete permanently. Prefer the
+	// email's own folder so this also holds when opened from search results.
+	const emailFolder = email.folder_id ?? folder;
+	const deletesPermanently = emailFolder === Folders.TRASH || emailFolder === Folders.DRAFT;
+	const handleDelete = () => {
+		if (!mailboxId) return;
+		if (deletesPermanently) {
+			if (!window.confirm("Permanently delete this email? This cannot be undone.")) return;
+			deleteEmailMut.mutate({ mailboxId, id: email.id });
+		} else {
+			if (isComposing && !window.confirm("Move to Trash? The reply you're writing will be discarded.")) return;
+			moveEmailMut.mutate({ mailboxId, id: email.id, folderId: Folders.TRASH });
+			toastManager.add({ title: "Moved to Trash" });
+		}
+		closePanel();
+	};
 
 	const handleEditDraft = (draftMsg?: Email) => {
 		const target = draftMsg || email;
@@ -173,6 +192,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				onMove={handleMove}
 				onViewSource={() => setSourceViewEmail(email)}
 				onDelete={handleDelete}
+				deleteLabel={deletesPermanently ? "Delete permanently" : "Move to Trash"}
 			/>
 
 			<EmailPanelHeader

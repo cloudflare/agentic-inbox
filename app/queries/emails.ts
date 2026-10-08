@@ -101,6 +101,7 @@ function useInvalidateEmailData() {
 		qc.invalidateQueries({
 			queryKey: queryKeys.folders.list(mailboxId),
 		});
+		qc.invalidateQueries({ queryKey: ["search", mailboxId] });
 	};
 }
 

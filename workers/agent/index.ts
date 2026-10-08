@@ -377,7 +377,9 @@ export class EmailAgent extends AIChatAgent<any> {
 			}
 
 		// Load thread for conversation context
-		const threadEmails = (await stub.getEmails({ thread_id: emailData.threadId })) as EmailMetadata[];
+		// Deleted (trashed) and spam messages stay out of the AI's thread context.
+		const threadEmails = ((await stub.getEmails({ thread_id: emailData.threadId })) as EmailMetadata[])
+			.filter((e) => e.folder_id !== Folders.TRASH && e.folder_id !== Folders.SPAM);
 		if (threadEmails.length > 1) {
 			const fullThread = await Promise.all(
 				threadEmails.map(async (e) => {

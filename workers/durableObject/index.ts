@@ -316,6 +316,9 @@ export class MailboxDO extends DurableObject<Env> {
 				FROM emails e
 				LEFT JOIN thread_to_conversation tc
 					ON COALESCE(e.thread_id, e.id) = tc.raw_thread_id
+				-- Trashed messages leave their conversation everywhere except the Trash view.
+				WHERE e.folder_id != 'trash'
+					OR (SELECT id FROM folders WHERE name = ?1 OR id = ?1 LIMIT 1) = 'trash'
 			),
 			conversation_stats AS (
 				SELECT

@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Pagination, Tooltip } from "@cloudflare/kumo";
+import { Button, Pagination, Tooltip, useKumoToastManager } from "@cloudflare/kumo";
 import {
 	ArchiveIcon,
 	ArrowBendUpLeftIcon,
@@ -27,6 +27,7 @@ import {
 	useDeleteEmail,
 	useEmails,
 	useMarkThreadRead,
+	useMoveEmail,
 	useUpdateEmail,
 } from "~/queries/emails";
 import { useFolders } from "~/queries/folders";
@@ -158,6 +159,8 @@ export default function EmailListRoute() {
 	const updateEmail = useUpdateEmail();
 	const markThreadRead = useMarkThreadRead();
 	const deleteEmail = useDeleteEmail();
+	const moveEmail = useMoveEmail();
+	const toastManager = useKumoToastManager();
 
 	const params = useMemo(
 		() => ({
@@ -210,13 +213,22 @@ export default function EmailListRoute() {
 			});
 	};
 
+	// Deleting moves to Trash; only Trash and Drafts delete permanently.
+	const deletesPermanently = folder === Folders.TRASH || folder === Folders.DRAFT;
+
 	const handleDelete = (e: React.MouseEvent, emailId: string) => {
 		e.preventDefault();
 		e.stopPropagation();
 		if (mailboxId) {
-			const confirmed = window.confirm("Are you sure you want to delete this email?");
-			if (!confirmed) return;
-			deleteEmail.mutate({ mailboxId, id: emailId });
+			if (deletesPermanently) {
+				const confirmed = window.confirm("Permanently delete this email? This cannot be undone.");
+				if (!confirmed) return;
+				deleteEmail.mutate({ mailboxId, id: emailId });
+			} else {
+				if (selectedEmailId === emailId && isComposing && !window.confirm("Move to Trash? The reply you're writing will be discarded.")) return;
+				moveEmail.mutate({ mailboxId, id: emailId, folderId: Folders.TRASH });
+				toastManager.add({ title: "Moved to Trash" });
+			}
 			if (selectedEmailId === emailId) closePanel();
 		}
 	};
@@ -422,14 +434,14 @@ export default function EmailListRoute() {
 													aria-label={email.read ? "Mark unread" : "Mark read"}
 												/>
 											</Tooltip>
-											<Tooltip content="Delete" asChild>
+											<Tooltip content={deletesPermanently ? "Delete permanently" : "Move to Trash"} asChild>
 												<Button
 													variant="ghost"
 													shape="square"
 													size="sm"
 													icon={<TrashIcon size={14} />}
 													onClick={(e) => handleDelete(e, email.id)}
-													aria-label="Delete"
+													aria-label={deletesPermanently ? "Delete permanently" : "Move to Trash"}
 												/>
 											</Tooltip>
 										</div>

@@ -39,6 +39,7 @@ interface EmailPanelToolbarProps {
 	onMove: (folderId: string) => void;
 	onViewSource: () => void;
 	onDelete: () => void;
+	deleteLabel?: string;
 }
 
 export default function EmailPanelToolbar({
@@ -58,6 +59,7 @@ export default function EmailPanelToolbar({
 	onMove,
 	onViewSource,
 	onDelete,
+	deleteLabel = "Delete",
 }: EmailPanelToolbarProps) {
 	return (
 		<div className="flex items-center gap-1 px-3 py-2 border-b border-kumo-line shrink-0 md:px-4">
@@ -169,14 +171,14 @@ export default function EmailPanelToolbar({
 						aria-label="View source"
 					/>
 				</Tooltip>
-				<Tooltip content="Delete" side="bottom" asChild>
+				<Tooltip content={deleteLabel} side="bottom" asChild>
 					<Button
 						variant="ghost"
 						shape="square"
 						size="sm"
 						icon={<TrashIcon size={18} />}
 						onClick={onDelete}
-						aria-label="Delete"
+						aria-label={deleteLabel}
 					/>
 				</Tooltip>
 				<Tooltip content="Close" side="bottom" asChild>
