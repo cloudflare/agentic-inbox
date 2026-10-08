@@ -26,7 +26,8 @@
 	--color-kumo-tint: #f4f4f5;
 	--color-kumo-contrast: #0b0b0d;
 	--color-kumo-elevated: #ffffff;
-	--color-kumo-overlay: #ffffff;
+	/* kumo uses overlay for highlighted menu/select options and modal backdrops. */
+	--color-kumo-overlay: #f4f4f5;
 	--color-kumo-control: #ffffff;
 	--color-kumo-interact: #d4d4d8;
 	--color-kumo-fill: #f1f1f3;
@@ -34,7 +35,8 @@
 	--color-kumo-brand: #5b5bd6;
 	--color-kumo-brand-hover: #4b4bc4;
 	--color-kumo-line: #e4e4e7;
-	--color-kumo-ring: #c7c7f5;
+	/* kumo draws secondary-button and control borders with ring, so it stays neutral. */
+	--color-kumo-ring: #d4d4d8;
 	--color-kumo-tip-shadow: #e4e4e7;
 	--color-kumo-tip-stroke: transparent;
 	--color-kumo-info: #5b5bd6;
@@ -64,15 +66,16 @@
 	--color-kumo-tint: #1b1b1f;
 	--color-kumo-contrast: #fafafa;
 	--color-kumo-elevated: #18181c;
-	--color-kumo-overlay: #18181c;
+	--color-kumo-overlay: #232328;
 	--color-kumo-control: #141417;
 	--color-kumo-interact: #3f3f46;
 	--color-kumo-fill: #1e1e22;
 	--color-kumo-fill-hover: #26262b;
-	--color-kumo-brand: #6e6ef0;
-	--color-kumo-brand-hover: #7c7cf0;
+	/* Deep enough that white button labels keep 4.5:1 contrast. */
+	--color-kumo-brand: #6262ea;
+	--color-kumo-brand-hover: #6e6ef0;
 	--color-kumo-line: #27272c;
-	--color-kumo-ring: #3a3a7a;
+	--color-kumo-ring: #3f3f46;
 	--color-kumo-tip-shadow: transparent;
 	--color-kumo-tip-stroke: #27272c;
 	--color-kumo-info: #7c7cf0;
@@ -99,4 +102,20 @@ html {
 * {
 	scrollbar-width: thin;
 	scrollbar-color: var(--color-kumo-fill-hover) transparent;
+}
+
+/* Browser focus rings pick up the accent instead of the default saturated blue. */
+:focus-visible {
+	outline-color: var(--color-kumo-brand);
+}
+
+/* Listbox and menu options already show focus with their highlighted background. */
+[role="option"]:focus-visible,
+[role="menuitem"]:focus-visible {
+	outline: none;
+}
+
+/* Modal backdrops dim the page in dark mode instead of washing it gray. */
+:root[data-mode="dark"] .fixed.inset-0.bg-kumo-overlay {
+	background-color: rgb(0 0 0 / 0.7);
 }

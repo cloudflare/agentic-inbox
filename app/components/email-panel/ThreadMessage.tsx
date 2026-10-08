@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Tooltip } from "@cloudflare/kumo";
+import { Button, Tooltip } from "@cloudflare/kumo";
 import {
 	CaretDownIcon,
 	CaretUpIcon,
@@ -16,8 +16,8 @@ import EmailIframe from "~/components/EmailIframe";
 import {
 	formatDetailDate,
 	formatShortDate,
+	getSnippetText,
 	rewriteInlineImages,
-	stripHtml,
 } from "~/lib/utils";
 import type { Email } from "~/types";
 
@@ -37,19 +37,32 @@ interface ThreadMessageProps {
 	onPreviewImage?: (url: string, filename: string) => void;
 }
 
-function Avatar({ isDraft, isSelf, sender }: { isDraft?: boolean; isSelf: boolean; sender: string }) {
+/** Up to two initials from a sender ("alex.smith@x.com" -> "AS", "Alex <a@x.com>" -> "A"). */
+function getInitials(sender: string): string {
+	const display = sender.replace(/<[^>]*>/g, "").replace(/["']/g, "").trim() || sender;
+	const name = display.includes("@") ? display.split("@")[0] : display;
+	const parts = name.split(/[\s._+-]+/).filter(Boolean);
+	if (parts.length >= 2) return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+	return (parts[0]?.charAt(0) || sender.charAt(0) || "?").toUpperCase();
+}
+
+export function SenderAvatar({ sender, isDraft }: { sender: string; isDraft?: boolean }) {
 	return (
 		<div
-			className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-				isDraft
-					? "bg-kumo-fill text-kumo-subtle"
-					: isSelf
-						? "bg-kumo-brand text-kumo-inverse"
-						: "bg-kumo-fill text-kumo-default"
+			className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+				isDraft ? "bg-kumo-base text-kumo-accent" : "bg-kumo-accent-soft text-kumo-accent"
 			}`}
 		>
-			{isDraft ? "D" : sender.charAt(0).toUpperCase()}
+			{isDraft ? "D" : getInitials(sender)}
 		</div>
+	);
+}
+
+function DraftPill() {
+	return (
+		<span className="shrink-0 rounded-full bg-kumo-base px-2 py-0.5 text-[11px] font-medium text-kumo-accent">
+			Draft
+		</span>
 	);
 }
 
@@ -69,152 +82,165 @@ export default function ThreadMessage({
 	onPreviewImage,
 }: ThreadMessageProps) {
 	const isSelf = email.sender === mailboxEmail;
-	const containerClassName = `${!isLast ? "border-b border-kumo-line" : ""} ${isDraft ? "border-l-2 border-l-kumo-warning bg-kumo-warning/[0.02]" : ""}`;
+	const separatorClassName = !isLast ? "border-b border-kumo-line" : "";
 	const senderLabel = isDraft ? "Draft reply" : isSelf ? "You" : email.sender;
 
 	if (!isExpanded) {
 		return (
-			<div className={containerClassName}>
+			<div className={`px-2 py-1 md:px-4 ${separatorClassName}`}>
 				<button
 					type="button"
 					onClick={onToggleExpand}
-					className="w-full flex items-center gap-3 px-4 py-3 hover:bg-kumo-tint rounded-lg text-left"
+					className={`w-full flex items-center gap-3 px-2 py-2 text-left transition-colors ${
+						isDraft
+							? "rounded-xl border border-kumo-accent-line bg-kumo-accent-soft hover:border-kumo-brand/40"
+							: "rounded-lg hover:bg-kumo-tint"
+					}`}
 				>
-					<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
+					<SenderAvatar isDraft={isDraft} sender={email.sender} />
 					<div className="flex-1 min-w-0">
-						<div className="flex items-center justify-between">
-							<span className="text-sm font-medium text-kumo-default truncate">
-								{senderLabel}
-							</span>
-							<span className="text-xs text-kumo-subtle shrink-0">
+						<div className="flex items-center justify-between gap-3">
+							<div className="flex items-center gap-2 min-w-0">
+								<span className="text-sm font-medium text-kumo-default truncate">
+									{senderLabel}
+								</span>
+								{isDraft && <DraftPill />}
+							</div>
+							<span className="text-xs text-kumo-subtle tabular-nums shrink-0">
 								{formatDetailDate(email.date)}
 							</span>
 						</div>
 						<p className="text-xs text-kumo-subtle truncate">
-							{stripHtml(email.body || "").slice(0, 80)}
+							{getSnippetText(email.body, 140)}
 						</p>
 					</div>
-					<CaretDownIcon size={14} className="text-kumo-subtle shrink-0" />
+					<CaretDownIcon size={14} className="text-kumo-inactive shrink-0" />
 				</button>
 			</div>
 		);
 	}
 
-	return (
-		<div className={`group/thread-msg ${containerClassName}`}>
-			<div className="px-4 py-4 md:px-6">
-				<div className="flex items-center justify-between gap-3 mb-3">
-					<div className="flex items-center gap-2.5 min-w-0">
-						<button
-							type="button"
-							onClick={onToggleExpand}
-							className="shrink-0"
-							aria-label="Collapse message"
-						>
-							<div className="cursor-pointer hover:ring-2 hover:ring-kumo-brand/30 transition-shadow rounded-full">
-								<Avatar isDraft={isDraft} isSelf={isSelf} sender={email.sender} />
-							</div>
-						</button>
-						<div className="min-w-0">
-							<div className="flex items-center gap-2">
-								<span className="text-sm font-medium text-kumo-default truncate">
-									{senderLabel}
-								</span>
-								{isDraft && <Badge variant="outline">Draft</Badge>}
-							</div>
-							<div className="text-xs text-kumo-subtle">To: {email.recipient}</div>
+	const content = (
+		<>
+			<div className="flex items-center justify-between gap-3">
+				<div className="flex items-center gap-3 min-w-0">
+					<button
+						type="button"
+						onClick={onToggleExpand}
+						className="shrink-0 cursor-pointer rounded-full transition-shadow hover:ring-2 hover:ring-kumo-ring"
+						aria-label="Collapse message"
+					>
+						<SenderAvatar isDraft={isDraft} sender={email.sender} />
+					</button>
+					<div className="min-w-0">
+						<div className="flex items-center gap-2 min-w-0">
+							<span className="text-sm font-medium text-kumo-default truncate">
+								{senderLabel}
+							</span>
+							{isDraft && <DraftPill />}
 						</div>
-					</div>
-					<div className="flex items-center gap-1 shrink-0">
-						<span className="text-xs text-kumo-subtle">
-							{formatShortDate(email.date)}
-						</span>
-						{onViewSource && (
-							<Tooltip content="View source" side="bottom" asChild>
-								<Button
-									variant="ghost"
-									shape="square"
-									size="sm"
-									icon={<CodeIcon size={14} />}
-									onClick={onViewSource}
-									aria-label="View source"
-									className="transition-opacity !h-6 !w-6"
-								/>
-							</Tooltip>
-						)}
-						<button
-							type="button"
-							onClick={onToggleExpand}
-							className="ml-1"
-							aria-label="Collapse message"
-						>
-							<CaretUpIcon
-								size={14}
-								className="text-kumo-subtle hover:text-kumo-default transition-colors"
-							/>
-						</button>
+						<div className="text-xs text-kumo-subtle truncate">To: {email.recipient}</div>
 					</div>
 				</div>
-
-				<div className="md:ml-[42px]">
-					<EmailIframe
-						body={rewriteInlineImages(
-							email.body || "",
-							mailboxId || "",
-							email.id,
-							email.attachments,
-						)}
-						autoSize
-					/>
-				</div>
-
-				{isDraft && (onSendDraft || onEditDraft || onDeleteDraft) && (
-					<div className="flex gap-2 mt-3 md:ml-[42px]">
-						{onSendDraft && (
-							<Button
-								variant="primary"
-								size="sm"
-								icon={<PaperPlaneTiltIcon size={14} />}
-								onClick={onSendDraft}
-								loading={isSending}
-								disabled={isSending}
-							>
-								{isSending ? "Sending..." : "Send"}
-							</Button>
-						)}
-						{onEditDraft && (
-							<Button
-								variant="secondary"
-								size="sm"
-								icon={<PencilSimpleIcon size={14} />}
-								onClick={onEditDraft}
-								disabled={isSending}
-							>
-								Edit
-							</Button>
-						)}
-						{onDeleteDraft && (
+				<div className="flex items-center gap-0.5 shrink-0">
+					<span className="mr-1 text-xs text-kumo-subtle tabular-nums">
+						{formatShortDate(email.date)}
+					</span>
+					{onViewSource && (
+						<Tooltip content="View source" side="bottom" asChild>
 							<Button
 								variant="ghost"
+								shape="square"
 								size="sm"
-								icon={<TrashIcon size={14} />}
-								onClick={onDeleteDraft}
-								disabled={isSending}
-							>
-								Discard
-							</Button>
-						)}
-					</div>
-				)}
+								icon={<CodeIcon size={14} />}
+								onClick={onViewSource}
+								aria-label="View source"
+								className="!h-6 !w-6 text-kumo-subtle hover:text-kumo-default"
+							/>
+						</Tooltip>
+					)}
+					<Button
+						variant="ghost"
+						shape="square"
+						size="sm"
+						icon={<CaretUpIcon size={14} />}
+						onClick={onToggleExpand}
+						aria-label="Collapse message"
+						className="!h-6 !w-6 text-kumo-subtle hover:text-kumo-default"
+					/>
+				</div>
+			</div>
 
-				<EmailAttachmentList
-					mailboxId={mailboxId}
-					emailId={email.id}
-					attachments={email.attachments}
-					onPreviewImage={onPreviewImage}
-					className="mt-3 md:ml-[42px]"
+			<div className="mt-3 md:ml-12">
+				<EmailIframe
+					body={rewriteInlineImages(
+						email.body || "",
+						mailboxId || "",
+						email.id,
+						email.attachments,
+					)}
+					autoSize
 				/>
 			</div>
+
+			{isDraft && (onSendDraft || onEditDraft || onDeleteDraft) && (
+				<div className="flex flex-wrap gap-2 mt-4 md:ml-12">
+					{onSendDraft && (
+						<Button
+							variant="primary"
+							size="sm"
+							icon={<PaperPlaneTiltIcon size={14} />}
+							onClick={onSendDraft}
+							loading={isSending}
+							disabled={isSending}
+						>
+							{isSending ? "Sending..." : "Send"}
+						</Button>
+					)}
+					{onEditDraft && (
+						<Button
+							variant="secondary"
+							size="sm"
+							icon={<PencilSimpleIcon size={14} />}
+							onClick={onEditDraft}
+							disabled={isSending}
+						>
+							Edit
+						</Button>
+					)}
+					{onDeleteDraft && (
+						<Button
+							variant="ghost"
+							size="sm"
+							icon={<TrashIcon size={14} />}
+							onClick={onDeleteDraft}
+							disabled={isSending}
+						>
+							Discard
+						</Button>
+					)}
+				</div>
+			)}
+
+			<EmailAttachmentList
+				mailboxId={mailboxId}
+				emailId={email.id}
+				attachments={email.attachments}
+				onPreviewImage={onPreviewImage}
+				className="mt-3 md:ml-12"
+			/>
+		</>
+	);
+
+	return (
+		<div className={`group/thread-msg px-4 py-4 md:px-6 ${separatorClassName}`}>
+			{isDraft ? (
+				<div className="rounded-xl border border-kumo-accent-line bg-kumo-accent-soft p-3 md:p-4">
+					{content}
+				</div>
+			) : (
+				content
+			)}
 		</div>
 	);
 }

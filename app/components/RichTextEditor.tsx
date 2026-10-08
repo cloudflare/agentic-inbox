@@ -33,6 +33,13 @@ interface RichTextEditorProps {
 	onChange: (value: string) => void;
 }
 
+// Ghost 28px toolbar buttons; active marks use the accent-soft selection.
+function toolbarButtonClass(active = false) {
+	return active
+		? "size-7 rounded-md bg-kumo-selected text-kumo-accent shadow-none hover:bg-kumo-selected"
+		: "size-7 rounded-md text-kumo-strong shadow-none hover:bg-kumo-tint hover:text-kumo-default";
+}
+
 export default function RichTextEditor({
 	value,
 	onChange,
@@ -52,7 +59,7 @@ export default function RichTextEditor({
 		editorProps: {
 			attributes: {
 				class:
-					"prose prose-sm max-w-none focus:outline-none min-h-[180px] p-3 text-sm [&_blockquote]:border-l-2 [&_blockquote]:border-kumo-line [&_blockquote]:pl-3 [&_blockquote]:text-kumo-subtle [&_blockquote]:bg-kumo-tint [&_blockquote]:py-1 [&_blockquote]:my-2 [&_blockquote]:text-xs [&_blockquote]:rounded-r-sm",
+					"min-h-[180px] flex-1 px-4 py-3 text-sm leading-relaxed text-kumo-default focus:outline-none [&_a]:text-kumo-link [&_a]:underline [&_a]:underline-offset-2 [&_hr]:my-3 [&_hr]:border-kumo-line [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-kumo-line [&_blockquote]:pl-3 [&_blockquote]:text-kumo-subtle",
 			},
 		},
 		onUpdate: ({ editor }) => {
@@ -88,13 +95,15 @@ export default function RichTextEditor({
 	if (!editor) return null;
 
 	return (
-		<div className="rounded-lg border border-kumo-line overflow-hidden flex flex-col h-full">
+		<div className="flex min-h-[220px] flex-1 flex-col">
 			{/* Toolbar */}
-			<div className="flex flex-wrap items-center gap-0.5 bg-kumo-recessed px-2 py-1.5 border-b border-kumo-line shrink-0">
+			<div className="flex min-h-10 shrink-0 flex-wrap items-center gap-0.5 border-b border-kumo-line px-2 py-1.5">
 				{/* Text formatting */}
 				<Tooltip content="Bold" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("bold") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("bold")}
+						className={toolbarButtonClass(editor.isActive("bold"))}
 						shape="square"
 						size="sm"
 						icon={<TextBIcon size={16} />}
@@ -104,7 +113,9 @@ export default function RichTextEditor({
 				</Tooltip>
 				<Tooltip content="Italic" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("italic") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("italic")}
+						className={toolbarButtonClass(editor.isActive("italic"))}
 						shape="square"
 						size="sm"
 						icon={<TextItalicIcon size={16} />}
@@ -114,7 +125,9 @@ export default function RichTextEditor({
 				</Tooltip>
 				<Tooltip content="Underline" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("underline") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("underline")}
+						className={toolbarButtonClass(editor.isActive("underline"))}
 						shape="square"
 						size="sm"
 						icon={<TextUnderlineIcon size={16} />}
@@ -124,7 +137,9 @@ export default function RichTextEditor({
 				</Tooltip>
 				<Tooltip content="Strikethrough" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("strike") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("strike")}
+						className={toolbarButtonClass(editor.isActive("strike"))}
 						shape="square"
 						size="sm"
 						icon={<TextStrikethroughIcon size={16} />}
@@ -133,12 +148,14 @@ export default function RichTextEditor({
 					/>
 				</Tooltip>
 
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
+				<div className="mx-1 h-4 w-px bg-kumo-line" />
 
 				{/* Lists */}
 				<Tooltip content="Bullet list" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("bulletList")}
+						className={toolbarButtonClass(editor.isActive("bulletList"))}
 						shape="square"
 						size="sm"
 						icon={<ListBulletsIcon size={16} />}
@@ -148,7 +165,9 @@ export default function RichTextEditor({
 				</Tooltip>
 				<Tooltip content="Numbered list" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("orderedList")}
+						className={toolbarButtonClass(editor.isActive("orderedList"))}
 						shape="square"
 						size="sm"
 						icon={<ListNumbersIcon size={16} />}
@@ -157,12 +176,14 @@ export default function RichTextEditor({
 					/>
 				</Tooltip>
 
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
+				<div className="mx-1 h-4 w-px bg-kumo-line" />
 
 				{/* Block formatting */}
 				<Tooltip content="Blockquote" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("blockquote") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("blockquote")}
+						className={toolbarButtonClass(editor.isActive("blockquote"))}
 						shape="square"
 						size="sm"
 						icon={<QuotesIcon size={16} />}
@@ -172,7 +193,9 @@ export default function RichTextEditor({
 				</Tooltip>
 				<Tooltip content="Link" side="bottom" asChild>
 					<Button
-						variant={editor.isActive("link") ? "secondary" : "ghost"}
+						variant="ghost"
+						aria-pressed={editor.isActive("link")}
+						className={toolbarButtonClass(editor.isActive("link"))}
 						shape="square"
 						size="sm"
 						icon={<LinkSimpleIcon size={16} />}
@@ -184,6 +207,7 @@ export default function RichTextEditor({
 					<Tooltip content="Remove link" side="bottom" asChild>
 						<Button
 							variant="ghost"
+							className={toolbarButtonClass()}
 							shape="square"
 							size="sm"
 							icon={<LinkBreakIcon size={16} />}
@@ -195,6 +219,7 @@ export default function RichTextEditor({
 				<Tooltip content="Horizontal rule" side="bottom" asChild>
 					<Button
 						variant="ghost"
+						className={toolbarButtonClass()}
 						shape="square"
 						size="sm"
 						icon={<MinusIcon size={16} />}
@@ -203,12 +228,13 @@ export default function RichTextEditor({
 					/>
 				</Tooltip>
 
-				<div className="mx-1 h-5 w-px bg-kumo-fill" />
+				<div className="mx-1 h-4 w-px bg-kumo-line" />
 
 				{/* Undo/Redo */}
 				<Tooltip content="Undo" side="bottom" asChild>
 					<Button
 						variant="ghost"
+						className={toolbarButtonClass()}
 						shape="square"
 						size="sm"
 						icon={<ArrowCounterClockwiseIcon size={16} />}
@@ -220,6 +246,7 @@ export default function RichTextEditor({
 				<Tooltip content="Redo" side="bottom" asChild>
 					<Button
 						variant="ghost"
+						className={toolbarButtonClass()}
 						shape="square"
 						size="sm"
 						icon={<ArrowClockwiseIcon size={16} />}
@@ -231,8 +258,8 @@ export default function RichTextEditor({
 			</div>
 
 			{/* Editor content */}
-			<div className="flex-1 overflow-y-auto">
-				<EditorContent editor={editor} />
+			<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+				<EditorContent editor={editor} className="flex flex-1 flex-col" />
 			</div>
 		</div>
 	);

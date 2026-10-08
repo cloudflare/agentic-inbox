@@ -9,6 +9,10 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import ThemeToggle from "~/components/ThemeToggle";
 import { useUIStore } from "~/hooks/useUIStore";
 
+// 32px quiet ghost icon buttons; the active state uses the selected tone instead of a ring.
+const iconButtonClass = "shrink-0 size-8 rounded-lg text-kumo-subtle hover:text-kumo-default";
+const activeIconButtonClass = "bg-kumo-selected text-kumo-accent hover:bg-kumo-selected hover:text-kumo-accent";
+
 export default function Header() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -57,27 +61,27 @@ export default function Header() {
 	const isSettingsActive = location.pathname.includes("/settings");
 
 	return (
-		<header className="flex items-center gap-2 px-3 py-2.5 bg-kumo-base border-b border-kumo-line sticky top-0 z-10 md:px-5 md:gap-4">
+		<header className="flex items-center h-14 px-4 gap-3 bg-kumo-base border-b border-kumo-line sticky top-0 z-10">
 			{/* Hamburger menu - mobile only */}
 			<Button
 				variant="ghost"
 				shape="square"
 				size="sm"
-				icon={<ListIcon size={20} />}
+				icon={<ListIcon size={18} />}
 				onClick={toggleSidebar}
 				aria-label="Toggle sidebar"
-				className="md:hidden shrink-0"
+				className={`md:hidden ${iconButtonClass}`}
 			/>
 
 			{/* Search - full on desktop, collapsible on mobile */}
 			<div
-				className={`flex-1 max-w-lg transition-all flex items-center gap-1 ${
+				className={`flex-1 max-w-xl items-center ${
 					isSearchExpanded ? "flex" : "hidden md:flex"
 				}`}
 			>
 				<div className="flex-1 relative flex items-center">
 					<Input
-						className="w-full"
+						className="w-full h-9 rounded-lg pl-9 pr-8 text-sm bg-kumo-tint ring-transparent transition-colors focus:bg-kumo-base focus:ring-kumo-ring"
 						aria-label="Search emails"
 						placeholder="Search emails... (try from:name, is:unread, has:attachment)"
 						value={searchQuery}
@@ -88,22 +92,24 @@ export default function Header() {
 						<button
 							type="button"
 							onClick={clearSearch}
-							className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-kumo-subtle hover:text-kumo-default hover:bg-kumo-tint transition-colors"
+							className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center size-5 rounded-md text-kumo-subtle hover:text-kumo-default hover:bg-kumo-fill-hover transition-colors"
 							aria-label="Clear search"
 						>
 							<XIcon size={14} />
 						</button>
 					)}
+					{/* Leading search icon doubles as the submit button */}
+					<Tooltip content="Search" side="bottom" asChild>
+						<button
+							type="button"
+							onClick={performSearch}
+							className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center size-6 rounded-md text-kumo-subtle hover:text-kumo-default transition-colors"
+							aria-label="Search"
+						>
+							<MagnifyingGlassIcon size={16} />
+						</button>
+					</Tooltip>
 				</div>
-				<Tooltip content="Search" side="bottom" asChild>
-					<Button
-						variant="ghost"
-						shape="square"
-						icon={<MagnifyingGlassIcon size={20} />}
-						onClick={performSearch}
-						aria-label="Search"
-					/>
-				</Tooltip>
 			</div>
 
 			{/* Search toggle button - mobile only, hidden when search is expanded */}
@@ -112,30 +118,32 @@ export default function Header() {
 					variant="ghost"
 					shape="square"
 					size="sm"
-					icon={<MagnifyingGlassIcon size={20} />}
+					icon={<MagnifyingGlassIcon size={18} />}
 					onClick={() => setIsSearchExpanded(true)}
 					aria-label="Search"
-					className="md:hidden shrink-0"
+					className={`md:hidden ${iconButtonClass}`}
 				/>
 			)}
 
-			<div className="flex items-center gap-1 ml-auto shrink-0">
+			<div className="flex items-center gap-0.5 ml-auto shrink-0">
 				<Tooltip content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"} side="bottom" asChild>
 					<Button
-						variant={isAgentPanelOpen ? "secondary" : "ghost"}
+						variant="ghost"
 						shape="square"
-						icon={<RobotIcon size={20} />}
+						size="sm"
+						icon={<RobotIcon size={18} />}
 						onClick={toggleAgentPanel}
 						aria-label="Toggle agent panel"
-						className="hidden lg:inline-flex"
+						className={`hidden lg:inline-flex ${iconButtonClass} ${isAgentPanelOpen ? activeIconButtonClass : ""}`}
 					/>
 				</Tooltip>
-				<ThemeToggle />
+				<ThemeToggle className={iconButtonClass} />
 				<Tooltip content="Settings" side="bottom" asChild>
 					<Button
-						variant={isSettingsActive ? "secondary" : "ghost"}
+						variant="ghost"
 						shape="square"
-						icon={<GearSixIcon size={20} />}
+						size="sm"
+						icon={<GearSixIcon size={18} />}
 						onClick={() =>
 							navigate(
 								isSettingsActive
@@ -144,6 +152,7 @@ export default function Header() {
 							)
 						}
 						aria-label="Settings"
+						className={`${iconButtonClass} ${isSettingsActive ? activeIconButtonClass : ""}`}
 					/>
 				</Tooltip>
 			</div>

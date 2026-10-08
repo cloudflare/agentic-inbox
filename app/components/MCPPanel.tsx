@@ -31,11 +31,12 @@ function CopyButton({ text }: { text: string }) {
 				variant="ghost"
 				shape="square"
 				size="sm"
+				className="rounded-lg text-kumo-subtle hover:bg-kumo-fill-hover hover:text-kumo-default"
 				icon={
 					copied ? (
-						<CheckIcon size={12} weight="bold" className="text-kumo-success" />
+						<CheckIcon size={14} weight="bold" className="text-kumo-success" />
 					) : (
-						<CopyIcon size={12} />
+						<CopyIcon size={14} />
 					)
 				}
 				onClick={handleCopy}
@@ -67,19 +68,15 @@ export default function MCPPanel() {
 	return (
 		<div className="flex flex-col h-full">
 			{/* Content */}
-			<div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+			<div className="flex-1 overflow-y-auto p-3 space-y-3">
 				{/* Intro */}
-				<div className="space-y-2">
-					<div className="flex items-center gap-2">
-						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-kumo-brand/10">
-							<PlugsIcon
-								size={20}
-								weight="duotone"
-								className="text-kumo-brand"
-							/>
+				<div className="rounded-xl border border-kumo-line bg-kumo-base p-4 space-y-3">
+					<div className="flex items-center gap-3">
+						<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-kumo-accent-soft text-kumo-accent">
+							<PlugsIcon size={18} />
 						</div>
-						<div>
-							<h3 className="text-sm font-semibold text-kumo-default">
+						<div className="min-w-0">
+							<h3 className="text-sm font-medium text-kumo-default">
 								Connect via MCP
 							</h3>
 							<p className="text-xs text-kumo-subtle">
@@ -96,42 +93,39 @@ export default function MCPPanel() {
 				</div>
 
 				{/* MCP URL */}
-				<div className="space-y-1.5">
+				<div className="rounded-xl border border-kumo-line bg-kumo-base p-4 space-y-2">
 					<label className="text-xs font-medium text-kumo-strong block">
 						Server URL
 					</label>
 					<div className="relative group">
-						<div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+						<div className="absolute right-1 top-1/2 -translate-y-1/2">
 							<CopyButton text={mcpUrl} />
 						</div>
-						<div className="bg-kumo-recessed text-kumo-default font-mono text-[11px] px-3 py-2.5 pr-10 rounded-lg border border-kumo-line break-all leading-relaxed">
+						<div className="rounded-lg bg-kumo-tint font-mono text-xs text-kumo-default px-3 py-2 pr-10 break-all leading-relaxed">
 							{mcpUrl}
 						</div>
 					</div>
 				</div>
 
 				{/* Available tools */}
-				<div className="space-y-2">
-					<h4 className="text-xs uppercase tracking-wider font-semibold text-kumo-subtle px-0.5">
+				<div className="rounded-xl border border-kumo-line bg-kumo-base p-4">
+					<h4 className="text-xs font-medium text-kumo-subtle mb-1">
 						Available Tools
 					</h4>
-					<div className="border border-kumo-line rounded-lg divide-y divide-kumo-line">
+					<div className="divide-y divide-kumo-line">
 						{TOOLS.map((tool) => (
 							<div
 								key={tool.name}
-								className="flex items-center gap-2.5 px-3 py-2"
+								className="flex items-center gap-2.5 py-2 last:pb-0"
 							>
 								<WrenchIcon
 									size={12}
-									weight="bold"
-									className="text-kumo-brand shrink-0"
+									className="text-kumo-subtle shrink-0"
 								/>
-								<div className="min-w-0 flex-1">
-									<span className="text-xs font-mono font-medium text-kumo-default">
-										{tool.name}
-									</span>
-								</div>
-								<span className="text-[11px] text-kumo-subtle shrink-0">
+								<span className="shrink-0 text-xs font-mono text-kumo-default">
+									{tool.name}
+								</span>
+								<span className="ml-auto min-w-0 truncate text-right text-xs text-kumo-subtle">
 									{tool.desc}
 								</span>
 							</div>

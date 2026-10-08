@@ -2,8 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
-import { RobotIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
+import { Button, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
+import { RobotIcon, ArrowCounterClockwiseIcon, UserCircleIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
@@ -56,8 +56,8 @@ export default function SettingsRoute() {
 
 	if (!mailbox) {
 		return (
-			<div className="flex justify-center py-20">
-				<Loader size="lg" />
+			<div className="flex h-full justify-center bg-kumo-recessed py-20">
+				<Loader size="lg" className="text-kumo-subtle" />
 			</div>
 		);
 	}
@@ -65,14 +65,19 @@ export default function SettingsRoute() {
 	const isCustomPrompt = agentPrompt.trim().length > 0;
 
 	return (
-		<div className="max-w-2xl px-4 py-4 md:px-8 md:py-6 h-full overflow-y-auto">
-			<h1 className="text-lg font-semibold text-kumo-default mb-6">Settings</h1>
+		<div className="h-full overflow-y-auto bg-kumo-recessed">
+			<div className="mx-auto max-w-2xl space-y-6 px-4 py-6 md:px-6 md:py-8">
+				<h1 className="text-xl font-medium tracking-tight text-kumo-default">
+					Settings
+				</h1>
 
-			<div className="space-y-6">
 				{/* Account */}
-				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
-					<div className="text-sm font-medium text-kumo-default mb-4">
-						Account
+				<section className="rounded-xl border border-kumo-line bg-kumo-base p-5">
+					<div className="mb-4 flex items-center gap-2">
+						<UserCircleIcon size={16} className="shrink-0 text-kumo-subtle" />
+						<h2 className="text-sm font-medium text-kumo-default">
+							Account
+						</h2>
 					</div>
 					<div className="space-y-3">
 						<Input
@@ -82,21 +87,31 @@ export default function SettingsRoute() {
 						/>
 						<Input label="Email" type="email" value={mailbox.email} disabled />
 					</div>
-				</div>
+				</section>
 
 				{/* Agent System Prompt */}
-				<div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
-					<div className="flex items-center justify-between mb-4">
-						<div className="flex items-center gap-2">
-							<RobotIcon size={16} weight="duotone" className="text-kumo-subtle" />
-							<span className="text-sm font-medium text-kumo-default">
-								AI Agent Prompt
-							</span>
-							{isCustomPrompt ? (
-								<Badge variant="primary">Custom</Badge>
-							) : (
-								<Badge variant="secondary">Default</Badge>
-							)}
+				<section className="rounded-xl border border-kumo-line bg-kumo-base p-5">
+					<div className="mb-4 flex items-start justify-between gap-3">
+						<div className="min-w-0">
+							<div className="flex items-center gap-2">
+								<RobotIcon size={16} className="shrink-0 text-kumo-subtle" />
+								<h2 className="text-sm font-medium text-kumo-default">
+									AI Agent Prompt
+								</h2>
+								{isCustomPrompt ? (
+									<span className="rounded-full bg-kumo-accent-soft px-2 py-0.5 text-[11px] font-medium text-kumo-accent">
+										Custom
+									</span>
+								) : (
+									<span className="rounded-full bg-kumo-fill px-2 py-0.5 text-[11px] font-medium text-kumo-strong">
+										Default
+									</span>
+								)}
+							</div>
+							<p className="mt-1.5 text-xs text-kumo-subtle">
+								Customize how the AI agent behaves for this mailbox.
+								Leave empty to use the built-in default prompt.
+							</p>
 						</div>
 						{isCustomPrompt && (
 							<Button
@@ -104,27 +119,24 @@ export default function SettingsRoute() {
 								size="xs"
 								icon={<ArrowCounterClockwiseIcon size={14} />}
 								onClick={handleResetPrompt}
+								className="shrink-0"
 							>
 								Reset to default
 							</Button>
 						)}
 					</div>
-					<p className="text-xs text-kumo-subtle mb-3">
-						Customize how the AI agent behaves for this mailbox.
-						Leave empty to use the built-in default prompt.
-					</p>
 					<textarea
 						value={agentPrompt}
 						onChange={(e) => setAgentPrompt(e.target.value)}
 						placeholder={PROMPT_PLACEHOLDER}
 						rows={12}
-						className="w-full resize-y rounded-lg border border-kumo-line bg-kumo-recessed px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring font-mono leading-relaxed"
+						className="w-full resize-y rounded-lg bg-kumo-control px-3 py-2.5 font-mono text-xs leading-relaxed text-kumo-default ring ring-kumo-line transition-shadow placeholder:text-kumo-subtle focus:outline-none focus:ring-kumo-ring"
 					/>
-					<p className="text-xs text-kumo-subtle mt-2">
+					<p className="mt-2 text-xs text-kumo-subtle">
 						The prompt is sent as the system message to the AI model.
 						It controls the agent's personality, writing style, and behavior rules.
 					</p>
-				</div>
+				</section>
 
 				{/* Save */}
 				<div className="flex justify-end">

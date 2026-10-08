@@ -39,11 +39,11 @@ export default function MailboxRoute() {
 	}, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
 
 	return (
-		<div className="flex h-screen overflow-hidden">
+		<div className="flex h-screen overflow-hidden bg-kumo-recessed text-kumo-default">
 			{/* Mobile sidebar overlay backdrop */}
 			{isSidebarOpen && (
 				<div
-					className="fixed inset-0 z-30 bg-black/30 md:hidden"
+					className="fixed inset-0 z-30 bg-black/40 md:hidden"
 					onClick={closeSidebar}
 					onKeyDown={(e) => e.key === "Escape" && closeSidebar()}
 					role="button"
@@ -54,8 +54,10 @@ export default function MailboxRoute() {
 
 			{/* Sidebar: hidden on mobile by default, shown as overlay when open */}
 			<div
-				className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-0 ${
-					isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+				className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 bg-kumo-sidebar border-r border-kumo-line transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 md:z-0 ${
+					isSidebarOpen
+						? "translate-x-0 shadow-float md:shadow-none"
+						: "-translate-x-full"
 				}`}
 			>
 				<Sidebar />

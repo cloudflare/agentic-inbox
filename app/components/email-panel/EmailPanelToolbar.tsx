@@ -62,7 +62,7 @@ export default function EmailPanelToolbar({
 	deleteLabel = "Delete",
 }: EmailPanelToolbarProps) {
 	return (
-		<div className="flex items-center gap-1 px-3 py-2 border-b border-kumo-line shrink-0 md:px-4">
+		<div className="flex h-12 shrink-0 items-center gap-0.5 border-b border-kumo-line bg-kumo-base px-3">
 			<Button
 				variant="ghost"
 				shape="square"
@@ -72,9 +72,10 @@ export default function EmailPanelToolbar({
 				aria-label="Back to list"
 				className="md:hidden shrink-0"
 			/>
+			<ToolbarDivider className="md:hidden" />
 
 			{isDraftFolder ? (
-				<>
+				<div className="flex items-center gap-1.5">
 					<Button
 						variant="primary"
 						size="sm"
@@ -92,7 +93,7 @@ export default function EmailPanelToolbar({
 					>
 						Edit
 					</Button>
-				</>
+				</div>
 			) : (
 				<>
 					<Tooltip content="Reply" side="bottom" asChild>
@@ -128,7 +129,7 @@ export default function EmailPanelToolbar({
 				</>
 			)}
 
-			<div className="h-5 w-px bg-kumo-fill mx-0.5" />
+			<ToolbarDivider />
 
 			<Tooltip content={email.starred ? "Unstar" : "Star"} side="bottom" asChild>
 				<Button
@@ -197,6 +198,10 @@ export default function EmailPanelToolbar({
 	);
 }
 
+function ToolbarDivider({ className = "" }: { className?: string }) {
+	return <div className={`mx-1 h-5 w-px shrink-0 bg-kumo-line ${className}`} aria-hidden="true" />;
+}
+
 function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id: string) => void }) {
 	const [open, setOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
@@ -223,14 +228,13 @@ function MoveToFolderMenu({ folders, onMove }: { folders: Folder[]; onMove: (id:
 				/>
 			</Tooltip>
 			{open && (
-				<div className="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-lg border border-kumo-line bg-kumo-elevated shadow-lg py-1">
-					<div className="px-3 py-1.5 text-xs font-medium text-kumo-subtle">Move to</div>
-					<div className="h-px bg-kumo-line my-1" />
+				<div className="absolute top-full left-0 z-50 mt-1.5 min-w-[180px] rounded-xl border border-kumo-line bg-kumo-elevated p-1 shadow-float">
+					<div className="px-2.5 pt-1.5 pb-1 text-xs font-medium text-kumo-subtle">Move to</div>
 					{folders.map((f) => (
 						<button
 							key={f.id}
 							type="button"
-							className="w-full text-left px-3 py-1.5 text-sm text-kumo-default hover:bg-kumo-overlay transition-colors"
+							className="block h-8 w-full truncate rounded-lg px-2.5 text-left text-sm leading-8 text-kumo-default transition-colors hover:bg-kumo-fill-hover"
 							onClick={() => { onMove(f.id); setOpen(false); }}
 						>
 							{f.name}

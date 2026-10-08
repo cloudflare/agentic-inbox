@@ -71,8 +71,8 @@ export default function EmailPanelDialogs({
 					if (!open) onCloseSource();
 				}}
 			>
-				<Dialog size="lg">
-					<Dialog.Title>
+				<Dialog size="lg" className="p-5">
+					<Dialog.Title className="text-base font-medium text-kumo-default">
 						Email Source Headers
 						{sourceViewEmail && (
 							<span className="text-sm font-normal text-kumo-subtle ml-2">
@@ -81,18 +81,18 @@ export default function EmailPanelDialogs({
 						)}
 					</Dialog.Title>
 					{sourceViewEmail && (
-						<div className="mt-4 max-h-[60vh] overflow-y-auto">
-							<table className="w-full text-sm border-collapse">
+						<div className="mt-4 max-h-[60vh] overflow-y-auto rounded-lg border border-kumo-line">
+							<table className="w-full text-xs border-collapse">
 								<tbody>
 									{sourceHeaders.map((header, idx) => (
 										<tr
 											key={`${header.key}-${idx}`}
-											className={idx % 2 === 0 ? "bg-kumo-tint/50" : ""}
+											className="border-b border-kumo-line last:border-b-0"
 										>
-											<td className="py-1.5 px-3 font-mono font-semibold text-kumo-default whitespace-nowrap align-top w-[160px]">
+											<td className="py-2 px-3 font-mono font-medium text-kumo-strong whitespace-nowrap align-top w-[160px]">
 												{header.key}
 											</td>
-											<td className="py-1.5 px-3 font-mono text-kumo-subtle break-all">
+											<td className="py-2 px-3 font-mono text-kumo-subtle break-all">
 												{header.value}
 											</td>
 										</tr>
@@ -106,7 +106,7 @@ export default function EmailPanelDialogs({
 							)}
 						</div>
 					)}
-					<div className="flex justify-end mt-4">
+					<div className="flex justify-end mt-5">
 						<Dialog.Close>
 							<Button variant="secondary" size="sm">
 								Close
@@ -122,18 +122,20 @@ export default function EmailPanelDialogs({
 					if (!open) onClosePreview();
 				}}
 			>
-				<Dialog size="lg">
-					<Dialog.Title>{previewImage?.filename}</Dialog.Title>
+				<Dialog size="lg" className="p-5">
+					<Dialog.Title className="text-base font-medium text-kumo-default truncate">
+						{previewImage?.filename}
+					</Dialog.Title>
 					{previewImage && (
-						<div className="mt-4 flex flex-col items-center justify-center bg-kumo-tint/30 rounded-lg p-4 min-h-[200px]">
+						<div className="mt-4 flex flex-col items-center justify-center rounded-xl bg-kumo-tint p-4 min-h-[200px]">
 							<img
 								src={previewImage.url}
 								alt={previewImage.filename}
-								className="max-w-full max-h-[70vh] object-contain rounded shadow-sm"
+								className="max-w-full max-h-[70vh] object-contain rounded-lg"
 							/>
 						</div>
 					)}
-					<div className="flex justify-between items-center mt-4">
+					<div className="flex justify-between items-center gap-2 mt-5">
 						<Button
 							variant="secondary"
 							size="sm"

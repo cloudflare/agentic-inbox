@@ -2,12 +2,11 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Loader, Tooltip } from "@cloudflare/kumo";
+import { Button, Loader, Tooltip } from "@cloudflare/kumo";
 import {
 	ArrowUpIcon,
 	RobotIcon,
 	TrashIcon,
-	UserIcon,
 	EnvelopeSimpleIcon,
 	MagnifyingGlassIcon,
 	PaperPlaneTiltIcon,
@@ -28,39 +27,39 @@ import type { UIMessage } from "ai";
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
 	list_emails: {
 		label: "Fetching emails",
-		icon: <EnvelopeSimpleIcon size={14} weight="bold" />,
+		icon: <EnvelopeSimpleIcon size={13} />,
 	},
 	get_email: {
 		label: "Reading email",
-		icon: <EyeIcon size={14} weight="bold" />,
+		icon: <EyeIcon size={13} />,
 	},
 	get_thread: {
 		label: "Loading thread",
-		icon: <ArrowBendUpLeftIcon size={14} weight="bold" />,
+		icon: <ArrowBendUpLeftIcon size={13} />,
 	},
 	search_emails: {
 		label: "Searching",
-		icon: <MagnifyingGlassIcon size={14} weight="bold" />,
+		icon: <MagnifyingGlassIcon size={13} />,
 	},
 	draft_email: {
 		label: "Drafting email",
-		icon: <PaperPlaneTiltIcon size={14} weight="bold" />,
+		icon: <PaperPlaneTiltIcon size={13} />,
 	},
 	draft_reply: {
 		label: "Drafting reply",
-		icon: <PaperPlaneTiltIcon size={14} weight="bold" />,
+		icon: <PaperPlaneTiltIcon size={13} />,
 	},
 	discard_draft: {
 		label: "Discarding draft",
-		icon: <TrashIcon size={14} weight="bold" />,
+		icon: <TrashIcon size={13} />,
 	},
 	mark_email_read: {
 		label: "Updating status",
-		icon: <CheckCircleIcon size={14} weight="bold" />,
+		icon: <CheckCircleIcon size={13} />,
 	},
 	move_email: {
 		label: "Moving email",
-		icon: <EnvelopeSimpleIcon size={14} weight="bold" />,
+		icon: <EnvelopeSimpleIcon size={13} />,
 	},
 };
 
@@ -73,7 +72,7 @@ function ToolCallBadge({
 }) {
 	const info = TOOL_LABELS[toolName] || {
 		label: toolName,
-		icon: <WrenchIcon size={14} weight="bold" />,
+		icon: <WrenchIcon size={13} />,
 	};
 	const isDone =
 		state === "output-available" ||
@@ -81,18 +80,28 @@ function ToolCallBadge({
 		state === "output-error";
 
 	return (
-		<div className="flex items-center gap-1.5 py-1 px-2 rounded bg-kumo-fill/50 text-xs">
-			<span className="text-kumo-brand">{info.icon}</span>
-			<span className="text-kumo-strong">{info.label}</span>
+		<div className="inline-flex items-center gap-1.5 rounded-full bg-kumo-fill px-2.5 py-1 text-xs text-kumo-strong">
+			<span className="flex text-kumo-subtle">{info.icon}</span>
+			<span>{info.label}</span>
 			{isDone ? (
 				<CheckCircleIcon
 					size={12}
 					weight="fill"
-					className="text-kumo-success ml-auto"
+					className="text-kumo-success"
 				/>
 			) : (
-				<Loader size="sm" className="ml-auto" />
+				<Loader size="sm" />
 			)}
+		</div>
+	);
+}
+
+const AUTO_TRIGGER_PREFIX = "[Auto-triggered]";
+
+function AgentAvatar() {
+	return (
+		<div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-kumo-accent-soft text-kumo-accent">
+			<RobotIcon size={13} />
 		</div>
 	);
 }
@@ -122,6 +131,7 @@ function DraftActions({
 			<Button
 				variant="primary"
 				size="sm"
+				className="rounded-lg"
 				icon={<PencilSimpleIcon size={14} />}
 				onClick={onEdit}
 				disabled={disabled}
@@ -144,128 +154,135 @@ function MessageBubble({
 	const isUser = message.role === "user";
 
 	return (
-		<div
-			className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}
-		>
+		<div className={`flex gap-2.5 ${isUser ? "justify-end" : ""}`}>
+			{!isUser && <AgentAvatar />}
 			<div
-				className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-					isUser
-						? "bg-kumo-brand text-kumo-inverse"
-						: "bg-kumo-fill text-kumo-default"
-				}`}
-			>
-				{isUser ? (
-					<UserIcon size={12} weight="bold" />
-				) : (
-					<RobotIcon size={12} weight="bold" />
-				)}
-			</div>
-			<div
-				className={`flex flex-col gap-1 max-w-[85%] min-w-0 ${
-					isUser ? "items-end" : "items-start"
+				className={`flex flex-col gap-1.5 min-w-0 ${
+					isUser ? "w-full items-end" : "flex-1 items-start"
 				}`}
 			>
 				{message.parts.map((part, i) => {
 					const key = `${message.id}-part-${i}`;
 					if (part.type === "text" && part.text.trim()) {
+						if (isUser && part.text.startsWith(AUTO_TRIGGER_PREFIX)) {
+							return (
+								<div
+									key={key}
+									className="flex w-full items-start gap-2 text-xs text-kumo-subtle"
+								>
+									<span className="shrink-0 rounded-full bg-kumo-fill px-2 py-0.5 text-[11px] font-medium text-kumo-strong">
+										Auto
+									</span>
+									<span className="min-w-0 pt-0.5 leading-relaxed break-words wrap-anywhere">
+										{part.text
+											.slice(AUTO_TRIGGER_PREFIX.length)
+											.trim()}
+									</span>
+								</div>
+							);
+						}
+						if (isUser) {
+							return (
+								<div
+									key={key}
+									className="ml-auto max-w-[85%] rounded-xl rounded-br-md bg-kumo-selected px-3.5 py-2.5 text-sm leading-relaxed text-kumo-default whitespace-pre-wrap break-words wrap-anywhere"
+								>
+									{part.text}
+								</div>
+							);
+						}
 						return (
 							<div
 								key={key}
-								className={`rounded-lg px-3 py-2 text-[13px] leading-relaxed break-words overflow-wrap-anywhere ${
-									isUser
-										? "bg-kumo-brand text-kumo-inverse rounded-br-sm"
-										: "bg-kumo-elevated text-kumo-default border border-kumo-line rounded-bl-sm overflow-hidden"
-								}`}
+								className="w-full min-w-0 pt-px text-sm leading-relaxed text-kumo-default break-words"
 							>
-								{isUser ? (
-									part.text
-								) : (
-									<Markdown
-										remarkPlugins={[remarkGfm]}
-										components={{
-											a: ({ href, children }) => (
-												<a
-													href={href}
-													target="_blank"
-													rel="noopener noreferrer"
-													style={{
-														color: "var(--color-link)",
-														textDecoration: "underline",
-													}}
-												>
+								<Markdown
+									remarkPlugins={[remarkGfm]}
+									components={{
+										a: ({ href, children }) => (
+											<a
+												href={href}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-kumo-link underline underline-offset-2"
+											>
+												{children}
+											</a>
+										),
+										p: ({ children }) => (
+											<p className="mb-2 last:mb-0">
+												{children}
+											</p>
+										),
+										strong: ({ children }) => (
+											<strong className="font-medium">
+												{children}
+											</strong>
+										),
+										ul: ({ children }) => (
+											<ul className="list-disc pl-4 mb-2 last:mb-0 space-y-0.5">
+												{children}
+											</ul>
+										),
+										ol: ({ children }) => (
+											<ol className="list-decimal pl-4 mb-2 last:mb-0 space-y-0.5">
+												{children}
+											</ol>
+										),
+										li: ({ children }) => (
+											<li>{children}</li>
+										),
+										h1: ({ children }) => (
+											<h3 className="font-medium text-sm mb-1">
+												{children}
+											</h3>
+										),
+										h2: ({ children }) => (
+											<h4 className="font-medium text-sm mb-1">
+												{children}
+											</h4>
+										),
+										h3: ({ children }) => (
+											<h5 className="font-medium text-sm mb-0.5">
+												{children}
+											</h5>
+										),
+										pre: ({ children }) => (
+											<pre className="my-2 overflow-x-auto rounded-lg bg-kumo-tint px-3 py-2 font-mono text-xs [&_code]:bg-transparent [&_code]:p-0">
+												{children}
+											</pre>
+										),
+										code: ({ children }) => (
+											<code className="rounded-md bg-kumo-fill px-1 py-0.5 font-mono text-[12px]">
+												{children}
+											</code>
+										),
+										table: ({ children }) => (
+											<div className="overflow-x-auto my-2 rounded-lg border border-kumo-line">
+												<table className="w-full text-xs border-collapse [&_tbody_tr:last-child>td]:border-b-0">
 													{children}
-												</a>
-											),
-											p: ({ children }) => (
-												<p className="mb-2 last:mb-0">
-													{children}
-												</p>
-											),
-											strong: ({ children }) => (
-												<strong className="font-semibold">
-													{children}
-												</strong>
-											),
-											ul: ({ children }) => (
-												<ul className="list-disc pl-4 mb-2 last:mb-0 space-y-0.5">
-													{children}
-												</ul>
-											),
-											ol: ({ children }) => (
-												<ol className="list-decimal pl-4 mb-2 last:mb-0 space-y-0.5">
-													{children}
-												</ol>
-											),
-											li: ({ children }) => (
-												<li>{children}</li>
-											),
-											h1: ({ children }) => (
-												<h3 className="font-semibold text-sm mb-1">
-													{children}
-												</h3>
-											),
-											h2: ({ children }) => (
-												<h4 className="font-semibold text-[13px] mb-1">
-													{children}
-												</h4>
-											),
-											h3: ({ children }) => (
-												<h5 className="font-semibold text-[13px] mb-0.5">
-													{children}
-												</h5>
-											),
-											code: ({ children }) => (
-												<code className="bg-kumo-fill px-1 py-0.5 rounded text-[12px]">
-													{children}
-												</code>
-											),
-											table: ({ children }) => (
-												<div className="overflow-x-auto my-2">
-													<table className="w-full text-xs border-collapse">
-														{children}
-													</table>
-												</div>
-											),
-											thead: ({ children }) => (
-												<thead className="border-b border-kumo-line bg-kumo-fill/30">
-													{children}
-												</thead>
-											),
-											th: ({ children }) => (
-												<th className="text-left px-2 py-1 font-semibold text-kumo-strong">
-													{children}
-												</th>
-											),
-											td: ({ children }) => (
-												<td className="px-2 py-1 border-b border-kumo-line/50">
-													{children}
-												</td>
-											),
-										}}
-									>
-										{part.text}
-									</Markdown>
-								)}
+												</table>
+											</div>
+										),
+										thead: ({ children }) => (
+											<thead className="border-b border-kumo-line bg-kumo-tint">
+												{children}
+											</thead>
+										),
+										th: ({ children }) => (
+											<th className="text-left px-2 py-1 font-medium text-kumo-strong">
+												{children}
+											</th>
+										),
+										td: ({ children }) => (
+											<td className="px-2 py-1 border-b border-kumo-line">
+												{children}
+											</td>
+										),
+									}}
+								>
+									{part.text}
+								</Markdown>
 							</div>
 						);
 					}
@@ -345,9 +362,11 @@ function AgentChatConnected({
 	return (
 		<div className="flex flex-col h-full">
 			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-1.5 border-b border-kumo-line shrink-0">
+			<div className="flex h-12 items-center justify-between px-3 border-b border-kumo-line shrink-0">
 				<div className="flex items-center gap-2">
-					<Badge variant="beta">AI</Badge>
+					<span className="rounded-full bg-kumo-accent-soft px-2 py-0.5 text-[11px] font-medium text-kumo-accent">
+						AI
+					</span>
 					<span className="text-xs text-kumo-subtle">
 						Email Agent
 					</span>
@@ -374,17 +393,13 @@ function AgentChatConnected({
 			</div>
 
 			{/* Messages */}
-			<div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4">
+			<div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
 				{messages.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full gap-4">
-						<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-kumo-brand/10">
-							<RobotIcon
-								size={24}
-								weight="duotone"
-								className="text-kumo-brand"
-							/>
+						<div className="flex size-10 items-center justify-center rounded-xl bg-kumo-accent-soft text-kumo-accent">
+							<RobotIcon size={20} />
 						</div>
-						<p className="text-xs text-kumo-subtle text-center leading-relaxed px-4">
+						<p className="text-sm text-kumo-subtle text-center leading-relaxed px-4">
 							I can read emails, search conversations, and draft
 							replies.
 						</p>
@@ -396,7 +411,7 @@ function AgentChatConnected({
 									onClick={() =>
 										sendMessage({ text: prompt })
 									}
-									className="text-left px-3 py-2 rounded-lg border border-kumo-line text-xs text-kumo-strong hover:bg-kumo-tint hover:border-kumo-fill-hover transition-colors cursor-pointer bg-transparent"
+									className="text-left px-3 py-2 rounded-lg border border-kumo-line text-sm text-kumo-strong hover:bg-kumo-tint hover:text-kumo-default transition-colors cursor-pointer bg-transparent"
 								>
 									{prompt}
 								</button>
@@ -404,7 +419,7 @@ function AgentChatConnected({
 						</div>
 					</div>
 				) : (
-					<div className="flex flex-col gap-3">
+					<div className="flex flex-col gap-4">
 						{messages.map((msg) => (
 							<MessageBubble
 								key={msg.id}
@@ -454,11 +469,9 @@ function AgentChatConnected({
 							/>
 						))}
 						{isStreaming && (
-							<div className="flex gap-2">
-								<div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-kumo-default">
-									<RobotIcon size={12} weight="bold" />
-								</div>
-								<div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-kumo-elevated border border-kumo-line rounded-bl-sm">
+							<div className="flex items-center gap-2.5">
+								<AgentAvatar />
+								<div className="flex items-center gap-1.5">
 									<Loader size="sm" />
 									<span className="text-xs text-kumo-subtle">
 										Thinking...
@@ -471,12 +484,13 @@ function AgentChatConnected({
 			</div>
 
 			{/* Input */}
-			<div className="shrink-0 border-t border-kumo-line px-3 py-2">
+			<div className="shrink-0 border-t border-kumo-line p-3">
 				{isStreaming ? (
 					<div className="flex justify-center">
 						<Button
 							variant="secondary"
 							size="sm"
+							className="rounded-lg"
 							icon={<StopIcon size={14} weight="fill" />}
 							onClick={() => stop()}
 						>
@@ -484,7 +498,7 @@ function AgentChatConnected({
 						</Button>
 					</div>
 				) : (
-					<div className="flex items-end gap-1.5">
+					<div className="flex items-end gap-2 rounded-xl border border-transparent bg-kumo-tint py-1.5 pl-3 pr-1.5 transition-colors focus-within:border-kumo-ring focus-within:bg-kumo-base">
 						<textarea
 							ref={inputRef}
 							id="agent-chat-input"
@@ -495,7 +509,7 @@ function AgentChatConnected({
 							placeholder="Ask your email agent..."
 							rows={1}
 							aria-label="Chat message input"
-							className="flex-1 resize-none rounded-lg border border-kumo-line bg-kumo-control px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring min-h-[36px] max-h-[100px]"
+							className="flex-1 resize-none border-0 bg-transparent py-1.5 text-sm leading-5 text-kumo-default placeholder:text-kumo-subtle focus:outline-none min-h-8 max-h-[100px]"
 							style={{ height: "auto", overflow: "hidden" }}
 							onInput={(e) => {
 								const t = e.target as HTMLTextAreaElement;
@@ -509,6 +523,7 @@ function AgentChatConnected({
 							variant="primary"
 							shape="square"
 							size="sm"
+							className="size-8 rounded-lg"
 							disabled={!inputValue.trim()}
 							icon={<ArrowUpIcon size={14} weight="bold" />}
 							onClick={handleSend}
@@ -548,7 +563,7 @@ export default function AgentPanel() {
 	if (loadError) {
 		return (
 			<div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
-				<span className="text-xs text-kumo-error">{loadError}</span>
+				<span className="text-xs text-kumo-danger">{loadError}</span>
 			</div>
 		);
 	}

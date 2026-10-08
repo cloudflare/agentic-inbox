@@ -21,10 +21,13 @@ import type { Email, Folder, Mailbox } from "~/types";
 
 function EmailPanelSkeleton() {
 	return (
-		<div className="animate-pulse p-5 space-y-4">
-			<div className="h-5 w-2/3 rounded bg-kumo-fill" />
-			<div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-kumo-fill" /><div className="space-y-2 flex-1"><div className="h-3 w-40 rounded bg-kumo-fill" /><div className="h-2.5 w-24 rounded bg-kumo-fill" /></div></div>
-			<div className="space-y-2 pt-4"><div className="h-2.5 w-full rounded bg-kumo-fill" /><div className="h-2.5 w-5/6 rounded bg-kumo-fill" /><div className="h-2.5 w-4/6 rounded bg-kumo-fill" /><div className="h-2.5 w-3/4 rounded bg-kumo-fill" /></div>
+		<div className="flex h-full flex-col bg-kumo-base">
+			<div className="h-12 shrink-0 border-b border-kumo-line" />
+			<div className="animate-pulse space-y-5 px-4 pt-5 md:px-6">
+				<div className="h-5 w-2/3 rounded-full bg-kumo-fill" />
+				<div className="flex items-center gap-3"><div className="size-9 shrink-0 rounded-full bg-kumo-fill" /><div className="flex-1 space-y-2"><div className="h-3 w-40 rounded-full bg-kumo-fill" /><div className="h-2.5 w-24 rounded-full bg-kumo-fill" /></div></div>
+				<div className="space-y-2.5 pt-2 md:ml-12"><div className="h-2.5 w-full rounded-full bg-kumo-fill" /><div className="h-2.5 w-5/6 rounded-full bg-kumo-fill" /><div className="h-2.5 w-4/6 rounded-full bg-kumo-fill" /><div className="h-2.5 w-3/4 rounded-full bg-kumo-fill" /></div>
+			</div>
 		</div>
 	);
 }
@@ -159,7 +162,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 	const hasThread = allMessages.length > 1;
 
 	return (
-		<div className="flex flex-col h-full">
+		<div className="flex flex-col h-full bg-kumo-base">
 			<EmailPanelToolbar
 				email={email}
 				mailboxId={mailboxId}
@@ -201,7 +204,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 				showThreadCount={hasThread}
 			/>
 
-			<div className="flex-1 overflow-y-auto">
+			<div className="flex-1 min-h-0 overflow-y-auto">
 				{hasThread ? (
 					allMessages.map((msg, idx) => {
 						const isDraft = draftMessageIds.has(msg.id);

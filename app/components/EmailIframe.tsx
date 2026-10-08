@@ -67,6 +67,10 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 		});
 
 		const padding = autoSize ? "0" : "24px";
+		// Plain-text mail has no markup, so keep its line breaks instead of collapsing them.
+		// Match real tags only: plain text often quotes "Name <a@b.com>".
+		const isPlainText =
+			!/<\/?(html|head|body|div|p|br|span|table|tr|td|a|img|b|i|u|strong|em|ul|ol|li|h[1-6]|blockquote|pre|font|center|hr)\b[^>]*>/i.test(body);
 
 		// Height-reporting script: sends body.scrollHeight to the parent.
 		// Runs inside the opaque-origin sandbox so it has zero access to
@@ -102,29 +106,30 @@ body {
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	font-size: 14px;
 	line-height: 1.6;
-	color: #1a1a1a;
+	color: #18181b;
 	background: #ffffff;
 	padding: ${padding};
 	margin: 0;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
+	${isPlainText ? "white-space: pre-wrap;" : ""}
 	${autoSize ? "overflow: hidden;" : ""}
 }
 [style*="position: fixed"], [style*="position:fixed"], [style*="position: absolute"], [style*="position:absolute"] {
 	position: relative !important;
 }
-a { color: #2563eb; }
+a { color: #4b4bc4; }
 img { max-width: 100%; height: auto; }
 blockquote {
-	border-left: 3px solid #d1d5db;
+	border-left: 2px solid #e4e4e7;
 	padding-left: 1em;
 	margin-left: 0;
-	color: #6b7280;
+	color: #71717a;
 }
 pre {
-	background: #f3f4f6;
+	background: #f4f4f5;
 	padding: 12px;
-	border-radius: 6px;
+	border-radius: 8px;
 	overflow-x: auto;
 	font-size: 13px;
 }
@@ -135,17 +140,24 @@ h1, h2, h3 { margin: 8px 0 4px; }
 ul, ol { padding-left: 20px; margin: 4px 0; }
 </style>
 </head>
-<body>${cleanBody}${heightScript}</body>
+<body>${isPlainText ? cleanBody.trim() : cleanBody}${heightScript}</body>
 </html>`;
 	}, [body, autoSize]);
 
+	// White surface in both modes so third-party HTML mail stays readable in dark mode.
 	return (
-		<iframe
-			ref={iframeRef}
-			className="block w-full border-0"
-			style={autoSize ? { height: `${height}px` } : { height: "100%" }}
-			sandbox="allow-scripts allow-popups allow-top-navigation-by-user-activation"
-			title="Email content"
-		/>
+		<div
+			className={`overflow-hidden rounded-xl border border-kumo-line bg-white ${
+				autoSize ? "px-3 py-3 md:px-5 md:py-4" : "h-full"
+			}`}
+		>
+			<iframe
+				ref={iframeRef}
+				className="block w-full border-0"
+				style={autoSize ? { height: `${height}px` } : { height: "100%" }}
+				sandbox="allow-scripts allow-popups allow-top-navigation-by-user-activation"
+				title="Email content"
+			/>
+		</div>
 	);
 }

@@ -25,7 +25,7 @@ function LazyAgentPanel() {
 	if (loadError) {
 		return (
 			<div className="flex items-center justify-center h-full">
-				<span className="text-xs text-kumo-error">{loadError}</span>
+				<span className="text-xs text-kumo-danger">{loadError}</span>
 			</div>
 		);
 	}
@@ -46,29 +46,29 @@ export default function AgentSidebar() {
 	return (
 		<div className="flex flex-col h-full">
 			{/* Tab bar */}
-			<div className="flex items-center border-b border-kumo-line shrink-0">
+			<div className="flex h-14 gap-4 px-3 border-b border-kumo-line shrink-0">
 				<button
 					type="button"
 					onClick={() => setActiveTab("agent")}
-					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
+					className={`-mb-px flex items-center gap-1.5 px-0.5 pt-0.5 text-sm transition-colors border-b-2 bg-transparent cursor-pointer ${
 						activeTab === "agent"
-							? "border-kumo-brand text-kumo-default"
+							? "border-kumo-brand text-kumo-default font-medium"
 							: "border-transparent text-kumo-subtle hover:text-kumo-default"
 					}`}
 				>
-					<RobotIcon size={14} weight={activeTab === "agent" ? "fill" : "regular"} />
+					<RobotIcon size={16} />
 					Agent
 				</button>
 				<button
 					type="button"
 					onClick={() => setActiveTab("mcp")}
-					className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 bg-transparent cursor-pointer ${
+					className={`-mb-px flex items-center gap-1.5 px-0.5 pt-0.5 text-sm transition-colors border-b-2 bg-transparent cursor-pointer ${
 						activeTab === "mcp"
-							? "border-kumo-brand text-kumo-default"
+							? "border-kumo-brand text-kumo-default font-medium"
 							: "border-transparent text-kumo-subtle hover:text-kumo-default"
 					}`}
 				>
-					<PlugsIcon size={14} weight={activeTab === "mcp" ? "fill" : "regular"} />
+					<PlugsIcon size={16} />
 					MCP
 				</button>
 			</div>

@@ -4,7 +4,6 @@
 
 import {
 	Button,
-	Empty,
 	LinkProvider,
 	Loader,
 	Toasty,
@@ -113,8 +112,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export function HydrateFallback() {
 	return (
-		<div className="flex items-center justify-center h-screen">
-			<Loader size="lg" />
+		<div className="flex h-screen items-center justify-center bg-kumo-recessed">
+			<Loader size="lg" className="text-kumo-subtle" />
 		</div>
 	);
 }
@@ -156,22 +155,27 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 	}
 
 	return (
-		<div className="flex items-center justify-center min-h-screen p-8">
-			<Empty
-				icon={<WarningIcon size={48} className="text-kumo-inactive" />}
-				title={status === 404 ? "404 — Page not found" : title}
-				description={description}
-				contents={
-					<Button
-						variant="primary"
-						onClick={() => {
-							window.location.href = "/";
-						}}
-					>
-						Go Home
-					</Button>
-				}
-			/>
+		<div className="flex min-h-screen items-center justify-center bg-kumo-recessed p-6">
+			<div className="flex max-w-md flex-col items-center gap-2 text-center">
+				<WarningIcon
+					size={40}
+					weight="light"
+					className="mb-2 text-kumo-inactive"
+				/>
+				<h1 className="text-[15px] font-medium text-kumo-default">
+					{status === 404 ? "404 — Page not found" : title}
+				</h1>
+				<p className="break-words text-sm text-kumo-subtle">{description}</p>
+				<Button
+					variant="primary"
+					className="mt-4"
+					onClick={() => {
+						window.location.href = "/";
+					}}
+				>
+					Go Home
+				</Button>
+			</div>
 		</div>
 	);
 }

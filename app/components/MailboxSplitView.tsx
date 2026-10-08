@@ -22,7 +22,7 @@ export default function MailboxSplitView({
 	return (
 		<div className="flex h-full">
 			<div
-				className={`flex flex-col min-w-0 shrink-0 ${
+				className={`flex flex-col min-w-0 shrink-0 bg-kumo-base ${
 					isPanelOpen
 						? "hidden md:flex md:w-[380px] md:border-r md:border-kumo-line"
 						: "w-full"
