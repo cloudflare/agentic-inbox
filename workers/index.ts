@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import { getAgentByName } from "agents";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
@@ -14,6 +15,7 @@ import {
 	generateMessageId,
 	buildThreadingHeaders,
 	listMailboxes,
+	normalizeMessageId,
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
@@ -206,7 +208,13 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 			to, cc, bcc, from, subject, html, text,
 			attachments: attachments?.map((att) => ({ content: att.content, filename: att.filename, type: att.type, disposition: att.disposition || "attachment", contentId: att.contentId })),
 			...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
-		}).catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
+		})
+			.then(async (sent) => {
+				// Cloudflare generates the Message-ID; store the one recipients will reply to.
+				const realId = normalizeMessageId(sent.messageId);
+				if (realId && realId !== outgoingMessageId) await (stub as any).setMessageId(messageId, realId);
+			})
+			.catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
 	);
 	return c.json({ id: messageId, status: "sent" }, 202);
 });
@@ -394,7 +402,11 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number; to?: 
 	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId) : [];
 	let threadId = emailReferences[0] || inReplyTo || messageId;
 
-	if (!inReplyTo && emailReferences.length === 0) {
+	if (inReplyTo || emailReferences.length > 0) {
+		// Join the thread of whichever stored email (inbound or sent) this one references.
+		const knownThread = await (stub as any).findThreadByMessageIds([...emailReferences, ...(inReplyTo ? [inReplyTo] : [])]);
+		if (knownThread) threadId = knownThread;
+	} else {
 		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
 		if (subjectThread) threadId = subjectThread;
 	}
@@ -411,11 +423,16 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number; to?: 
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
 	}, attachmentData);
 
-	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
-	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
-		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
-	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+	// EmailAgent is a partyserver Server: an instance that was never reached through
+	// /agents/... has no stored name and rejects bare requests. getAgentByName names it first.
+	const trigger = JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId });
+	ctx.waitUntil((async () => {
+		const agentStub = await getAgentByName(env.EMAIL_AGENT, mailboxId);
+		const res = await agentStub.fetch(new Request("https://agents/onNewEmail", {
+			method: "POST", headers: { "Content-Type": "application/json" }, body: trigger,
+		}));
+		if (!res.ok) console.error(`Auto-draft trigger failed: HTTP ${res.status}`, (await res.text()).slice(0, 500));
+	})().catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
 }
 
 export { app, receiveEmail };

@@ -13,6 +13,7 @@ import {
 	buildReferencesChain,
 	buildThreadingHeaders,
 	resolveOriginalEmail,
+	normalizeMessageId,
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
 import { Folders } from "../../shared/folders";
@@ -104,9 +105,14 @@ export async function handleReplyEmail(c: AppContext) {
 				contentId: att.contentId,
 			})),
 			headers: buildThreadingHeaders(originalMsgId, references),
-		}).catch((e) => {
-			console.error("Deferred reply delivery failed:", (e as Error).message);
-		}),
+		})
+			.then(async (sent) => {
+				const realId = normalizeMessageId(sent.messageId);
+				if (realId && realId !== outgoingMessageId) await (stub as any).setMessageId(messageId, realId);
+			})
+			.catch((e) => {
+				console.error("Deferred reply delivery failed:", (e as Error).message);
+			}),
 	);
 
 	return c.json({ id: messageId, status: "sent" }, 202);
@@ -189,9 +195,14 @@ export async function handleForwardEmail(c: AppContext) {
 				disposition: att.disposition,
 				contentId: att.contentId,
 			})),
-		}).catch((e) => {
-			console.error("Deferred forward delivery failed:", (e as Error).message);
-		}),
+		})
+			.then(async (sent) => {
+				const realId = normalizeMessageId(sent.messageId);
+				if (realId && realId !== outgoingMessageId) await (stub as any).setMessageId(messageId, realId);
+			})
+			.catch((e) => {
+				console.error("Deferred forward delivery failed:", (e as Error).message);
+			}),
 	);
 
 	return c.json({ id: messageId, status: "sent" }, 202);

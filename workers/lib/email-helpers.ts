@@ -91,6 +91,16 @@ export function generateMessageId(fromDomain: string): {
 	return { messageId, outgoingMessageId };
 }
 
+/**
+ * Normalize a Message-ID to the bare form stored in `emails.message_id`
+ * ("<abc@host>" -> "abc@host"). Returns null for empty input.
+ */
+export function normalizeMessageId(raw: string | null | undefined): string | null {
+	if (!raw) return null;
+	const m = raw.match(/<([^>]+)>/);
+	return (m ? m[1] : raw).trim() || null;
+}
+
 // ── Threading ──────────────────────────────────────────────────────
 
 /**

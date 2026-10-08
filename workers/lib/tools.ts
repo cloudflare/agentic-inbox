@@ -25,6 +25,7 @@ import {
 	generateMessageId,
 	buildReferencesChain,
 	buildThreadingHeaders,
+	normalizeMessageId,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
 import { sendEmail } from "../email-sender";
@@ -433,14 +434,16 @@ export async function toolSendReply(
 	});
 	const fullBodyHtml = sanitizedBody + quotedBlock;
 
+	let sentMessageId: string | null = null;
 	try {
-		await sendEmail(env.EMAIL, {
+		const sent = await sendEmail(env.EMAIL, {
 			to: params.to,
 			from: mailboxId,
 			subject: params.subject,
 			html: fullBodyHtml,
 			headers: buildThreadingHeaders(originalMsgId, references),
 		});
+		sentMessageId = normalizeMessageId(sent.messageId);
 	} catch (e) {
 		console.error("Email send failed:", (e as Error).message);
 		return { error: `Failed to send reply: ${(e as Error).message}` };
@@ -459,7 +462,7 @@ export async function toolSendReply(
 			email_references:
 				references.length > 0 ? JSON.stringify(references) : null,
 			thread_id: threadId,
-			message_id: outgoingMessageId,
+			message_id: sentMessageId ?? outgoingMessageId,
 		},
 		[],
 	);
@@ -498,13 +501,15 @@ export async function toolSendEmail(
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
 
+	let sentMessageId: string | null = null;
 	try {
-		await sendEmail(env.EMAIL, {
+		const sent = await sendEmail(env.EMAIL, {
 			to: params.to,
 			from: mailboxId,
 			subject: params.subject,
 			html: sanitizedBody,
 		});
+		sentMessageId = normalizeMessageId(sent.messageId);
 	} catch (e) {
 		console.error("Email send failed:", (e as Error).message);
 		return { error: `Failed to send email: ${(e as Error).message}` };
@@ -522,7 +527,7 @@ export async function toolSendEmail(
 			in_reply_to: null,
 			email_references: null,
 			thread_id: messageId,
-			message_id: outgoingMessageId,
+			message_id: sentMessageId ?? outgoingMessageId,
 		},
 		[],
 	);

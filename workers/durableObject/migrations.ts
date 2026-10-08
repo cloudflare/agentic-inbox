@@ -168,4 +168,31 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
 	},
+	{
+		name: "9_add_message_id_index",
+		sql: `CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);`,
+	},
+	{
+		// Inbound replies used to get thread_id = the root's Message-ID string while the
+		// root kept its internal UUID. Re-point those rows (and drafts that inherited the
+		// string) at the thread of the email that owns that Message-ID. Run twice to
+		// follow one extra hop (In-Reply-To-only chains); a no-op once data is clean.
+		name: "10_rejoin_split_threads",
+		sql: `
+            UPDATE emails SET thread_id = (
+                SELECT r.thread_id FROM emails r
+                WHERE r.message_id = emails.thread_id AND r.thread_id IS NOT NULL AND r.thread_id != emails.thread_id
+                ORDER BY r.date ASC LIMIT 1
+            )
+            WHERE thread_id IN (SELECT message_id FROM emails WHERE message_id IS NOT NULL AND thread_id IS NOT NULL AND thread_id != message_id)
+                AND NOT EXISTS (SELECT 1 FROM emails x WHERE x.id = emails.thread_id);
+            UPDATE emails SET thread_id = (
+                SELECT r.thread_id FROM emails r
+                WHERE r.message_id = emails.thread_id AND r.thread_id IS NOT NULL AND r.thread_id != emails.thread_id
+                ORDER BY r.date ASC LIMIT 1
+            )
+            WHERE thread_id IN (SELECT message_id FROM emails WHERE message_id IS NOT NULL AND thread_id IS NOT NULL AND thread_id != message_id)
+                AND NOT EXISTS (SELECT 1 FROM emails x WHERE x.id = emails.thread_id);
+        `,
+	},
 ];
