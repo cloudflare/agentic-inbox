@@ -1,0 +1,102 @@
+/* Graphite theme: overrides kumo's semantic tokens. Unlayered rules beat kumo's @layer base. */
+@theme {
+	--font-sans: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+	--color-kumo-sidebar: #f6f6f7;
+	--color-kumo-selected: #eef0ff;
+	--color-kumo-accent-soft: #eef0ff;
+	--color-kumo-accent-line: #dcdcfb;
+	--text-color-kumo-accent: #3e3eb8;
+	--shadow-float: 0 8px 24px rgb(0 0 0 / 0.08), 0 2px 6px rgb(0 0 0 / 0.05);
+}
+
+:root {
+	--text-color-kumo-default: #18181b;
+	--text-color-kumo-inverse: #fafafa;
+	--text-color-kumo-strong: #3f3f46;
+	--text-color-kumo-subtle: #71717a;
+	--text-color-kumo-inactive: #a1a1aa;
+	--text-color-kumo-brand: #5b5bd6;
+	--text-color-kumo-link: #4b4bc4;
+	--text-color-kumo-success: #15803d;
+	--text-color-kumo-danger: #dc2626;
+	--text-color-kumo-warning: #a16207;
+	--color-kumo-surface: #ffffff;
+	--color-kumo-recessed: #fafafa;
+	--color-kumo-base: #ffffff;
+	--color-kumo-tint: #f4f4f5;
+	--color-kumo-contrast: #0b0b0d;
+	--color-kumo-elevated: #ffffff;
+	--color-kumo-overlay: #ffffff;
+	--color-kumo-control: #ffffff;
+	--color-kumo-interact: #d4d4d8;
+	--color-kumo-fill: #f1f1f3;
+	--color-kumo-fill-hover: #e9e9ec;
+	--color-kumo-brand: #5b5bd6;
+	--color-kumo-brand-hover: #4b4bc4;
+	--color-kumo-line: #e4e4e7;
+	--color-kumo-ring: #c7c7f5;
+	--color-kumo-tip-shadow: #e4e4e7;
+	--color-kumo-tip-stroke: transparent;
+	--color-kumo-info: #5b5bd6;
+	--color-kumo-info-tint: #e6e7ff;
+	--color-kumo-warning: #eab308;
+	--color-kumo-warning-tint: #fef3c7;
+	--color-kumo-danger: #dc2626;
+	--color-kumo-danger-tint: #fee2e2;
+	--color-kumo-success: #16a34a;
+	--color-kumo-success-tint: #dcfce7;
+}
+
+:root[data-mode="dark"] {
+	--text-color-kumo-default: #ededef;
+	--text-color-kumo-inverse: #0b0b0d;
+	--text-color-kumo-strong: #c4c4cc;
+	--text-color-kumo-subtle: #8b8b93;
+	--text-color-kumo-inactive: #5c5c66;
+	--text-color-kumo-brand: #9090f5;
+	--text-color-kumo-link: #a5a5ff;
+	--text-color-kumo-success: #4ade80;
+	--text-color-kumo-danger: #f87171;
+	--text-color-kumo-warning: #facc15;
+	--color-kumo-surface: #0b0b0d;
+	--color-kumo-recessed: #0b0b0d;
+	--color-kumo-base: #141417;
+	--color-kumo-tint: #1b1b1f;
+	--color-kumo-contrast: #fafafa;
+	--color-kumo-elevated: #18181c;
+	--color-kumo-overlay: #18181c;
+	--color-kumo-control: #141417;
+	--color-kumo-interact: #3f3f46;
+	--color-kumo-fill: #1e1e22;
+	--color-kumo-fill-hover: #26262b;
+	--color-kumo-brand: #6e6ef0;
+	--color-kumo-brand-hover: #7c7cf0;
+	--color-kumo-line: #27272c;
+	--color-kumo-ring: #3a3a7a;
+	--color-kumo-tip-shadow: transparent;
+	--color-kumo-tip-stroke: #27272c;
+	--color-kumo-info: #7c7cf0;
+	--color-kumo-info-tint: #1e1e3a;
+	--color-kumo-warning: #ca8a04;
+	--color-kumo-warning-tint: #3a2e0a;
+	--color-kumo-danger: #ef4444;
+	--color-kumo-danger-tint: #3b1414;
+	--color-kumo-success: #22c55e;
+	--color-kumo-success-tint: #0f2e1a;
+	--color-kumo-sidebar: #0e0e10;
+	--color-kumo-selected: #1d1d33;
+	--color-kumo-accent-soft: #1e1e3a;
+	--color-kumo-accent-line: #2e2e5a;
+	--text-color-kumo-accent: #c0c0ff;
+	--shadow-float: 0 8px 24px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.3);
+}
+
+html {
+	font-feature-settings: "cv11", "ss01";
+	-webkit-font-smoothing: antialiased;
+}
+
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-kumo-fill-hover) transparent;
+}

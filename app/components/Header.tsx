@@ -6,6 +6,7 @@ import { Button, Input, Tooltip } from "@cloudflare/kumo";
 import { GearSixIcon, ListIcon, MagnifyingGlassIcon, RobotIcon, XIcon } from "@phosphor-icons/react";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import ThemeToggle from "~/components/ThemeToggle";
 import { useUIStore } from "~/hooks/useUIStore";
 
 export default function Header() {
@@ -129,6 +130,7 @@ export default function Header() {
 						className="hidden lg:inline-flex"
 					/>
 				</Tooltip>
+				<ThemeToggle />
 				<Tooltip content="Settings" side="bottom" asChild>
 					<Button
 						variant={isSettingsActive ? "secondary" : "ghost"}

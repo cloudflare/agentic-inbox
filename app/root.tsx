@@ -22,6 +22,7 @@ import {
 	Scripts,
 	ScrollRestoration,
 } from "react-router";
+import { THEME_INIT_SCRIPT } from "~/lib/theme";
 import { ApiError } from "~/services/api";
 import "./index.css";
 
@@ -75,10 +76,19 @@ const KumoLink = forwardRef<
 	return <a href={href} ref={ref} {...props} />;
 });
 
+export function links() {
+	return [
+		{ rel: "preconnect", href: "https://fonts.googleapis.com" },
+		{ rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+		{ rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" },
+	];
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en">
+		<html lang="en" suppressHydrationWarning>
 			<head>
+				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 				<meta charSet="UTF-8" />
 				<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 				<link
