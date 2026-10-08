@@ -6,6 +6,15 @@
 	"observability": {
 		"enabled": true
 	},
+	"routes": [
+		{
+			"pattern": "mail.juliusyolo.com",
+			"custom_domain": true
+		}
+	],
+	// Serve only from the Access-protected custom domain; POLICY_AUD matches a single Access app.
+	"workers_dev": false,
+	"preview_urls": false,
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
@@ -13,7 +22,7 @@
 		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
-		"DOMAINS": "example.com",
+		"DOMAINS": "juliusyolo.com",
 		"EMAIL_ADDRESSES": []
 	},
 	"send_email": [
