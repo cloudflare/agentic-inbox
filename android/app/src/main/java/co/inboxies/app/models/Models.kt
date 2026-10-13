@@ -1163,6 +1163,12 @@ data class DomainAvailabilityResponse(
 )
 
 @Serializable
+data class CheckoutStatusResponse(
+    val status: String,
+    val domain: String? = null,
+)
+
+@Serializable
 data class DomainCheckoutResponse(
     val checkoutUrl: String,
     val sessionId: String,

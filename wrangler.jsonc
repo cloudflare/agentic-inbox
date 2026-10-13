@@ -69,8 +69,10 @@
             },
         ],
     },
-    "workers_dev": true,
-    "preview_urls": true,
+    // Serve only from the custom domain. Preview URLs would run old versions
+    // against production R2, Durable Objects and email sending.
+    "workers_dev": false,
+    "preview_urls": false,
     "durable_objects": {
         "bindings": [
             {

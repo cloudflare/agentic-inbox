@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Debug only: allow cleartext for local development -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Force HTTPS for production domains -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">inboxies.email</domain>
+    </domain-config>
+</network-security-config>

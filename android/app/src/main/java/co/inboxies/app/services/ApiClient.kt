@@ -1001,6 +1001,15 @@ class ApiClient private constructor() {
         authed = false,
     )
 
+    suspend fun checkoutStatus(domain: String, sessionId: String? = null): CheckoutStatusResponse = request(
+        "/api/v1/billing/checkout-status",
+        query = buildMap {
+            put("domain", domain)
+            if (!sessionId.isNullOrBlank()) put("session_id", sessionId)
+        },
+        authed = false,
+    )
+
     // MARK: - Email Export Engine
 
     suspend fun exportDomain(domain: String): ExportJob = request(

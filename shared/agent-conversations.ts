@@ -37,19 +37,18 @@ export function conversationIdFromAgentName(agentName: string): string | null {
 }
 
 /**
- * Mailbox id from `/agents/{agentClass}/{instanceName}` where instanceName is
- * `mailboxId` or `mailboxId::conversationId`. Decodes `%40` / `%3A%3A`.
+ * Mailbox id from `/agents/email-agent/{instanceName}` where instanceName is
+ * `mailboxId` or `mailboxId::conversationId`. Returned exactly as sent, not
+ * decoded: partyserver names the agent after the raw path segment and the
+ * agent builds its tools from that name, so the gate must authorize this same
+ * string. Other agent classes (e.g. the mailbox DO) are not routable.
  */
 export function mailboxIdFromAgentPath(pathname: string): string | null {
 	const parts = pathname.split("/").filter(Boolean);
-	if (parts[0] !== "agents" || parts.length < 3) return null;
-	let instanceName = parts[2];
-	try {
-		instanceName = decodeURIComponent(instanceName);
-	} catch {
-		/* keep raw */
+	if (parts[0] !== "agents" || parts[1] !== "email-agent" || parts.length < 3) {
+		return null;
 	}
-	return mailboxIdFromAgentName(instanceName) || null;
+	return mailboxIdFromAgentName(parts[2]) || null;
 }
 
 export function mailboxIdFromAgentsUrl(url: string): string | null {

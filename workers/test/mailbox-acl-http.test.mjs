@@ -423,7 +423,7 @@ async function jsonRequest(app, env, { method = "GET", path, principal, body } =
 	assert.equal(allowed.ok, true);
 
 	const deniedUrl = "https://inboxies.test/agents/email-agent/secret%40inboxies.email::c1";
-	assert.equal(mailboxIdFromAgentsUrl(deniedUrl), "secret@inboxies.email");
+	assert.equal(mailboxIdFromAgentsUrl(deniedUrl), "secret%40inboxies.email");
 	const denied = await authorizeMailbox(
 		bucket,
 		bob,

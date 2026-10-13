@@ -1238,6 +1238,11 @@ struct DomainAvailabilityResponse: Codable, Hashable {
     var pricing: DomainPricingBreakdown?
 }
 
+struct CheckoutStatusResponse: Codable {
+    var status: String
+    var domain: String?
+}
+
 struct DomainCheckoutResponse: Codable {
     var checkoutUrl: String
     var sessionId: String

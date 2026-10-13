@@ -47,6 +47,7 @@ import {
 	attachPasswordToSessionAccount,
 	ensurePrincipalAccount,
 	IdentityAlreadyLinkedError,
+	IdentityNotOwnedError,
 	listAllIdentityAccounts,
 	listIdentitiesForPrincipal,
 	mintIdentityLinkCode,
@@ -54,7 +55,6 @@ import {
 	redeemIdentityLinkCode,
 	resolveAclPrincipalsToAccounts,
 	updatePasswordHashForSessionAccount,
-	upsertIdentityLink,
 } from "../lib/identity-links";
 import { verifyAppleIdentityToken } from "../lib/apple-auth";
 import { verifyGoogleIdentityToken } from "../lib/google-auth";
@@ -64,7 +64,6 @@ import {
 	canonicalMailboxId,
 	mailboxMetadataKey,
 } from "../lib/mailbox-routing";
-import { normalizeEmailAddress } from "../lib/mail-automations";
 import { resolveMailDomain } from "../lib/mail-domain";
 import { listMailboxes, getMailboxStub } from "../lib/email-helpers";
 import {
@@ -76,7 +75,6 @@ import {
 	verifyPassword,
 } from "../lib/password-auth";
 import {
-	aclKeysForPlatformUser,
 	findUserIdByLoginEmail,
 	loadPlatformUser,
 	principalFromPlatformUser,
@@ -770,9 +768,10 @@ export function registerAdminAndInviteRoutes(app: App) {
 
 		const sessionPrincipal = principalFromPlatformUser(user);
 		const ensured = await ensurePrincipalAccount(c.env.BUCKET, sessionPrincipal, {
+			// The invitee email is unverified (the inviter sees the token), so it
+			// is contact info only: never an identity key.
 			extraPrincipals: [
 				`user:${user.id}`,
-				`email:${normalizeEmailAddress(invite.inviteeEmail) ?? invite.inviteeEmail}`,
 				...(user.mailboxEmail
 					? [`email:${canonicalMailboxId(user.mailboxEmail) ?? user.mailboxEmail}`]
 					: []),
@@ -798,9 +797,7 @@ export function registerAdminAndInviteRoutes(app: App) {
 			JSON.stringify(next),
 		);
 
-		const sessionEmail = claimMailboxLogin
-			? invite.mailboxId
-			: invite.inviteeEmail;
+		const sessionEmail = claimMailboxLogin ? invite.mailboxId : undefined;
 		const session = await issuePasswordSessionToken(mobileSecret, {
 			userId,
 			email: sessionEmail,
@@ -846,7 +843,7 @@ export function registerAdminAndInviteRoutes(app: App) {
 		if (!ok) return c.json({ error: "Invalid email or password" }, 401);
 		const session = await issuePasswordSessionToken(mobileSecret, {
 			userId: user.id,
-			email: user.mailboxEmail ?? user.contactEmail,
+			email: user.mailboxEmail,
 		});
 		c.header(
 			"Set-Cookie",
@@ -1010,7 +1007,7 @@ export function registerAdminAndInviteRoutes(app: App) {
 
 		const session = await issuePasswordSessionToken(mobileSecret, {
 			userId: user.id,
-			email: user.mailboxEmail ?? user.contactEmail,
+			email: user.mailboxEmail,
 		});
 		c.header(
 			"Set-Cookie",
@@ -1026,46 +1023,6 @@ export function registerAdminAndInviteRoutes(app: App) {
 			email: principal.email ?? null,
 			sub: principal.sub ?? null,
 			keys: principalKeys(principal),
-		});
-	});
-
-	app.post("/api/v1/auth/link-provider", async (c) => {
-		const principal = c.get("principal");
-		if (!principal?.sub?.startsWith("user:")) {
-			return c.json(
-				{ error: "Only password accounts can link providers from this endpoint" },
-				403,
-			);
-		}
-		const userId = principal.sub.slice("user:".length);
-		const body = z
-			.object({
-				provider: z.enum(["apple", "google"]),
-				sub: z.string().min(1),
-			})
-			.parse(await c.req.json());
-		const user = await loadPlatformUser(c.env.BUCKET, userId);
-		if (!user) return c.json({ error: "User not found" }, 404);
-		if (!user.linkedSubs.includes(body.sub)) {
-			user.linkedSubs = [...user.linkedSubs, body.sub];
-			user.updatedAt = new Date().toISOString();
-			await savePlatformUser(c.env.BUCKET, user);
-		}
-		const emails = [
-			user.mailboxEmail,
-			user.contactEmail,
-		].filter((e): e is string => Boolean(e));
-		await upsertIdentityLink(c.env.BUCKET, {
-			sub: body.sub,
-			provider: body.provider,
-			emails,
-			linkedByKeys: [`user:${userId}`],
-			extraPrincipals: [`user:${userId}`, ...emails.map((e) => `email:${e}`)],
-		});
-		return c.json({
-			userId: user.id,
-			linkedSubs: user.linkedSubs,
-			keys: aclKeysForPlatformUser(user),
 		});
 	});
 
@@ -1251,6 +1208,9 @@ export function registerAdminAndInviteRoutes(app: App) {
 		} catch (err) {
 			if (err instanceof IdentityAlreadyLinkedError) {
 				return c.json({ error: err.message }, 409);
+			}
+			if (err instanceof IdentityNotOwnedError) {
+				return c.json({ error: err.message }, 403);
 			}
 			const message =
 				err instanceof Error ? err.message : "Could not attach identity";

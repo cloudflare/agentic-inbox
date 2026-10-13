@@ -12,7 +12,7 @@ import {
 	runMailboxExportJob,
 	runDomainExportJob,
 	hasRecentExportForDomain,
-	exportDataKey,
+	type ExportJob,
 } from "../lib/email-exporter";
 import {
 	authorizeDomainAdmin,
@@ -52,7 +52,8 @@ export function registerExportAndOffboardingRoutes(
 		}
 
 		try {
-			const job = await runMailboxExportJob(c.env, mailboxId);
+			// Export the mailbox that was authorized, not the raw path value.
+			const job = await runMailboxExportJob(c.env, auth.mailboxId);
 			return c.json({
 				exportId: job.id,
 				status: job.status,
@@ -95,16 +96,34 @@ export function registerExportAndOffboardingRoutes(
 	});
 
 	/**
-	 * Query export job status and progress.
+	 * Load an export job the caller may read: they must still have access to
+	 * the exported mailbox, or admin rights on the exported domain.
 	 */
-	app.get("/api/v1/exports/:exportId", async (c) => {
-		const exportId = c.req.param("exportId");
+	const loadAuthorizedExport = async (
+		c: Context<{ Bindings: Env; Variables: AppVariables }>,
+		exportId: string,
+	): Promise<ExportJob | Response> => {
 		const job = await getExportJob(c.env.BUCKET, exportId);
-
 		if (!job) {
 			return c.json({ error: "Export job not found" }, 404);
 		}
+		if (job.targetType === "domain") {
+			const authz = await authorizeDomainAdmin(c, job.targetId);
+			if (authz instanceof Response) return c.json({ error: "Forbidden" }, 403);
+		} else {
+			const principal = c.get("principal") as RequestPrincipal | undefined;
+			const auth = await authorizeMailbox(c.env.BUCKET, principal, job.targetId);
+			if (!auth.ok) return c.json({ error: "Forbidden" }, 403);
+		}
+		return job;
+	};
 
+	/**
+	 * Query export job status and progress.
+	 */
+	app.get("/api/v1/exports/:exportId", async (c) => {
+		const job = await loadAuthorizedExport(c, c.req.param("exportId"));
+		if (job instanceof Response) return job;
 		return c.json(job);
 	});
 
@@ -112,17 +131,18 @@ export function registerExportAndOffboardingRoutes(
 	 * Download an exported .mbox file archive.
 	 */
 	app.get("/api/v1/exports/:exportId/download", async (c) => {
-		const exportId = c.req.param("exportId");
-		const job = await getExportJob(c.env.BUCKET, exportId);
+		const job = await loadAuthorizedExport(c, c.req.param("exportId"));
+		if (job instanceof Response) return job;
+		if (!job.downloadKey || new Date(job.expiresAt).getTime() < Date.now()) {
+			return c.json({ error: "Export archive file not found or expired" }, 404);
+		}
 
-		const dataKey = job?.downloadKey || exportDataKey(exportId, "mbox");
-		const fileObj = await c.env.BUCKET.get(dataKey);
-
+		const fileObj = await c.env.BUCKET.get(job.downloadKey);
 		if (!fileObj) {
 			return c.json({ error: "Export archive file not found or expired" }, 404);
 		}
 
-		const filename = job?.filename || `inboxies-export-${exportId}.mbox`;
+		const filename = job.filename || `inboxies-export-${job.id}.mbox`;
 
 		return new Response(fileObj.body, {
 			headers: {

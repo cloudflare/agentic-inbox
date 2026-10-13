@@ -1926,16 +1926,19 @@ struct MailboxOnboardingView: View {
         isPaymentSyncing = true
         Task {
             let components = URLComponents(url: callbackUrl, resolvingAgainstBaseURL: false)
-            let token = components?.queryItems?.first(where: { $0.name == "token" })?.value
             let domainFromUrl = components?.queryItems?.first(where: { $0.name == "domain" })?.value
+            let sessionId = components?.queryItems?.first(where: { $0.name == "session_id" })?.value
             let targetDomain = domainFromUrl ?? customDomain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-            if let token = token, !token.isEmpty {
-                createdAuthToken = token
+            // The return link carries no session. Wait for the webhook to create
+            // the account, then sign in with the password chosen at checkout.
+            if !auth.isAuthenticated, await waitForDomainReady(domain: targetDomain, sessionId: sessionId) {
                 let username = customUsername.isEmpty ? "admin" : customUsername.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                let email = "\(username)@\(targetDomain)"
-                auth.applySession(token: token, email: email)
-                await app.bootstrap(authToken: token)
+                await auth.signInWithPassword(email: "\(username)@\(targetDomain)", password: customPassword)
+                if let token = auth.token, auth.isAuthenticated {
+                    createdAuthToken = token
+                    await app.bootstrap(authToken: token)
+                }
             }
 
             _ = try? await APIClient.shared.fixDomainEmailDns(domain: targetDomain)
@@ -1945,6 +1948,18 @@ struct MailboxOnboardingView: View {
                 navigationPath.append(.domain(step: 7))
             }
         }
+    }
+
+    /// Polls checkout status for up to a minute; true once the domain is provisioned.
+    private func waitForDomainReady(domain: String, sessionId: String?) async -> Bool {
+        for _ in 0..<40 {
+            if let status = try? await APIClient.shared.checkoutStatus(domain: domain, sessionId: sessionId),
+               status.status == "ready" {
+                return true
+            }
+            try? await Task.sleep(for: .seconds(1.5))
+        }
+        return false
     }
 
     private func provisionDomainAccount() async {

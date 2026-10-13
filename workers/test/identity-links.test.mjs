@@ -4,6 +4,7 @@
  */
 
 import assert from "node:assert/strict";
+import { findUserIdByLoginEmail } from "../lib/platform-users.ts";
 import {
 	autoLinkSubIfAdminEmail,
 	attachIdpToSessionAccount,
@@ -12,6 +13,7 @@ import {
 	ensureIdentityAccount,
 	expandPrincipalWithLinks,
 	IdentityAlreadyLinkedError,
+	IdentityNotOwnedError,
 	identityLinkCodeIsActive,
 	listIdentitiesForPrincipal,
 	mintIdentityLinkCode,
@@ -506,6 +508,35 @@ function mockBucket(initial = {}) {
 	const types = listed.identities.map((i) => i.type).sort();
 	assert.deepEqual(types, ["access", "apple", "password"]);
 	assert.ok(!listed.identities.some((i) => i.type === "sub"));
+}
+
+// ── Add password cannot claim an email the account doesn't own ─────
+
+{
+	const bucket = mockBucket();
+	const google = principalFromClaims({
+		email: "mallory@gmail.com",
+		sub: "google.mallory",
+	});
+	await assert.rejects(
+		() =>
+			attachPasswordToSessionAccount(bucket, google, {
+				passwordHash: "hash-x",
+				loginEmail: "victim@example.com",
+			}),
+		(err) => err instanceof IdentityNotOwnedError,
+	);
+	assert.equal(
+		await findUserIdByLoginEmail(bucket, "victim@example.com"),
+		null,
+		"a rejected attach must not leave a login pointer behind",
+	);
+	// The account's own email is still accepted.
+	const ok = await attachPasswordToSessionAccount(bucket, google, {
+		passwordHash: "hash-y",
+		loginEmail: "Mallory@gmail.com",
+	});
+	assert.ok(ok.userId);
 }
 
 // ── Dual-read: legacy account + by-key still expands / lists ──────

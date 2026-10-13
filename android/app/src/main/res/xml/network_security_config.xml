@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext for local development by default -->
-    <base-config cleartextTrafficPermitted="true">
+    <!-- Release builds speak HTTPS only. The debug source set overrides this
+         file to allow cleartext for local Workers (10.0.2.2). -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-
-    <!-- Force HTTPS for production domains -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">inboxies.email</domain>
-    </domain-config>
 </network-security-config>

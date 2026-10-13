@@ -52,7 +52,9 @@ class MainActivity : ComponentActivity() {
             PreviewHarness.seed(previewMode, auth, model)
         } else {
             auth.resyncFromStorage()
-            val extraApiBase = intent.getStringExtra("apiBase")
+            // Any app can start this exported activity, so only debug builds may
+            // repoint the API (and with it, where the bearer token is sent).
+            val extraApiBase = if (BuildConfig.DEBUG) intent.getStringExtra("apiBase") else null
             if (!extraApiBase.isNullOrBlank()) {
                 co.inboxies.app.config.AppConfig.parseAPIBaseURL(extraApiBase)?.let { parsed ->
                     co.inboxies.app.config.AppConfig.apiBaseURL = parsed
@@ -124,19 +126,9 @@ class MainActivity : ComponentActivity() {
         val isOnboarding = (data.scheme == "inboxies" && (data.host == "onboarding" || data.host == "domain-ready"))
             || (data.host == "inboxies.email" && data.path?.startsWith("/onboarding") == true)
         if (isOnboarding) {
-            val token = data.getQueryParameter("token")
-            val domain = data.getQueryParameter("domain")
-            if (!token.isNullOrBlank()) {
-                val auth = (application as InboxiesApplication).authStore
-                val email = if (!domain.isNullOrBlank()) "admin@$domain" else null
-                auth.applySession(token, email)
-                if (::appModel.isInitialized) {
-                    lifecycleScope.launch {
-                        appModel.bootstrap(token)
-                        appModel.refreshMailboxes(showLoading = true)
-                    }
-                }
-            } else if (::appModel.isInitialized) {
+            // Never take a session from a link: anyone can send one. Onboarding
+            // signs in with the password chosen at checkout instead.
+            if (::appModel.isInitialized) {
                 lifecycleScope.launch {
                     appModel.refreshMailboxes(showLoading = true)
                 }

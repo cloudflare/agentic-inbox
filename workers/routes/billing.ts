@@ -27,15 +27,12 @@ import {
 } from "../lib/domain-registry";
 import {
 	hashPassword,
-	issuePasswordSessionToken,
 	verifyPasswordSessionToken,
-	passwordSessionCookieHeader,
 	PASSWORD_SESSION_COOKIE,
 } from "../lib/password-auth";
 import {
 	findUserIdByLoginEmail,
 	savePlatformUser,
-	loadPlatformUser,
 	principalFromPlatformUser,
 	type PlatformUser,
 } from "../lib/platform-users";
@@ -399,9 +396,13 @@ export function registerBillingRoutes(app: Hono<{ Bindings: Env }>) {
 
 	/**
 	 * Hosted Bridge Return Handler after Stripe checkout completes.
-	 * Redirects mobile clients to `inboxies://onboarding/domain-ready` with authenticated token,
-	 * automatically closing the in-app browser (ASWebAuthenticationSession / Custom Tabs).
-	 * Redirects desktop web users to `/checkout/success` with the session cookie set.
+	 * Redirects mobile clients to `inboxies://onboarding/domain-ready`, closing the
+	 * in-app browser (ASWebAuthenticationSession / Custom Tabs), and desktop web
+	 * users to `/checkout/success`.
+	 *
+	 * This route is public and only knows the domain, so it never issues a
+	 * session: clients sign in with the password chosen at checkout once
+	 * `checkout-status` reports ready.
 	 */
 	app.get("/api/v1/billing/checkout-return", async (c) => {
 		const domain = (c.req.query("domain") || "").toLowerCase().trim();
@@ -410,32 +411,8 @@ export function registerBillingRoutes(app: Hono<{ Bindings: Env }>) {
 		const userAgent = c.req.header("user-agent") || "";
 		const isMobile = clientQuery === "ios" || clientQuery === "android" || /iPhone|iPad|iPod|Android/i.test(userAgent);
 
-		// Resolve or mint session token if user was created
-		let token: string | undefined;
-		let mailboxId: string | undefined;
-
-		if (domain) {
-			const meta = await getDomainMetadata(c.env.BUCKET, domain);
-			if (meta && meta.ownerUserId) {
-				const owner = await loadPlatformUser(c.env.BUCKET, meta.ownerUserId);
-				if (owner && owner.mailboxEmail) {
-					mailboxId = owner.mailboxEmail;
-					const secret = c.env.MOBILE_JWT_SECRET || (isDevRuntime() ? "dev-mobile-jwt-secret-change-me" : "");
-					if (secret) {
-						const session = await issuePasswordSessionToken(secret, {
-							userId: owner.id,
-							email: owner.mailboxEmail,
-						});
-						token = session.token;
-					}
-				}
-			}
-		}
-
 		if (isMobile) {
-			let deepLink = `inboxies://onboarding/domain-ready?domain=${encodeURIComponent(domain)}&session_id=${encodeURIComponent(sessionId)}`;
-			if (token) deepLink += `&token=${encodeURIComponent(token)}`;
-			if (mailboxId) deepLink += `&mailbox_id=${encodeURIComponent(mailboxId)}`;
+			const deepLink = `inboxies://onboarding/domain-ready?domain=${encodeURIComponent(domain)}&session_id=${encodeURIComponent(sessionId)}`;
 
 			// 302 Redirect with HTML bridge script fallback to close in-app browser
 			return c.html(`<!DOCTYPE html>
@@ -459,18 +436,11 @@ window.location.href = ${JSON.stringify(deepLink)};
 			});
 		}
 
-		// Web desktop return -> redirect to checkout success page with cookie
-		const headers: Record<string, string> = {
-			Location: `/checkout/success?session_id=${encodeURIComponent(sessionId)}&domain=${encodeURIComponent(domain)}`,
-		};
-		if (token) {
-			headers["Set-Cookie"] = passwordSessionCookieHeader(token, {
-				secure: !isDevRuntime(),
-			});
-		}
 		return new Response(null, {
 			status: 302,
-			headers,
+			headers: {
+				Location: `/checkout/success?session_id=${encodeURIComponent(sessionId)}&domain=${encodeURIComponent(domain)}`,
+			},
 		});
 	});
 
@@ -520,7 +490,6 @@ window.location.href = ${JSON.stringify(deepLink)};
 				return c.json({
 					status: "ready",
 					domain: targetDomain,
-					ownerUserId: meta.ownerUserId,
 					pricing: sessionRecord?.pricing ?? computeDomainPricing(10.44),
 					mailboxId: sessionRecord?.mailboxId,
 				});

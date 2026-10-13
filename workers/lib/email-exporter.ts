@@ -140,8 +140,12 @@ export async function hasRecentExportForDomain(
 		if (!res) continue;
 		try {
 			const job = (await res.json()) as ExportJob;
+			// Only a whole-domain export of exactly this domain counts: a single
+			// mailbox export doesn't cover the domain, and a suffix match would
+			// let `acme.com` exports satisfy `cme.com`.
 			if (
-				job.targetId.toLowerCase().endsWith(normalizedDomain) &&
+				job.targetType === "domain" &&
+				job.targetId.toLowerCase() === normalizedDomain &&
 				job.status === "completed"
 			) {
 				const isExpired = new Date(job.expiresAt).getTime() < Date.now();

@@ -1281,6 +1281,14 @@ export async function updatePasswordHashForSessionAccount(
 }
 
 /** Thrown when attaching an IdP/password principal already owned by another account. */
+/** The session tried to claim an email its account has not proven. */
+export class IdentityNotOwnedError extends Error {
+	constructor(message = "Use an email already on this account") {
+		super(message);
+		this.name = "IdentityNotOwnedError";
+	}
+}
+
 export class IdentityAlreadyLinkedError extends Error {
 	constructor(
 		message = "This identity is already linked to another Inboxies account",
@@ -1440,6 +1448,24 @@ export async function attachPasswordToSessionAccount(
 	const contact =
 		normalizeEmailAddress(opts.contactEmail ?? loginRaw) ?? login;
 
+	// A login email becomes an identity, so it must be one this account
+	// already holds (session or linked email), never an arbitrary address.
+	const ownedEmails = new Set(
+		[
+			...sessionAccount.principals
+				.filter((k) => k.startsWith("email:"))
+				.map((k) => k.slice("email:".length)),
+			...emailsForPrincipal(session),
+		].flatMap((e) => [
+			canonicalMailboxId(e),
+			normalizeEmailAddress(e),
+			e.toLowerCase(),
+		]),
+	);
+	if (!ownedEmails.has(login)) {
+		throw new IdentityNotOwnedError();
+	}
+
 	const existingLogin = await findUserIdByLoginEmail(bucket, login);
 	if (existingLogin) {
 		const existingUserAccount = await findAccountIdByPrincipalKey(
@@ -1467,13 +1493,13 @@ export async function attachPasswordToSessionAccount(
 		createdAt: now,
 		updatedAt: now,
 	};
-	await savePlatformUser(bucket, user);
 
 	const userKey = `user:${userId}`;
 	await assertPrincipalsAttachable(bucket, sessionAccount.id, [
 		userKey,
 		`email:${login}`,
 	]);
+	await savePlatformUser(bucket, user);
 
 	const account: IdentityAccount = {
 		...sessionAccount,

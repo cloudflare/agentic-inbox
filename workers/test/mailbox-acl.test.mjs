@@ -279,9 +279,15 @@ function mockBucket(initial = {}) {
 		mailboxIdFromAgentsUrl("https://app.example/agents/email-agent/ada@inboxies.email::c1"),
 		"ada@inboxies.email",
 	);
+	// Not decoded: the gate rejects escaped names instead of authorizing a
+	// different string than the agent is named after.
 	assert.equal(
 		mailboxIdFromAgentsUrl("https://app.example/agents/email-agent/ada%40inboxies.email"),
-		"ada@inboxies.email",
+		"ada%40inboxies.email",
+	);
+	assert.equal(
+		mailboxIdFromAgentsUrl("https://app.example/agents/mailbox/ada@inboxies.email"),
+		null,
 	);
 	assert.equal(
 		mailboxIdFromAgentsUrl("https://app.example/agents/email-agent/ada@inboxies.email"),

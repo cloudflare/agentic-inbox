@@ -693,6 +693,24 @@ async function runTests() {
 	assert.equal(readyStatus.status, "ready");
 	assert.equal(readyStatus.domain, "my-novel-company.com");
 
+	// checkout-return is public: knowing a provisioned domain must not yield
+	// a session for its owner, on mobile or web.
+	assert.ok(savedMeta.ownerUserId, "fixture domain must have an owner");
+	const hijackMobile = await apiApp.request(
+		"/api/v1/billing/checkout-return?domain=my-novel-company.com&client=ios",
+		{},
+		env,
+	);
+	const hijackMobileLoc = hijackMobile.headers.get("Location") || "";
+	assert.ok(!hijackMobileLoc.includes("token="), "mobile return must not carry a session token");
+	assert.ok(!(await hijackMobile.text()).includes("token="), "bridge page must not carry a session token");
+	const hijackWeb = await apiApp.request(
+		"/api/v1/billing/checkout-return?domain=my-novel-company.com",
+		{ headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" } },
+		env,
+	);
+	assert.equal(hijackWeb.headers.get("Set-Cookie"), null, "web return must not set a session cookie");
+
 	console.log("✔ Stripe webhook fulfillment & HMAC verification tests passed");
 
 	// ---------------------------------------------------------

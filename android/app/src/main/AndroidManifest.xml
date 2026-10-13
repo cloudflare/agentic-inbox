@@ -25,8 +25,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Inboxies"
-        android:usesCleartextTraffic="true">
+        android:theme="@style/Theme.Inboxies">
 
         <activity
             android:name=".MainActivity"

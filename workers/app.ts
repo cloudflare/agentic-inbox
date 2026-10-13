@@ -17,6 +17,7 @@ import {
 	type RequestPrincipal,
 } from "./lib/mailbox-acl";
 import { expandPrincipalWithLinks } from "./lib/identity-links";
+import { canonicalMailboxId } from "./lib/mailbox-routing";
 import { PASSWORD_SESSION_COOKIE } from "./lib/password-auth";
 import { mailboxIdFromAgentsUrl } from "../shared/agent-conversations";
 import type { Env } from "./types";
@@ -205,7 +206,9 @@ app.route("/", apiApp);
 // Agent WebSocket routing - must be before React Router catch-all
 app.all("/agents/*", async (c) => {
 	const mailboxId = mailboxIdFromAgentsUrl(c.req.url);
-	if (!mailboxId) {
+	// The agent's tools act on this raw string, so it must already be the
+	// canonical id that gets authorized: no %-escapes, +tags or <brackets>.
+	if (!mailboxId || mailboxId.includes("%") || canonicalMailboxId(mailboxId) !== mailboxId) {
 		return c.json({ error: "Forbidden" }, 403);
 	}
 	const authz = await authorizeMailbox(c.env.BUCKET, c.get("principal"), mailboxId);

@@ -863,6 +863,12 @@ final class APIClient: @unchecked Sendable {
         )
     }
 
+    func checkoutStatus(domain: String, sessionId: String?) async throws -> CheckoutStatusResponse {
+        var query = ["domain": domain]
+        if let sessionId, !sessionId.isEmpty { query["session_id"] = sessionId }
+        return try await request(path: "/api/v1/billing/checkout-status", query: query, authed: false)
+    }
+
     // MARK: - Email Export Engine
 
     func exportDomain(domain: String) async throws -> ExportJob {

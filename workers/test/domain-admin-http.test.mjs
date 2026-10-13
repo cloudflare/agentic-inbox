@@ -417,6 +417,59 @@ async function jsonRequest(app, env, { method = "GET", path, principal, body } =
 	assert.equal(secondAccept.status, 409);
 }
 
+// ── Accepting your own invite must not grant the invitee's identity ──
+
+{
+	const bucket = mockBucket({
+		[mailboxMetadataKey("eve@inboxies.email")]: {
+			fromName: "Eve",
+			acl: { owners: ["email:eve@example.com"], members: [] },
+		},
+		[mailboxMetadataKey("vault@inboxies.email")]: {
+			fromName: "Victim",
+			acl: { owners: ["email:victim@example.com"], members: [] },
+		},
+	});
+	const env = mockEnv(bucket);
+
+	// Eve owns a mailbox, so she can invite any address and sees the token.
+	const invite = await jsonRequest(apiApp, env, {
+		method: "POST",
+		path: "/api/v1/mailboxes/eve@inboxies.email/invites",
+		principal: eve,
+		body: { inviteEmail: "victim@example.com", role: "member" },
+	});
+	assert.equal(invite.status, 201);
+	const accept = await jsonRequest(apiApp, env, {
+		method: "POST",
+		path: `/api/v1/invites/${invite.json.token}/accept`,
+		body: { password: "attacker-password-1" },
+	});
+	assert.equal(accept.status, 200);
+
+	const claims = await verifyMobileSessionToken(
+		accept.json.token,
+		env.MOBILE_JWT_SECRET,
+	);
+	assert.notEqual(claims.email, "victim@example.com", "session must not claim the invitee email");
+	const asSession = principalFromClaims(claims);
+	const vault = await jsonRequest(apiApp, env, {
+		path: "/api/v1/mailboxes/vault@inboxies.email",
+		principal: asSession,
+	});
+	assert.equal(vault.status, 403, "invite accept must not open the invitee's mailboxes");
+
+	// The invitee email still works as a login for the new member.
+	const login = await jsonRequest(apiApp, env, {
+		method: "POST",
+		path: "/api/v1/auth/password",
+		body: { email: "victim@example.com", password: "attacker-password-1" },
+	});
+	assert.equal(login.status, 200);
+	const loginClaims = await verifyMobileSessionToken(login.json.token, env.MOBILE_JWT_SECRET);
+	assert.notEqual(loginClaims.email, "victim@example.com");
+}
+
 // ── Admin transfer ACL ────────────────────────────────────────────
 
 {

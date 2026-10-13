@@ -325,6 +325,26 @@ fun MailboxOnboardingView(
         }
     }
 
+    // The checkout return link carries no session. Wait for the webhook to
+    // create the account, then sign in with the password chosen at checkout.
+    LaunchedEffect(isPaymentSyncing) {
+        if (!isPaymentSyncing || auth.isAuthenticated) return@LaunchedEffect
+        val domain = customDomain.trim().lowercase()
+        repeat(40) {
+            val ready = try {
+                ApiClient.shared.checkoutStatus(domain).status == "ready"
+            } catch (_: Exception) {
+                false
+            }
+            if (ready) {
+                val username = customUsername.ifBlank { "admin" }.trim().lowercase()
+                auth.signInWithPassword("$username@$domain", customPassword)
+                return@LaunchedEffect
+            }
+            kotlinx.coroutines.delay(1_500)
+        }
+    }
+
     LaunchedEffect(customDomain) {
         val trimmed = customDomain.trim().lowercase().removePrefix(".").removeSuffix(".")
         if (!trimmed.contains(".") || trimmed.endsWith(".")) {

@@ -268,6 +268,19 @@ async function runTests() {
 	assert.equal(downloadRes.headers.get("Content-Type"), "application/mbox; charset=utf-8");
 	assert.ok(downloadRes.headers.get("Content-Disposition").includes(".mbox"));
 
+	// Another signed-in user can neither read nor download someone's export.
+	const outsider = harness(env, { email: "outsider@elsewhere.com", sub: "outsider" });
+	const outsiderStatus = await outsider.request(`/api/v1/exports/${exportData.exportId}`);
+	assert.equal(outsiderStatus.status, 403);
+	const outsiderDownload = await outsider.request(
+		`/api/v1/exports/${exportData.exportId}/download`,
+	);
+	assert.equal(outsiderDownload.status, 403);
+
+	// A different domain sharing the suffix must not satisfy the export check.
+	const lookalike = await hasRecentExportForDomain(bucket, "cme.com");
+	assert.equal(lookalike.hasExport, false, "acme.com exports must not count for cme.com");
+
 	console.log("✔ Export API & Download tests passed");
 
 	// ---------------------------------------------------------

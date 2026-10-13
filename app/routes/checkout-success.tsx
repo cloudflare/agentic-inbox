@@ -31,6 +31,15 @@ export default function CheckoutSuccessRoute() {
 		staleTime: 1000,
 	});
 
+	// checkout-return never signs anyone in, so anonymous buyers sign in with
+	// the password they chose at checkout.
+	const { data: me } = useQuery({
+		queryKey: ["me"],
+		queryFn: () => api.getMe(),
+		retry: false,
+	});
+	const isSignedIn = Boolean(me);
+
 	const isReady = statusData?.status === "ready";
 	const pricing = statusData?.pricing;
 	const domainFee = pricing?.domainFeeUsd ?? 10.44;
@@ -141,9 +150,9 @@ export default function CheckoutSuccessRoute() {
 
 				{/* Action Buttons */}
 				<div className="flex flex-col sm:flex-row gap-3 pt-2">
-					<Link to="/" className="flex-1">
+					<Link to={isSignedIn ? "/" : "/login"} className="flex-1">
 						<Button variant="primary" className="w-full justify-center">
-							Open Mailbox
+							{isSignedIn ? "Open Mailbox" : "Sign in to your mailbox"}
 						</Button>
 					</Link>
 					<Link
