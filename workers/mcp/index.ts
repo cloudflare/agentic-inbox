@@ -165,19 +165,32 @@ export class EmailMCP extends McpAgent<Env> {
 		// ── search_emails ──────────────────────────────────────────
 		this.server.tool(
 			"search_emails",
-			"Search for emails matching a query across subject and body fields.",
+			"Search emails, optionally restricted to unread mail. `query` matches text across subject, body, sender, recipient, cc and bcc; pass an empty query to match all mail and filter by read state instead.",
 			{
 				mailboxId: z.string().describe("The mailbox email address"),
-				query: z.string().describe("Search query to match against subject and body"),
+				query: z
+					.string()
+					.default("")
+					.describe(
+						"Free-text query across subject, body, sender, recipient, cc and bcc. Empty string matches everything.",
+					),
 				folder: z
 					.string()
 					.optional()
-					.describe("Optional folder to restrict search to"),
+					.describe(FOLDER_TOOL_DESCRIPTION),
+				is_read: z
+					.boolean()
+					.optional()
+					.describe("false returns only unread mail, true returns only read mail"),
 			},
-			async ({ mailboxId, query, folder }) => {
+			async ({ mailboxId, query, folder, is_read }) => {
 				const denied = await verifyMailbox(mailboxId);
 				if (denied) return denied;
-				const result = await toolSearchEmails(env, mailboxId, { query, folder });
+				const result = await toolSearchEmails(env, mailboxId, {
+					query,
+					folder,
+					is_read,
+				});
 				return mcpText(result);
 			},
 		);

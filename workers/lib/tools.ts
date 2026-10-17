@@ -36,6 +36,7 @@ type MailboxSearchStub = {
 	searchEmails: (options: {
 		query: string;
 		folder?: string;
+		is_read?: boolean;
 	}) => Promise<unknown>;
 };
 
@@ -95,12 +96,15 @@ export async function toolGetThread(
 export async function toolSearchEmails(
 	env: Env,
 	mailboxId: string,
-	params: { query: string; folder?: string },
+	params: { query: string; folder?: string; is_read?: boolean },
 ) {
 	const stub = getMailboxStub(env, mailboxId);
+	// An empty query matches everything, so callers can use the read filter on
+	// its own (e.g. { is_read: false, folder: "inbox" }) to list unread mail.
 	return (stub as unknown as MailboxSearchStub).searchEmails({
-		query: params.query,
+		query: params.query ?? "",
 		folder: params.folder,
+		is_read: params.is_read,
 	});
 }
 
