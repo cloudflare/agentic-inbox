@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
 	toolListMailboxes,
+	toolCreateMailbox,
 	toolListEmails,
 	toolGetEmail,
 	toolGetThread,
@@ -90,6 +91,26 @@ export class EmailMCP extends McpAgent<Env> {
 			async () => {
 				const result = await toolListMailboxes(env);
 				return mcpText(result);
+			},
+		);
+
+		// ── create_mailbox ─────────────────────────────────────────
+		this.server.tool(
+			"create_mailbox",
+			"Create a new mailbox for an address on one of the configured domains. Mail sent to an address with no mailbox is dropped, so create the mailbox before handing the address out. Returns an error if the mailbox already exists.",
+			{
+				email: z
+					.string()
+					.email()
+					.describe("The full address to create, e.g. support@example.com"),
+				name: z
+					.string()
+					.optional()
+					.describe("Optional display name, used as the default 'from' name"),
+			},
+			async ({ email, name }) => {
+				const result = await toolCreateMailbox(env, { email, name });
+				return mcpResult(result);
 			},
 		);
 

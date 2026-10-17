@@ -104,6 +104,57 @@ export async function toolSearchEmails(
 	});
 }
 
+// ── create_mailbox ─────────────────────────────────────────────────
+
+/**
+ * Create a mailbox from the MCP/agent layer.
+ *
+ * Mirrors `POST /api/v1/mailboxes` so a client can provision an address on
+ * demand instead of requiring someone to click through the UI first. This
+ * matters because the inbound handler drops mail for any address that has no
+ * mailbox marker in R2, so a mailbox must exist before an address can receive
+ * anything.
+ */
+export async function toolCreateMailbox(
+	env: Env,
+	params: { email: string; name?: string; settings?: Record<string, unknown> },
+) {
+	const email = params.email.trim().toLowerCase();
+	if (!email) return { error: "An email address is required" };
+
+	const allowedAddresses = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) =>
+		a.trim().toLowerCase(),
+	);
+	if (allowedAddresses.length > 0 && !allowedAddresses.includes(email)) {
+		return {
+			error: `Mailbox creation is restricted to configured EMAIL_ADDRESSES: ${allowedAddresses.join(", ")}`,
+		};
+	}
+
+	const key = `mailboxes/${email}.json`;
+	if (await env.BUCKET.head(key)) {
+		return { error: `Mailbox "${email}" already exists` };
+	}
+
+	const name = params.name?.trim() || email;
+	const defaultSettings = {
+		fromName: name,
+		forwarding: { enabled: false, email: "" },
+		signature: { enabled: false, text: "" },
+		autoReply: { enabled: false, subject: "", message: "" },
+	};
+	const settings = { ...defaultSettings, ...(params.settings ?? {}) };
+
+	await env.BUCKET.put(key, JSON.stringify(settings));
+
+	// Materialise the Durable Object's default folders so the mailbox is usable
+	// immediately.
+	const stub = getMailboxStub(env, email);
+	await (stub as unknown as { getFolders: () => Promise<unknown> }).getFolders();
+
+	return { id: email, email, name, settings, created: true };
+}
+
 // ── draft_reply ────────────────────────────────────────────────────
 
 /**
