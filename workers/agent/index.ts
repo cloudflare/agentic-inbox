@@ -273,6 +273,24 @@ function createEmailTools(env: Env, mailboxId: string) {
 // SEND_EMAIL binding shape and the AIChatAgent constraint.  The actual env
 // is fully typed inside the tools via the closure.
 export class EmailAgent extends AIChatAgent<any> {
+	/**
+	 * Drop persisted chat history for this mailbox.
+	 *
+	 * Called when the mailbox itself is deleted. Best-effort by design: this
+	 * storage belongs to the Agents SDK, so we only clear it when the runtime
+	 * actually exposes it, and a failure must not block the mailbox deletion.
+	 */
+	async wipeHistory() {
+		const storage = (
+			this as unknown as {
+				ctx?: { storage?: { deleteAll: () => Promise<void> } };
+			}
+		).ctx?.storage;
+		if (!storage) return { wiped: false };
+		await storage.deleteAll();
+		return { wiped: true };
+	}
+
 	async onChatMessage(onFinish: any) {
 		const env = this.env as Env;
 		const mailboxId = this.name;

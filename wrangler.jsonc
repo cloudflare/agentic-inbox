@@ -14,7 +14,11 @@
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
 		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": []
+		"EMAIL_ADDRESSES": [],
+		// Opt-in switch for destructive maintenance tools. While this is not
+		// "true", the delete_mailbox MCP tool is not registered at all.
+		// Leave it off unless you mean it.
+		"YOLO_MODE": "false"
 	},
 	"send_email": [
 		{

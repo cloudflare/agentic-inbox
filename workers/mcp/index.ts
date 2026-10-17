@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
 	toolListMailboxes,
+	toolDeleteMailbox,
 	toolListEmails,
 	toolGetEmail,
 	toolGetThread,
@@ -71,6 +72,15 @@ export class EmailMCP extends McpAgent<Env> {
 		const env = this.env;
 
 		/**
+		 * Destructive maintenance tools are opt-in per deployment. They are not
+		 * registered at all unless YOLO_MODE is enabled, so a default deployment
+		 * cannot delete a mailbox over MCP even by being asked nicely.
+		 */
+		const yoloMode = ["true", "1", "yes"].includes(
+			String(env.YOLO_MODE ?? "").trim().toLowerCase(),
+		);
+
+		/**
 		 * Verify a mailbox exists in R2 before operating on it.
 		 * Returns an MCP error response if the mailbox is not found, or null if valid.
 		 */
@@ -92,6 +102,24 @@ export class EmailMCP extends McpAgent<Env> {
 				return mcpText(result);
 			},
 		);
+
+		// ── delete_mailbox (opt-in, destructive) ───────────────────
+		if (yoloMode) {
+			this.server.tool(
+				"delete_mailbox",
+				"Permanently delete a mailbox and everything in it: all mail, attachments and agent chat history. This cannot be undone. Only available when YOLO_MODE is enabled.",
+				{
+					mailboxId: z.string().describe("The mailbox email address to delete"),
+					confirm: z
+						.literal(true)
+						.describe("Must be true — guards against accidental deletion"),
+				},
+				async ({ mailboxId }) => {
+					const result = await toolDeleteMailbox(env, mailboxId);
+					return mcpResult(result);
+				},
+			);
+		}
 
 		// ── list_emails ────────────────────────────────────────────
 		this.server.tool(
