@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Email, Folder, Mailbox } from "~/types";
+import type { SendEmailParams } from "../../workers/email-sender";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -137,11 +138,12 @@ const api = {
 			bcc?: string;
 			subject?: string;
 			body: string;
+			attachments?: SendEmailParams["attachments"];
 			in_reply_to?: string;
 			thread_id?: string;
 			draft_id?: string;
 		},
-	) => post<{ draft_id: string }>(`/api/v1/mailboxes/${mailboxId}/drafts`, draft),
+	) => post<{ id: string }>(`/api/v1/mailboxes/${mailboxId}/drafts`, draft),
 	replyToEmail: (mailboxId: string, emailId: string, email: unknown) =>
 		post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/reply`, email),
 	forwardEmail: (mailboxId: string, emailId: string, email: unknown) =>

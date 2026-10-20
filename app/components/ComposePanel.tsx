@@ -7,6 +7,7 @@ import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
+import { ComposeAttachmentList } from "./ComposeAttachmentList";
 
 export default function ComposePanel() {
 	const { mailboxId, folder } = useParams<{
@@ -27,6 +28,7 @@ export default function ComposePanel() {
 		setSubject,
 		body,
 		setBody,
+		attachments, addAttachments, removeAttachment, isLoadingAttachments, attachmentLoadFailed,
 		error,
 		isSavingDraft,
 		isSending,
@@ -144,8 +146,10 @@ export default function ComposePanel() {
 						<RichTextEditor
 							value={body}
 							onChange={setBody}
+							attachments={attachments} onAttach={addAttachments} onRemoveAttachment={removeAttachment} disabled={isSending || isSavingDraft || isLoadingAttachments || attachmentLoadFailed}
 						/>
 					</div>
+					<ComposeAttachmentList attachments={attachments} onRemove={removeAttachment} disabled={isSending || isSavingDraft || isLoadingAttachments || attachmentLoadFailed} />
 				</div>
 
 				{/* Footer actions */}
@@ -160,7 +164,7 @@ export default function ComposePanel() {
 								variant="secondary"
 								size="sm"
 								loading={isSavingDraft}
-								disabled={isSending}
+								disabled={isSending || isLoadingAttachments || attachmentLoadFailed}
 								icon={<FloppyDiskIcon size={14} />}
 								onClick={handleSaveDraft}
 							>
@@ -171,7 +175,7 @@ export default function ComposePanel() {
 								variant="primary"
 								size="sm"
 								loading={isSending}
-								disabled={isSavingDraft || isSending}
+								disabled={isSavingDraft || isSending || isLoadingAttachments || attachmentLoadFailed}
 								icon={<PaperPlaneTiltIcon size={14} />}
 							>
 								{isSending ? "Sending..." : "Send"}

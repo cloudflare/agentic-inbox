@@ -59,7 +59,9 @@ export async function sendEmail(
 
 	if (params.attachments && params.attachments.length > 0) {
 		message.attachments = params.attachments.map((att) => ({
-			content: att.content,
+			// Decode the JSON transport representation explicitly so the binding
+			// receives file bytes rather than base64 text as attachment content.
+			content: Uint8Array.from(atob(att.content), (char) => char.charCodeAt(0)),
 			filename: att.filename,
 			type: att.type,
 			disposition: att.disposition,

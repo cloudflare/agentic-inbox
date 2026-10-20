@@ -165,7 +165,11 @@ export const mailboxMigrations: Migration[] = [
 		sql: `
             CREATE INDEX IF NOT EXISTS idx_emails_folder_id ON emails(folder_id);
             CREATE INDEX IF NOT EXISTS idx_emails_date ON emails(date);
-            CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
-        `,
+			CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
+		`,
+	},
+	{
+		name: "9_add_message_id_index",
+		sql: `CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);`,
 	},
 ];

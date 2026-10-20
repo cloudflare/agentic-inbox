@@ -20,6 +20,8 @@ import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import { restoreAttachments } from "./lib/restore-attachments";
+import { OutgoingAttachmentsSchema } from "./lib/outgoing-attachments";
 
 type AppContext = Context<MailboxContext>;
 
@@ -32,6 +34,7 @@ const CreateMailboxBody = z.object({
 });
 
 const DraftBody = z.object({
+	attachments: OutgoingAttachmentsSchema.optional(),
 	to: z.string().optional(),
 	cc: z.string().optional(),
 	bcc: z.string().optional(),
@@ -63,6 +66,62 @@ function boolQuery(c: AppContext, key: string): boolean | undefined {
 	return v === "true" || v === "1";
 }
 
+function parseList(value: string | string[] | undefined): string[] {
+	if (!value) return [];
+	if (Array.isArray(value)) return value.map((item) => item.trim()).filter(Boolean);
+
+	const trimmed = value.trim();
+	if (!trimmed) return [];
+
+	try {
+		const parsed = JSON.parse(trimmed);
+		if (Array.isArray(parsed)) {
+			return parsed.map((item) => String(item).trim()).filter(Boolean);
+		}
+	} catch {
+		// Fall through to comma-separated parsing.
+	}
+
+	return trimmed.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function hasValidApiKey(c: { req: { header(name: string): string | undefined }; env: Env }): boolean {
+	const apiKey = c.req.header("X-API-Key");
+	return Boolean(apiKey && apiKey === c.env.STALWART_ACCOUNT_PASSWORD);
+}
+
+async function getImportMessageId(rawEmail: ArrayBuffer, messageId?: string): Promise<string> {
+	if (messageId) {
+		const match = messageId.match(/<([^>]+)>/);
+		return match ? match[1] : messageId.trim().split(/\s+/)[0];
+	}
+
+	const digest = await crypto.subtle.digest("SHA-256", rawEmail);
+	return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+const CHATWOOT_INBOX_MAP: Record<string, string> = {
+	"support@team.easyrentbali.com": "support",
+	"reservation@team.easyrentbali.com": "reservation",
+	"billing@team.easyrentbali.com": "billing",
+	"partners@team.easyrentbali.com": "partners",
+	"test-rsvbook@team.easyrentbali.com": "reservation",
+	"accounting@easyrentbali.com": "accounting",
+	"cs@easyrentbali.com": "cs",
+	"director@easyrentbali.com": "director",
+	"fin.acct@easyrentbali.com": "fin-acct",
+	"finance@easyrentbali.com": "finance",
+	"gm@easyrentbali.com": "gm",
+	"info@easyrentbali.com": "info",
+	"jagoan@easyrentbali.com": "jagoan",
+	"job_career@easyrentbali.com": "job-career",
+	"manager@easyrentbali.com": "manager",
+	"marketing@easyrentbali.com": "marketing",
+	"reservation@easyrentbali.com": "reservation-erb",
+	"support@easyrentbali.com": "support-erb",
+	"tester@easyrentbali.com": "tester",
+};
+
 // -- App & middleware -----------------------------------------------
 
 const app = new Hono<MailboxContext>();
@@ -83,13 +142,282 @@ app.use("/api/*", cors({
 }));
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
+// -- Setup: Auto-create mailboxes from EMAIL_ADDRESSES --------------------
+
+app.post("/api/v1/setup", async (c) => {
+	if (!hasValidApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+
+	const allowedAddresses = parseList(c.env.EMAIL_ADDRESSES);
+	if (allowedAddresses.length === 0) {
+		return c.json({ error: "No EMAIL_ADDRESSES configured" }, 400);
+	}
+
+	const results: { email: string; status: string; error?: string }[] = [];
+
+	for (const email of allowedAddresses) {
+		const emailLower = email.toLowerCase();
+		const key = `mailboxes/${emailLower}.json`;
+
+		try {
+			// Check if mailbox already exists
+			if (await c.env.BUCKET.head(key)) {
+				results.push({ email: emailLower, status: "exists" });
+				continue;
+			}
+
+			// Extract name from email (e.g., "accounting" from "accounting@easyrentbali.com")
+			const name = emailLower.split("@")[0]
+				.replace(/[._-]/g, " ")
+				.replace(/\b\w/g, (l) => l.toUpperCase());
+
+			// Create mailbox settings
+			const settings = {
+				fromName: name,
+				forwarding: { enabled: false, email: "" },
+				signature: { enabled: false, text: "" },
+				autoReply: { enabled: false, subject: "", message: "" },
+			};
+
+			// Save mailbox config
+			await c.env.BUCKET.put(key, JSON.stringify(settings));
+
+			// Initialize the Durable Object
+			const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(emailLower));
+			await stub.getFolders();
+
+			results.push({ email: emailLower, status: "created" });
+		} catch (e: any) {
+			results.push({ email: emailLower, status: "error", error: e.message });
+		}
+	}
+
+	return c.json({
+		success: true,
+		total: allowedAddresses.length,
+		created: results.filter((r) => r.status === "created").length,
+		existing: results.filter((r) => r.status === "exists").length,
+		errors: results.filter((r) => r.status === "error").length,
+		results,
+	});
+});
+
 // -- Config ---------------------------------------------------------
 
 app.get("/api/v1/config", (c) => {
-	const domainsRaw = c.env.DOMAINS || "";
-	const domains = domainsRaw.split(",").map((d) => d.trim()).filter(Boolean);
-	const emailAddresses = c.env.EMAIL_ADDRESSES ?? [];
+	const domains = parseList(c.env.DOMAINS);
+	const emailAddresses = parseList(c.env.EMAIL_ADDRESSES);
 	return c.json({ domains, emailAddresses });
+});
+
+// -- Import: Bulk .eml import via raw MIME POST ----------------------------
+
+app.post("/api/v1/import", async (c) => {
+	if (!hasValidApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+
+	const contentType = c.req.header("content-type") || "";
+	if (!contentType.includes("message/rfc822") && !contentType.includes("application/octet-stream")) {
+		return c.json({ error: "Content-Type must be message/rfc822 or application/octet-stream" }, 400);
+	}
+
+	const rawEmail = await c.req.arrayBuffer();
+	if (rawEmail.byteLength === 0) return c.json({ error: "Empty body" }, 400);
+	if (rawEmail.byteLength > MAX_EMAIL_SIZE) return c.json({ error: `Email too large: ${rawEmail.byteLength} bytes` }, 413);
+
+	const parsedEmail = await new PostalMime().parse(rawEmail);
+
+	const extractMsgId = (s: string) => { const m = s.match(/<([^>]+)>/); return m ? m[1] : s.trim().split(/\s+/)[0]; };
+	const originalMessageId = await getImportMessageId(rawEmail, parsedEmail.messageId);
+
+	// Resolve mailbox — prefer explicit override, then To address.
+	const allowedAddresses = parseList(c.env.EMAIL_ADDRESSES).map((a) => a.toLowerCase());
+	const allRecipients = parsedEmail.to?.map((t) => t.address?.toLowerCase()).filter(Boolean) as string[] || [];
+	const requestedMailbox = c.req.header("X-Mailbox-Id")?.trim().toLowerCase();
+	let mailboxId = requestedMailbox;
+	if (mailboxId && !allowedAddresses.includes(mailboxId)) {
+		return c.json({ error: "X-Mailbox-Id is not configured", mailbox: mailboxId }, 422);
+	}
+	if (allowedAddresses.length > 0) {
+		mailboxId ??= allRecipients.find((addr) => allowedAddresses.includes(addr));
+		if (!mailboxId) {
+			return c.json({ error: "No recipient matches EMAIL_ADDRESSES", recipients: allRecipients }, 422);
+		}
+	} else {
+		mailboxId = allRecipients[0];
+	}
+	if (!mailboxId) return c.json({ error: "No valid recipient address" }, 400);
+
+	// Ensure mailbox exists
+	if (!(await c.env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
+		return c.json({ error: `Mailbox ${mailboxId} does not exist` }, 404);
+	}
+
+	const messageId = crypto.randomUUID();
+	const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+	const existingEmail = await stub.findEmailByMessageId(originalMessageId);
+	if (existingEmail) {
+		return c.json({
+			success: true,
+			duplicate: true,
+			message_id: existingEmail.id,
+			original_message_id: originalMessageId,
+			mailbox: mailboxId,
+		});
+	}
+
+	// Store attachments
+	const attachmentData: StoredAttachment[] = [];
+	if (parsedEmail.attachments) {
+		for (const att of parsedEmail.attachments) {
+			const attId = crypto.randomUUID();
+			const filename = (att.filename || "untitled").replace(/[\/\\:*?"<>|\x00-\x1f]/g, "_");
+			await c.env.BUCKET.put(`attachments/${messageId}/${attId}/${filename}`, att.content);
+			attachmentData.push({
+				id: attId, email_id: messageId, filename, mimetype: att.mimeType,
+				size: typeof att.content === "string" ? att.content.length : att.content.byteLength,
+				content_id: att.contentId || null, disposition: att.disposition || "attachment",
+			});
+		}
+	}
+
+	// Thread detection
+	const inReplyTo = parsedEmail.inReplyTo ? extractMsgId(parsedEmail.inReplyTo) : null;
+	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId) : [];
+	let threadId = emailReferences[0] || inReplyTo || messageId;
+
+	if (!inReplyTo && emailReferences.length === 0) {
+		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
+		if (subjectThread) threadId = subjectThread;
+	}
+
+	// Use the email's own Date header for imported emails (not receive time)
+	const emailDate = parsedEmail.date ? new Date(parsedEmail.date).toISOString() : new Date().toISOString();
+
+	// Create email in inbox
+	await stub.createEmail(Folders.INBOX, {
+		id: messageId, subject: parsedEmail.subject || "",
+		sender: (parsedEmail.from?.address || "").toLowerCase(),
+		recipient: allRecipients.join(", ") || mailboxId,
+		cc: (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean).join(", ") || null,
+		bcc: (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean).join(", ") || null,
+		date: emailDate,
+		body: parsedEmail.html || parsedEmail.text || "",
+		in_reply_to: inReplyTo,
+		email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
+		thread_id: threadId, message_id: originalMessageId,
+		raw_headers: JSON.stringify(parsedEmail.headers),
+	}, attachmentData);
+
+	// === FAN-OUT: Same as receiveEmail ===
+
+	const primaryTo = parsedEmail.to?.[0]?.address?.toLowerCase() || mailboxId || "";
+	const chatwootInbox = CHATWOOT_INBOX_MAP[primaryTo];
+
+	const skipChatwoot = c.req.header("X-Skip-Chatwoot") != null;
+	let chatwootConversationId: number | undefined;
+	if (!skipChatwoot && chatwootInbox && c.env.CHATWOOT_RELAY_URL) {
+		try {
+			const relayBody = allRecipients.includes(mailboxId)
+				? rawEmail
+				: new Blob([`Delivered-To: ${mailboxId}\r\nX-Original-To: ${mailboxId}\r\n`, rawEmail]);
+			const relayResponse = await fetch(c.env.CHATWOOT_RELAY_URL, {
+				method: "POST",
+				headers: {
+					"Content-Type": "message/rfc822",
+					Authorization: `Basic ${btoa(`actionmailbox:${c.env.CHATWOOT_INGRESS_PASSWORD}`)}`,
+				},
+				body: relayBody,
+			});
+			if (relayResponse.ok) {
+				const relayData = await relayResponse.json() as any;
+				chatwootConversationId = relayData?.id;
+			} else {
+				console.error("Chatwoot relay failed:", relayResponse.status);
+			}
+		} catch (e) {
+			console.error("Chatwoot relay error:", e);
+		}
+	}
+
+	// 2. R2 cold storage
+	try {
+		const r2Key = `archive/${mailboxId}/${new Date().toISOString().slice(0, 10)}/${messageId}.eml`;
+		await c.env.BUCKET.put(r2Key, rawEmail);
+	} catch (e) {
+		console.error("R2 archive error:", e);
+	}
+
+	return c.json({
+		success: true,
+		message_id: messageId,
+		original_message_id: originalMessageId,
+		mailbox: mailboxId,
+		subject: parsedEmail.subject || "",
+		from: parsedEmail.from?.address || "",
+		date: emailDate,
+		chatwoot_conversation_id: chatwootConversationId || null,
+		stalwart_email_id: null,
+		is_ota: false,
+	}, 201);
+});
+
+// Archive raw MIME to R2 cold storage. Used by the bulk importer for oversized
+// emails that exceed MAX_EMAIL_SIZE on /import.
+app.post("/api/v1/archive", async (c) => {
+	if (!hasValidApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+	const mailboxId = c.req.header("X-Mailbox-Id")?.trim().toLowerCase();
+	if (!mailboxId) return c.json({ error: "X-Mailbox-Id required" }, 400);
+	const raw = await c.req.arrayBuffer();
+	if (raw.byteLength === 0) return c.json({ error: "Empty body" }, 400);
+	const messageId = crypto.randomUUID();
+	const r2Key = `archive/${mailboxId}/${new Date().toISOString().slice(0, 10)}/${messageId}.eml`;
+	await c.env.BUCKET.put(r2Key, raw);
+	return c.json({ success: true, r2_key: r2Key }, 201);
+});
+
+// Metadata-only inbox insert (no raw body). Used by the bulk importer for
+// oversized emails: the full MIME goes to R2 via /archive, headers+body here.
+app.post("/api/v1/import-reference", async (c) => {
+	if (!hasValidApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+	const ref = await c.req.json() as Record<string, any>;
+	const allowedAddresses = parseList(c.env.EMAIL_ADDRESSES).map((a) => a.toLowerCase());
+	const mailboxId = (c.req.header("X-Mailbox-Id")?.trim().toLowerCase()) || (ref.mailbox || "").toLowerCase();
+	if (!mailboxId) return c.json({ error: "No mailbox" }, 400);
+	if (allowedAddresses.length > 0 && !allowedAddresses.includes(mailboxId)) {
+		return c.json({ error: "Mailbox not configured", mailbox: mailboxId }, 422);
+	}
+	if (!(await c.env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
+		return c.json({ error: `Mailbox ${mailboxId} does not exist` }, 404);
+	}
+
+	const originalMessageId = ref.message_id || ref.sha256;
+	const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+	const existingEmail = await stub.findEmailByMessageId(originalMessageId);
+	if (existingEmail) {
+		return c.json({ success: true, duplicate: true, message_id: existingEmail.id, mailbox: mailboxId });
+	}
+
+	const messageId = crypto.randomUUID();
+	const refList = ref.references ? String(ref.references).split(/\s+/).filter(Boolean) : [];
+	const threadId = refList[0] || ref.in_reply_to || messageId;
+	const emailDate = ref.date ? new Date(ref.date).toISOString() : new Date().toISOString();
+
+	await stub.createEmail(Folders.INBOX, {
+		id: messageId,
+		subject: ref.subject || "",
+		sender: (ref.sender || "").toLowerCase(),
+		recipient: ref.recipient || mailboxId,
+		cc: ref.cc || null,
+		bcc: ref.bcc || null,
+		date: emailDate,
+		body: ref.body || "",
+		in_reply_to: ref.in_reply_to || null,
+		email_references: refList.length > 0 ? JSON.stringify(refList) : null,
+		thread_id: threadId,
+		message_id: originalMessageId,
+		raw_headers: ref.raw_headers ? JSON.stringify(ref.raw_headers) : null,
+	}, []);
+
+	return c.json({ success: true, message_id: messageId, original_message_id: originalMessageId, mailbox: mailboxId }, 201);
 });
 
 // -- Mailboxes ------------------------------------------------------
@@ -102,7 +430,7 @@ app.get("/api/v1/mailboxes", async (c) => {
 app.post("/api/v1/mailboxes", async (c) => {
 	const { name, settings, email: rawEmail } = CreateMailboxBody.parse(await c.req.json());
 	const email = rawEmail.toLowerCase();
-	const allowedAddresses = (c.env.EMAIL_ADDRESSES ?? []) as string[];
+	const allowedAddresses = parseList(c.env.EMAIL_ADDRESSES);
 	if (allowedAddresses.length > 0 && !allowedAddresses.map((a) => a.toLowerCase()).includes(email)) {
 		return c.json({ error: "Mailbox creation is restricted to configured EMAIL_ADDRESSES" }, 403);
 	}
@@ -213,17 +541,24 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 
 app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
 	const mailboxId = c.req.param("mailboxId")!;
-	const { to, cc, bcc, subject, body, in_reply_to, thread_id, draft_id } = DraftBody.parse(await c.req.json());
+	const { to, cc, bcc, subject, body, in_reply_to, thread_id, draft_id, attachments } = DraftBody.parse(await c.req.json());
 	const stub = c.var.mailboxStub;
-	if (draft_id) await stub.deleteEmail(draft_id); // not atomic — create-then-delete would be safer
+	if (draft_id) {
+		const existing = await stub.getEmail(draft_id);
+		const folders = await stub.getFolders();
+		const draftFolder = folders.find((folder) => folder.name === Folders.DRAFT);
+		if (!existing || existing.folder_id !== draftFolder?.id) return c.json({ error: "Draft not found" }, 404);
+	}
 	const messageId = crypto.randomUUID();
 	const now = new Date().toISOString();
+	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 	await stub.createEmail(Folders.DRAFT, {
 		id: messageId, subject: subject || "", sender: mailboxId.toLowerCase(),
 		recipient: (to || "").toLowerCase(), cc: cc?.toLowerCase() || null, bcc: bcc?.toLowerCase() || null,
 		date: now, body, in_reply_to: in_reply_to || null, email_references: null,
 		thread_id: thread_id || in_reply_to || messageId,
-	}, []);
+	}, attachmentData);
+	if (draft_id) await stub.deleteEmail(draft_id);
 	return c.json({ id: messageId, status: "draft", subject: subject || "", recipient: to || "", date: now }, 201);
 });
 
@@ -311,11 +646,24 @@ app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
 
 // -- Attachments ----------------------------------------------------
 
+app.post("/api/v1/mailboxes/:mailboxId/emails/:emailId/restore-attachments", async (c: AppContext) => {
+	if (!hasValidApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+	const input = z.object({ sourceMailbox: z.string().email(), sourceId: z.string().uuid() }).safeParse(await c.req.json());
+	if (!input.success) return c.json({ error: "Invalid source identity" }, 400);
+	const { sourceMailbox, sourceId } = input.data;
+	if (!(await c.env.BUCKET.head(`mailboxes/${sourceMailbox}.json`))) return c.json({ error: "Source mailbox not found" }, 404);
+	try {
+		return c.json(await restoreAttachments(c.env, decodeURIComponent(c.req.param("mailboxId")!), c.req.param("emailId")!, sourceMailbox, sourceId));
+	} catch {
+		return c.json({ error: "Attachments could not be restored from matching source" }, 409);
+	}
+});
+
 app.get("/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId", async (c: AppContext) => {
 	const emailId = c.req.param("emailId")!;
 	const attachmentId = c.req.param("attachmentId")!;
 	const attachment = await c.var.mailboxStub.getAttachment(attachmentId);
-	if (!attachment) return c.json({ error: "Attachment not found" }, 404);
+	if (!attachment || attachment.email_id !== emailId) return c.json({ error: "Attachment not found" }, 404);
 	const obj = await c.env.BUCKET.get(`attachments/${emailId}/${attachmentId}/${attachment.filename}`);
 	if (!obj) return c.json({ error: "Attachment file not found" }, 404);
 	const headers = new Headers();
@@ -345,28 +693,29 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	return result;
 }
 
-async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env: Env, ctx: ExecutionContext) {
+async function receiveEmail(event: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
 	const rawEmail = await streamToArrayBuffer(event.raw, event.rawSize);
 	const parsedEmail = await new PostalMime().parse(rawEmail);
 
-	if (!parsedEmail.to?.length || !parsedEmail.to[0].address) throw new Error("received email with empty to");
-
-	const allowedAddresses = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
-	const allRecipients = parsedEmail.to.map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
+	const allowedAddresses = parseList(env.EMAIL_ADDRESSES).map((a) => a.toLowerCase());
+	const allRecipients = (parsedEmail.to || []).map((t) => t.address?.toLowerCase()).filter(Boolean) as string[];
 	const ccRecipients = (parsedEmail.cc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
 	const bccRecipients = (parsedEmail.bcc || []).map((e) => e.address?.toLowerCase()).filter(Boolean) as string[];
 
-	let mailboxId: string | undefined;
-	if (allowedAddresses.length > 0) {
-		mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
-		if (!mailboxId) { console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`); return; }
-	} else { mailboxId = allRecipients[0]; }
-	if (!mailboxId) throw new Error("received email with no valid recipient address");
+	// Cloudflare invokes this handler for each envelope recipient, including CC/BCC.
+	const mailboxId = event.to?.trim().toLowerCase();
+	if (!mailboxId || (allowedAddresses.length > 0 && !allowedAddresses.includes(mailboxId))) {
+		throw new Error("Incoming envelope recipient is not configured");
+	}
 
 	const messageId = crypto.randomUUID();
-	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) { console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`); return; }
+	if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
+		throw new Error(`Incoming mailbox does not exist: ${mailboxId}`);
+	}
 
 	const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
+	const originalMessageId = await getImportMessageId(rawEmail.buffer, parsedEmail.messageId);
+	if (await stub.findEmailByMessageId(originalMessageId)) return;
 
 	const attachmentData: StoredAttachment[] = [];
 	if (parsedEmail.attachments) {
@@ -390,9 +739,7 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		if (subjectThread) threadId = subjectThread;
 	}
 
-	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
-
-	await stub.createEmail(Folders.INBOX, {
+	const stored = await stub.createInboundEmail({
 		id: messageId, subject: parsedEmail.subject || "",
 		sender: (parsedEmail.from?.address || "").toLowerCase(), recipient: allRecipients.join(", "),
 		cc: ccRecipients.join(", ") || null, bcc: bccRecipients.join(", ") || null,
@@ -401,12 +748,167 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		in_reply_to: inReplyTo, email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
 		thread_id: threadId, message_id: originalMessageId, raw_headers: JSON.stringify(parsedEmail.headers),
 	}, attachmentData);
+	if (!stored.created) return;
 
-	const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
-	ctx.waitUntil(agentStub.fetch(new Request("https://agents/onNewEmail", {
-		method: "POST", headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ mailboxId, emailId: messageId, sender: (parsedEmail.from?.address || "").toLowerCase(), subject: parsedEmail.subject || "", threadId }),
-	})).catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)));
+	// Preserve the original MIME, attachments, and sender authentication on the Gmail copy.
+	const gmailDestination = ({
+		"reservation@easyrentbali.com": "reservation.easyrentbali@gmail.com",
+		"marketing@easyrentbali.com": "marketing.easyrentbali@gmail.com",
+	} as Record<string, string>)[mailboxId];
+	if (gmailDestination) {
+		try {
+			await event.forward(gmailDestination);
+		} catch (error) {
+			console.error("Gmail fan-out failed:", mailboxId, (error as Error).message);
+		}
+	}
+
+	// === EASYRENT CUSTOM ROUTING ===
+
+	const primaryTo = mailboxId;
+	const chatwootInbox = CHATWOOT_INBOX_MAP[primaryTo];
+
+	if (chatwootInbox && env.CHATWOOT_RELAY_URL) {
+		try {
+			const relayResponse = await fetch(env.CHATWOOT_RELAY_URL, {
+				method: "POST",
+				headers: {
+					"Content-Type": "message/rfc822",
+					Authorization: `Basic ${btoa(`actionmailbox:${env.CHATWOOT_INGRESS_PASSWORD}`)}`,
+				},
+				body: rawEmail,
+			});
+			if (!relayResponse.ok) {
+				console.error("Chatwoot relay failed:", relayResponse.status, await relayResponse.text());
+			}
+		} catch (relayError) {
+			console.error("Chatwoot relay error:", relayError);
+		}
+	}
+
+	// 2. Import raw MIME to Stalwart via JMAP (backup mailbox)
+	if (env.STALWART_JMAP_URL && env.STALWART_ACCOUNT_EMAIL && env.STALWART_ACCOUNT_PASSWORD) {
+		try {
+			const authHeader = `Basic ${btoa(`${env.STALWART_ACCOUNT_EMAIL}:${env.STALWART_ACCOUNT_PASSWORD}`)}`;
+
+			// Step 1: Get JMAP session via /jmap/session endpoint
+			const sessionRes = await fetch(`${env.STALWART_JMAP_URL}/session`, {
+				method: "GET",
+				headers: { "Authorization": authHeader },
+			});
+
+			if (!sessionRes.ok) {
+				console.error("Stalwart JMAP session failed:", sessionRes.status);
+			} else {
+				const sessionData = await sessionRes.json() as any;
+				// Always use the Zeabur URL since mx.easyrentbali.com has no SSL
+				const apiUrl = env.STALWART_JMAP_URL;
+				const accountId = sessionData?.primaryAccounts?.["urn:ietf:params:jmap:mail"];
+
+				if (!accountId) {
+					console.error("Stalwart JMAP: no accountId in session");
+				} else {
+				// Step 2: Upload raw email as blob
+					const blobName = `email-${Date.now()}.eml`;
+					const uploadUrl = apiUrl.replace(/\/jmap\/?$/, `/jmap/upload/${accountId}/`);
+					const rawEmailStr = new TextDecoder().decode(rawEmail);
+					const uploadRes = await fetch(uploadUrl, {
+						method: "POST",
+						headers: {
+							"Content-Type": "message/rfc822",
+							"Authorization": authHeader,
+						},
+						body: rawEmailStr,
+					});
+
+					if (!uploadRes.ok) {
+						console.error("Stalwart blob upload failed:", uploadRes.status);
+					} else {
+						const uploadData = await uploadRes.json() as any;
+						const blobId = uploadData.blobId;
+
+						// Step 3: Import email via JMAP
+						const importRes = await fetch(apiUrl, {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								"Authorization": authHeader,
+							},
+							body: JSON.stringify({
+								using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+								methodCalls: [
+									["Email/import", {
+										accountId,
+										emails: {
+											"e0": {
+												blobId,
+												mailboxIds: { "a": true },
+											},
+										},
+									}, "c1"],
+								],
+							}),
+						});
+
+						if (!importRes.ok) {
+							console.error("Stalwart JMAP import failed:", importRes.status);
+						} else {
+							const importData = await importRes.json() as any;
+							const created = importData?.methodResponses?.[0]?.[1]?.created;
+							const notCreated = importData?.methodResponses?.[0]?.[1]?.notCreated;
+							if (created && Object.keys(created).length > 0) {
+								console.log("Stalwart JMAP import OK:", Object.keys(created).length, "email(s)");
+							} else {
+								console.error("Stalwart JMAP import result:", JSON.stringify(importData?.methodResponses?.[0]?.[1]));
+							}
+						}
+					}
+				}
+			}
+		} catch (stalwartError) {
+			console.error("Stalwart JMAP error:", stalwartError);
+		}
+	}
+
+	// 3. POST to reservation-agent for queue updates (OTA emails only).
+	// Gate on the OTA sender ALLOWLIST (exact from-address) — far fewer false
+	// positives/negatives than keyword matching. Kept in sync with
+	// apps/erp/src/lib/ota-sources.ts + reservation-agent/src/inbox-sweep.ts.
+	const fromAddr = (parsedEmail.from?.address || "").toLowerCase();
+	const OTA_SENDERS = [
+		"reservationsdept@cartrawler.com",
+		"noreply@cartrawler.com",
+		"xczc_tzzy@trip.com",
+		"support@qbookingsolutions.com",
+		"admin@email.yesaway.com",
+		"booking@zuzuche.com",
+		"confirmations@bookinggroup.com",
+		"reservations@economycarrentals.com",
+		"joanna@economycarrentals.com",
+		"mail@localrent.com",
+		"support@driveo.asia",
+	];
+	const isOTA = OTA_SENDERS.some((addr) => fromAddr.includes(addr));
+
+	if (isOTA && env.RESERVATION_AGENT_URL) {
+		try {
+			await fetch(env.RESERVATION_AGENT_URL, {
+				method: "POST",
+				headers: {
+					"Content-Type": "message/rfc822",
+					"X-Email-Id": messageId,
+					"X-From": fromAddr,
+					"X-Subject": parsedEmail.subject || "",
+				},
+				body: rawEmail,
+			});
+		} catch (agentError) {
+			console.error("Reservation agent relay error:", agentError);
+		}
+	}
+
+	// Automatic agent drafts are intentionally disabled. Agents can still be opened
+	// manually from the mailbox header when a reply suggestion is wanted.
 }
 
 export { app, receiveEmail };

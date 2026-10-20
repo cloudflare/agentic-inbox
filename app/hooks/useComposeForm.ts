@@ -17,6 +17,8 @@ import {
 import { useDeleteEmail, useForwardEmail, useReplyToEmail, useSaveDraft, useSendEmail } from "~/queries/emails";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import api from "~/services/api";
+import { type ComposeAttachment, encodeAttachment, validateAttachmentSize, prepareComposeBody, previewComposeBody, attachmentPreview } from "~/lib/compose-attachments";
 
 function appendUniqueAddress(
 	addresses: string[],
@@ -178,6 +180,11 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	const [showCcBcc, setShowCcBcc] = useState(false);
 	const [subject, setSubject] = useState("");
 	const [body, setBody] = useState("");
+	const [attachments, setAttachments] = useState<ComposeAttachment[]>([]);
+	const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+	const [attachmentLoadFailed, setAttachmentLoadFailed] = useState(false);
+	const attachmentBusy = useRef(false);
+	const [savedDraftId, setSavedDraftId] = useState<string | undefined>();
 	const [error, setError] = useState<string | null>(null);
 	const [isSavingDraft, setIsSavingDraft] = useState(false);
 	const [isSending, setIsSending] = useState(false);
@@ -207,21 +214,61 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		setShowCcBcc(initialFields.showCcBcc);
 		setSubject(initialFields.subject);
 		setBody(initialFields.body);
+		setAttachments([]);
+		setAttachmentLoadFailed(false);
+		setSavedDraftId(composeOptions.draftEmail?.id);
 	}, [composeOptions, currentMailbox?.email, sigBlock]);
 
-	const handleSaveDraft = async () => {
-		if (!mailboxId || isSending) return; setIsSavingDraft(true); setError(null);
+	useEffect(() => {
+		const draft = composeOptions.draftEmail;
+		if (!draft || !mailboxId) { setIsLoadingAttachments(false); return; }
+		let cancelled = false;
+		setIsLoadingAttachments(true);
+		api.getEmail(mailboxId, draft.id).then(async (email) => {
+			const loaded = await Promise.all((email.attachments || []).map(async (item) => {
+				const blob = await api.getAttachment(mailboxId, draft.id, item.id);
+				const encoded = await encodeAttachment(new File([blob], item.filename, { type: item.mimetype }));
+				return { ...encoded, disposition: item.disposition === "inline" ? "inline" as const : "attachment" as const, contentId: item.content_id || undefined };
+			}));
+			if (!cancelled) { setAttachments(loaded); setBody(previewComposeBody(email.body || "", loaded)); }
+		}).catch(() => { if (!cancelled) { setAttachmentLoadFailed(true); setError("Could not load draft attachments. Reopen the draft before saving or sending."); } })
+			.finally(() => { if (!cancelled) setIsLoadingAttachments(false); });
+		return () => { cancelled = true; };
+	}, [composeOptions, mailboxId]);
+
+	const addAttachments = async (files: File[], inline = false) => {
+		if (attachmentBusy.current || isSending || isSavingDraft || isLoadingAttachments) return [];
+		attachmentBusy.current = true; setIsLoadingAttachments(true); setError(null);
 		try {
-			await saveDraftMutation.mutateAsync({ mailboxId, draft: {
+			validateAttachmentSize(attachments, files.map((file) => file.size));
+			const added = await Promise.all(files.map((file) => encodeAttachment(file, inline)));
+			if (lastInitializedOptionsRef.current !== composeOptions) return [];
+			setAttachments((current) => [...current, ...added]);
+			return added;
+		} catch (err) { setError(err instanceof Error ? err.message : "Could not attach files."); return []; }
+		finally { attachmentBusy.current = false; setIsLoadingAttachments(false); }
+	};
+	const removeAttachment = (index: number) => {
+		const item = attachments[index];
+		if (item?.contentId) setBody((html) => html.replace(/<img\b[^>]*>/gi, (tag) => tag.includes(`src="${attachmentPreview(item)}"`) || tag.includes(`src="cid:${item.contentId}"`) ? "" : tag));
+		setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index));
+	};
+
+	const handleSaveDraft = async () => {
+		if (!mailboxId || isSending || isLoadingAttachments || attachmentLoadFailed) return; setIsSavingDraft(true); setError(null);
+		try {
+			const saved = await saveDraftMutation.mutateAsync({ mailboxId, draft: {
 				to,
 				cc: cc || undefined,
 				bcc: bcc || undefined,
 				subject,
-				body,
+				body: prepareComposeBody(body, attachments),
+				attachments,
 				in_reply_to: composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to || undefined,
 				thread_id: composeOptions.originalEmail?.thread_id || composeOptions.draftEmail?.thread_id || undefined,
-				draft_id: composeOptions.draftEmail?.id || undefined,
+				draft_id: savedDraftId,
 			} });
+			setSavedDraftId(saved.id);
 			toastManager.add({ title: "Draft saved!" });
 		}
 		catch (err: unknown) {
@@ -233,7 +280,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 	};
 
 	const handleSend = async (e: FormEvent, onClose: () => void) => {
-		e.preventDefault(); if (isSending) return; setError(null);
+		e.preventDefault(); if (isSending || isLoadingAttachments || attachmentLoadFailed) return; setError(null);
 		if (!currentMailbox || !mailboxId) { setError("No mailbox selected."); return; }
 		const toRecipients = splitEmailList(to);
 		if (toRecipients.length === 0) { setError("Add at least one recipient."); return; }
@@ -246,10 +293,11 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			bcc: toEmailListValue(bccRecipients),
 			from,
 			subject,
-			html: body,
+			html: prepareComposeBody(body, attachments),
+			attachments,
 			text: htmlToPlainText(body),
 		};
-		const draftId = composeOptions.draftEmail?.id; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
+		const draftId = savedDraftId; const mode = composeOptions.mode; const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
 		setIsSending(true); toastManager.add({ title: "Sending email..." });
 		try {
 			if ((mode === "reply" || mode === "reply-all") && originalId) await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
@@ -262,5 +310,5 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 		finally { setIsSending(false); }
 	};
 
-	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel };
+	return { to, setTo, cc, setCc, bcc, setBcc, showCcBcc, setShowCcBcc, subject, setSubject, body, setBody, attachments, addAttachments, removeAttachment, isLoadingAttachments, attachmentLoadFailed, error, setError, isSavingDraft, isSending, formTitle, handleSaveDraft, handleSend, closeCompose, closePanel };
 }

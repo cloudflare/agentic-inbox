@@ -4,6 +4,7 @@
 
 import DOMPurify from "dompurify";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isInlineAttachmentUrl, rasterImageType } from "~/lib/inline-images";
 
 interface EmailIframeProps {
 	body: string;
@@ -59,12 +60,36 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 		const iframe = iframeRef.current;
 		if (!iframe || !body) return;
 
+		const controller = new AbortController();
+		const render = async () => {
 		const cleanBody = DOMPurify.sanitize(body, {
 			USE_PROFILES: { html: true },
 			FORBID_TAGS: ["style"],
 			ADD_ATTR: ["target"],
 			FORCE_BODY: true,
 		});
+		// Fetch embedded images in the authenticated parent. The opaque-origin
+		// sandbox cannot make authenticated attachment requests itself.
+		const doc = new DOMParser().parseFromString(cleanBody, "text/html");
+		const images = Array.from(doc.querySelectorAll("img"));
+		const urls = [...new Set(images.map(img => img.getAttribute("src") || "").filter(isInlineAttachmentUrl))];
+		await Promise.all(urls.map(async url => {
+			try {
+				const response = await fetch(url, { credentials: "same-origin", signal: controller.signal });
+				if (!response.ok) return;
+				const bytes = new Uint8Array(await response.arrayBuffer());
+				const type = rasterImageType(bytes);
+				if (!type) return;
+				const dataUrl = await new Promise<string>((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => resolve(String(reader.result));
+					reader.onerror = reject;
+					reader.readAsDataURL(new Blob([bytes], { type }));
+				});
+				for (const img of images) if (img.getAttribute("src") === url) img.setAttribute("src", dataUrl);
+			} catch { /* A missing image must not prevent the rest of the email rendering. */ }
+		}));
+		if (controller.signal.aborted) return;
 
 		const padding = autoSize ? "0" : "24px";
 
@@ -135,8 +160,11 @@ h1, h2, h3 { margin: 8px 0 4px; }
 ul, ol { padding-left: 20px; margin: 4px 0; }
 </style>
 </head>
-<body>${cleanBody}${heightScript}</body>
+<body>${doc.body.innerHTML}${heightScript}</body>
 </html>`;
+		};
+		void render();
+		return () => controller.abort();
 	}, [body, autoSize]);
 
 	return (

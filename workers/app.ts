@@ -44,9 +44,31 @@ const app = new Hono<{ Bindings: Env }>();
 
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
-	// Skip validation in development
 	if (import.meta.env.DEV) {
 		return next();
+	}
+
+	const apiKeyPaths = new Set([
+		"POST /api/v1/setup",
+		"POST /api/v1/import",
+		"POST /api/v1/archive",
+		"POST /api/v1/import-reference",
+		"POST /api/v1/mailboxes",
+		"GET /api/v1/mailboxes",
+	]);
+	// Read-only inbox routes that the reservation-agent cron sweep reads with an
+	// X-API-Key (server-to-server). Matched by pattern since they carry IDs.
+	const apiKeyPatterns: RegExp[] = [
+		/^POST \/api\/v1\/mailboxes\/[^/]+\/emails\/[^/]+\/restore-attachments$/,
+		/^GET \/api\/v1\/mailboxes\/[^/]+\/emails$/,
+		/^GET \/api\/v1\/mailboxes\/[^/]+\/emails\/[^/]+$/,
+	];
+	const reqSig = `${c.req.method} ${c.req.path}`;
+	if (apiKeyPaths.has(reqSig) || apiKeyPatterns.some((re) => re.test(reqSig))) {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey === c.env.STALWART_ACCOUNT_PASSWORD) {
+			return next();
+		}
 	}
 
 	const { POLICY_AUD, TEAM_DOMAIN } = c.env;
@@ -111,7 +133,7 @@ app.all("*", (c) => {
 export default {
 	fetch: app.fetch,
 	async email(
-		event: { raw: ReadableStream; rawSize: number },
+		event: ForwardableEmailMessage,
 		env: Env,
 		ctx: ExecutionContext,
 	) {

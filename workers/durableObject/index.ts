@@ -459,6 +459,15 @@ export class MailboxDO extends DurableObject<Env> {
 		};
 	}
 
+	async findEmailByMessageId(messageId: string) {
+		return this.db
+			.select({ id: schema.emails.id })
+			.from(schema.emails)
+			.where(eq(schema.emails.message_id, messageId))
+			.limit(1)
+			.get() ?? null;
+	}
+
 	/**
 	 * Fetch all emails in a thread with full bodies and attachments in
 	 * two queries (one for emails, one for attachments) instead of
@@ -818,11 +827,38 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Email creation (Drizzle) ───────────────────────────────────
 
+	/** Fill attachment metadata only when the matching message has none. */
+	async restoreMissingAttachments(emailId: string, messageId: string, attachments: AttachmentData[]) {
+		return this.ctx.storage.transactionSync(() => {
+			const email = this.db.select().from(schema.emails).where(eq(schema.emails.id, emailId)).get();
+			if (!email || email.message_id !== messageId) throw new Error("Message identity mismatch");
+			if (this.db.select().from(schema.attachments).where(eq(schema.attachments.email_id, emailId)).limit(1).get()) return 0;
+			if (attachments.some(a => a.email_id !== emailId)) throw new Error("Attachment ownership mismatch");
+			if (attachments.length) this.db.insert(schema.attachments).values(attachments).run();
+			return attachments.length;
+		});
+	}
+
+	/** Atomic mailbox-local deduplication for native delivery retries. */
+	async createInboundEmail(email: EmailData, attachments: AttachmentData[]) {
+		return this.ctx.storage.transactionSync(() => {
+			const existing = this.db.select({ id: schema.emails.id }).from(schema.emails)
+				.where(eq(schema.emails.message_id, email.message_id!)).limit(1).get();
+			if (existing) return { created: false, id: existing.id };
+			this.insertEmail(Folders.INBOX, email, attachments);
+			return { created: true, id: email.id };
+		});
+	}
+
 	async createEmail(
 		folder: string,
 		email: EmailData,
 		attachments: AttachmentData[],
 	) {
+		this.insertEmail(folder, email, attachments);
+	}
+
+	private insertEmail(folder: string, email: EmailData, attachments: AttachmentData[]) {
 		// Resolve folder name or ID to the actual folder ID.
 		const folderRow = this.db
 			.select({ id: schema.folders.id })

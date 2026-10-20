@@ -26,24 +26,32 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { attachmentPreview, type ComposeAttachment } from "~/lib/compose-attachments";
 
 interface RichTextEditorProps {
 	value: string;
 	onChange: (value: string) => void;
+	attachments?: ComposeAttachment[];
+	onAttach?: (files: File[], inline?: boolean) => Promise<ComposeAttachment[]>;
+	onRemoveAttachment?: (index: number) => void;
+	disabled?: boolean;
 }
 
 export default function RichTextEditor({
 	value,
 	onChange,
+	attachments = [], onAttach, onRemoveAttachment, disabled = false,
 }: RichTextEditorProps) {
+	const fileInput = useRef<HTMLInputElement>(null);
+	const imageInput = useRef<HTMLInputElement>(null);
 	const editor = useEditor({
 		extensions: [
 			StarterKit,
 			Underline,
 			TextAlign.configure({ types: ["heading", "paragraph"] }),
 			LinkExtension.configure({ openOnClick: false }),
-			TiptapImage,
+			TiptapImage.configure({ allowBase64: true }),
 			TextStyle,
 			Color,
 			Highlight.configure({ multicolor: true }),
@@ -59,6 +67,10 @@ export default function RichTextEditor({
 			onChange(editor.getHTML());
 		},
 	});
+
+	useEffect(() => {
+		editor?.setEditable(!disabled);
+	}, [editor, disabled]);
 
 	useEffect(() => {
 		if (editor && !editor.isDestroyed && value !== editor.getHTML()) {
@@ -86,11 +98,23 @@ export default function RichTextEditor({
 	}, [editor]);
 
 	if (!editor) return null;
+	const attachFiles = async (input: HTMLInputElement, inline: boolean) => {
+		const files = Array.from(input.files || []); input.value = "";
+		if (!files.length || !onAttach) return;
+		const added = await onAttach(files, inline);
+		if (inline && added.length && !editor.isDestroyed) editor.chain().focus().insertContent(added.map((item) => ({ type: "image", attrs: { src: attachmentPreview(item), alt: item.filename } }))).run();
+	};
 
 	return (
 		<div className="rounded-lg border border-kumo-line overflow-hidden flex flex-col h-full">
 			{/* Toolbar */}
 			<div className="flex flex-wrap items-center gap-0.5 bg-kumo-recessed px-2 py-1.5 border-b border-kumo-line shrink-0">
+				{onAttach && <>
+					<input ref={fileInput} type="file" multiple hidden aria-label="Choose attachments" onChange={(event) => { void attachFiles(event.currentTarget, false); }} />
+					<input ref={imageInput} type="file" multiple accept="image/png,image/jpeg,image/gif,image/webp" hidden aria-label="Choose inline images" onChange={(event) => { void attachFiles(event.currentTarget, true); }} />
+					<Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => fileInput.current?.click()}>Attach files</Button>
+					<Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => imageInput.current?.click()}>Insert image</Button>
+				</>}
 				{/* Text formatting */}
 				<Tooltip content="Bold" side="bottom" asChild>
 					<Button

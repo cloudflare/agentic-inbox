@@ -7,6 +7,7 @@ import { FloppyDiskIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
+import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { useUIStore } from "~/hooks/useUIStore";
 
 export default function ComposeEmail() {
@@ -30,6 +31,7 @@ export default function ComposeEmail() {
 		setSubject,
 		body,
 		setBody,
+		attachments, addAttachments, removeAttachment, isLoadingAttachments, attachmentLoadFailed,
 		error,
 		isSavingDraft,
 		isSending,
@@ -104,7 +106,8 @@ export default function ComposeEmail() {
 						<Text size="sm" DANGEROUS_className="font-medium mb-1.5 block">
 							Message
 						</Text>
-						<RichTextEditor value={body} onChange={setBody} />
+						<RichTextEditor value={body} onChange={setBody} attachments={attachments} onAttach={addAttachments} onRemoveAttachment={removeAttachment} disabled={isSending || isSavingDraft || isLoadingAttachments || attachmentLoadFailed} />
+						<ComposeAttachmentList attachments={attachments} onRemove={removeAttachment} disabled={isSending || isSavingDraft || isLoadingAttachments || attachmentLoadFailed} />
 					</div>
 					<div className="flex justify-between items-center pt-2">
 						<Button
@@ -122,7 +125,7 @@ export default function ComposeEmail() {
 								variant="secondary"
 								size="sm"
 								loading={isSavingDraft}
-								disabled={isSending}
+								disabled={isSending || isLoadingAttachments || attachmentLoadFailed}
 								icon={<FloppyDiskIcon size={14} />}
 								onClick={handleSaveDraft}
 							>
@@ -133,7 +136,7 @@ export default function ComposeEmail() {
 								variant="primary"
 								size="sm"
 								loading={isSending}
-								disabled={isSavingDraft || isSending}
+								disabled={isSavingDraft || isSending || isLoadingAttachments || attachmentLoadFailed}
 								icon={<PaperPlaneTiltIcon size={14} />}
 							>
 								{isSending ? "Sending..." : "Send"}

@@ -3,6 +3,7 @@
 	"name": "agentic-inbox",
 	"compatibility_date": "2025-11-28",
 	"main": "./workers/app.ts",
+	"preview_urls": true,
 	"observability": {
 		"enabled": true
 	},
@@ -13,8 +14,30 @@
 		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
-		"DOMAINS": "example.com",
-		"EMAIL_ADDRESSES": []
+		"DOMAINS": "team.easyrentbali.com,easyrentbali.com",
+		"EMAIL_ADDRESSES": [
+			"test-rsvbook@team.easyrentbali.com",
+			"support@team.easyrentbali.com",
+			"reservation@team.easyrentbali.com",
+			"billing@team.easyrentbali.com",
+			"partners@team.easyrentbali.com",
+			"accounting@easyrentbali.com",
+			"cs@easyrentbali.com",
+			"director@easyrentbali.com",
+			"fin.acct@easyrentbali.com",
+			"finance@easyrentbali.com",
+			"gm@easyrentbali.com",
+			"info@easyrentbali.com",
+			"jagoan@easyrentbali.com",
+			"job_career@easyrentbali.com",
+			"manager@easyrentbali.com",
+			"marketing@easyrentbali.com",
+			"reservation@easyrentbali.com",
+			"support@easyrentbali.com",
+			"tester@easyrentbali.com"
+		],
+		"STALWART_JMAP_URL": "https://stalwart.zeabur.app/jmap",
+		"STALWART_ACCOUNT_EMAIL": "test-rsvbook@team.easyrentbali.com"
 	},
 	"send_email": [
 		{
@@ -25,8 +48,8 @@
 	"r2_buckets": [
 		{
 			"binding": "BUCKET",
-			"bucket_name": "agentic-inbox",
-			"preview_bucket_name": "agentic-inbox"
+			"bucket_name": "easyrent-email-backup",
+			"preview_bucket_name": "easyrent-email-backup"
 		}
 	],
 	"ai": {

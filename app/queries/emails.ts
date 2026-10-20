@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "~/services/api";
 import type { Email } from "~/types";
+import type { SendEmailParams } from "../../workers/email-sender";
 import { queryKeys } from "./keys";
 
 // ---------- Types ----------
@@ -243,6 +244,7 @@ export function useSaveDraft() {
 				bcc?: string;
 				subject?: string;
 				body: string;
+				attachments?: SendEmailParams["attachments"];
 				in_reply_to?: string;
 				thread_id?: string;
 				draft_id?: string;
