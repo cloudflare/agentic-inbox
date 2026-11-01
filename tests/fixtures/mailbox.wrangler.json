@@ -1,0 +1,9 @@
+{
+	"name": "mailbox-create-test",
+	"main": "./mailbox-worker.mjs",
+	"compatibility_date": "2025-11-28",
+	"durable_objects": {
+		"bindings": [{ "name": "MAILBOX", "class_name": "MailboxDO" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["MailboxDO"] }]
+}
