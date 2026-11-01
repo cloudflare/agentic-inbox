@@ -59,7 +59,8 @@ export async function sendEmail(
 
 	if (params.attachments && params.attachments.length > 0) {
 		message.attachments = params.attachments.map((att) => ({
-			content: att.content,
+			// Match the decoded Sent copy and avoid treating base64 as literal file text.
+			content: Uint8Array.from(atob(att.content), (c) => c.charCodeAt(0)),
 			filename: att.filename,
 			type: att.type,
 			disposition: att.disposition,
