@@ -739,6 +739,20 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Threading helpers (raw SQL) ────────────────────────────────
 
+	async findThreadByMessageIds(messageIds: string[]): Promise<string | null> {
+		const ids = messageIds.filter((id) => id && id.length <= 998).slice(0, 50);
+		if (ids.length === 0) return null;
+
+		const placeholders = ids.map((_, i) => `?${i + 1}`).join(", ");
+		const rows = [...this.ctx.storage.sql.exec<{ thread_id: string }>(
+			`SELECT thread_id FROM emails
+			 WHERE message_id IN (${placeholders}) AND thread_id IS NOT NULL
+			 ORDER BY date ASC LIMIT 1`,
+			...ids,
+		)];
+		return rows[0]?.thread_id ?? null;
+	}
+
 	async findThreadBySubject(subject: string, senderAddress?: string): Promise<string | null> {
 		const normalized = subject
 			.replace(/^(?:(?:re|fwd?|fw|aw|wg|r[eé]f|sv)\s*:\s*)+/i, "")

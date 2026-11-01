@@ -380,17 +380,28 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 		}
 	}
 
-	const extractMsgId = (s: string) => { const m = s.match(/<([^>]+)>/); return m ? m[1] : s.trim().split(/\s+/)[0]; };
-	const inReplyTo = parsedEmail.inReplyTo ? extractMsgId(parsedEmail.inReplyTo) : null;
-	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId) : [];
-	let threadId = emailReferences[0] || inReplyTo || messageId;
+	const extractMsgId = (s: string) => {
+		const m = s.match(/<([^>]+)>/);
+		const id = m ? m[1] : s.trim().split(/\s+/)[0];
+		return id && id.length <= 998 ? id : "";
+	};
+	const inReplyTo = (parsedEmail.inReplyTo ? extractMsgId(parsedEmail.inReplyTo) : "") || null;
+	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId).filter(Boolean) : [];
+	let parentMessageIds = [...new Set([...emailReferences, ...(inReplyTo ? [inReplyTo] : [])])];
+	if (parentMessageIds.length > 50) {
+		// Bound SQL variables while retaining the chain root and most recent parents.
+		parentMessageIds = [parentMessageIds[0], ...parentMessageIds.slice(-49)];
+	}
+	// RFC Message-IDs in reply headers refer to rows whose thread IDs are local UUIDs.
+	const existingThread = parentMessageIds.length > 0 ? await stub.findThreadByMessageIds(parentMessageIds) : null;
+	let threadId = existingThread || emailReferences[0] || inReplyTo || messageId;
 
 	if (!inReplyTo && emailReferences.length === 0) {
 		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
 		if (subjectThread) threadId = subjectThread;
 	}
 
-	const originalMessageId = parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : null;
+	const originalMessageId = (parsedEmail.messageId ? extractMsgId(parsedEmail.messageId) : "") || null;
 
 	await stub.createEmail(Folders.INBOX, {
 		id: messageId, subject: parsedEmail.subject || "",
