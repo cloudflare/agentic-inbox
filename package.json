@@ -18,7 +18,8 @@
 		"deploy": "npm run build && wrangler deploy",
 		"dev": "react-router dev",
 		"preview": "npm run build && vite preview",
-		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
+		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b",
+		"test": "node --experimental-strip-types --test workers/lib/inbound-mailbox.test.ts"
 	},
 	"dependencies": {
 		"@cloudflare/ai-chat": "^0.1.8",
