@@ -396,6 +396,7 @@ export async function toolSendReply(
 	params: {
 		originalEmailId: string;
 		to: string;
+		cc?: string[];
 		subject: string;
 		bodyHtml: string;
 	},
@@ -436,6 +437,7 @@ export async function toolSendReply(
 	try {
 		await sendEmail(env.EMAIL, {
 			to: params.to,
+			...(params.cc?.length ? { cc: params.cc } : {}),
 			from: mailboxId,
 			subject: params.subject,
 			html: fullBodyHtml,
@@ -453,6 +455,7 @@ export async function toolSendReply(
 			subject: params.subject,
 			sender: mailboxId.toLowerCase(),
 			recipient: params.to.toLowerCase(),
+			cc: params.cc?.length ? params.cc.join(", ").toLowerCase() : null,
 			date: new Date().toISOString(),
 			body: fullBodyHtml,
 			in_reply_to: originalMsgId,
@@ -474,6 +477,7 @@ export async function toolSendEmail(
 	mailboxId: string,
 	params: {
 		to: string;
+		cc?: string[];
 		subject: string;
 		bodyHtml: string;
 	},
@@ -501,6 +505,7 @@ export async function toolSendEmail(
 	try {
 		await sendEmail(env.EMAIL, {
 			to: params.to,
+			...(params.cc?.length ? { cc: params.cc } : {}),
 			from: mailboxId,
 			subject: params.subject,
 			html: sanitizedBody,
@@ -517,6 +522,7 @@ export async function toolSendEmail(
 			subject: params.subject,
 			sender: mailboxId.toLowerCase(),
 			recipient: params.to.toLowerCase(),
+			cc: params.cc?.length ? params.cc.join(", ").toLowerCase() : null,
 			date: new Date().toISOString(),
 			body: sanitizedBody,
 			in_reply_to: null,
