@@ -3,7 +3,7 @@
 	"info": {
 		"title": "RealAdvisor Inbox API",
 		"version": "1.0.0",
-		"description": "Shared mailbox API backed by Neon Postgres.\n\n## Authentication\nHosted documentation uses Cloudflare Access browser login. API calls accept a verified browser session or an inbox API key. Requests from this page use your existing same-origin session. All allowed users can access registered live mailboxes. Only designated mailbox administrators may create them. Local development is synthetic and loopback-only.\n\n## Automation / n8n\nCreate a key in Settings \u2192 API keys. Send Authorization: Bearer inbox_\u2026; no Cloudflare service-token headers are needed after the API path is configured for application authentication. Keys are restricted to selected mailboxes and mail:read, drafts:manage, mail:send, conversations:manage webhooks:manage, classifications:read, classifications:review, classifications:run, folders:manage and agent:use permissions. Agent access also requires mail:read and each tool respects the granted scopes. Send email is opt-in. Keys cannot manage people, settings or other keys. Administrators manage keys using their browser session.\n\n## Mail identities\nEach registered name@ingest.realadvisor.com mailbox sends as name@realadvisor.com. Public-address forwarding from Google Workspace is configured separately.\n\n## Interactive requests\nRequests execute against the current origin. Sending, modifying and deleting affect real data on the hosted instance. No external request proxy is used."
+		"description": "Shared mailbox API backed by Neon Postgres.\n\n## Authentication\nHosted documentation uses Cloudflare Access browser login. API calls accept a verified browser session or an inbox API key. Requests from this page use your existing same-origin session. All allowed users can access registered live mailboxes. Only designated mailbox administrators may create them. Local development is synthetic and loopback-only.\n\n## Automation / n8n\nCreate a key in Settings → API keys. Send Authorization: Bearer inbox_…; no Cloudflare service-token headers are needed after the API path is configured for application authentication. Keys are restricted to selected mailboxes and mail:read, drafts:manage, mail:send, conversations:manage webhooks:manage, classifications:read, classifications:review, classifications:run, folders:manage and agent:use permissions. Agent access also requires mail:read and each tool respects the granted scopes. Send email is opt-in. Keys cannot manage people, settings or other keys. Administrators manage keys using their browser session.\n\n## Mail identities\nEach registered name@ingest.realadvisor.com mailbox sends as name@realadvisor.com. Public-address forwarding from Google Workspace is configured separately.\n\n## Interactive requests\nRequests execute against the current origin. Sending, modifying and deleting affect real data on the hosted instance. No external request proxy is used."
 	},
 	"servers": [
 		{
@@ -380,7 +380,7 @@
 				"operationId": "postCreateMailbox",
 				"summary": "Create mailbox",
 				"tags": ["Mailboxes"],
-				"description": "In live mode, only users listed in MAILBOX_ADMINS can create mailboxes, and creation must be enabled. The email must use ingest.realadvisor.com, with a 1\u201364 character lowercase local part containing letters, numbers, dots, underscores or hyphens, starting and ending with a letter or number; consecutive dots are forbidden. Case is normalized to lowercase. Registration and system folders are committed atomically. Existing addresses return 409. The shared routing rule immediately permits this registered inbox, and sending uses the matching @realadvisor.com identity. Google Workspace/Groups forwarding for the public address is a separate step. Local synthetic mode remains unrestricted.",
+				"description": "In live mode, only users listed in MAILBOX_ADMINS can create mailboxes, and creation must be enabled. The email must use ingest.realadvisor.com, with a 1–64 character lowercase local part containing letters, numbers, dots, underscores or hyphens, starting and ending with a letter or number; consecutive dots are forbidden. Case is normalized to lowercase. Registration and system folders are committed atomically. Existing addresses return 409. The shared routing rule immediately permits this registered inbox, and sending uses the matching @realadvisor.com identity. Google Workspace/Groups forwarding for the public address is a separate step. Local synthetic mode remains unrestricted.",
 				"parameters": [],
 				"responses": {
 					"201": {
@@ -1109,7 +1109,7 @@
 				"operationId": "postSendEmail",
 				"summary": "Send email",
 				"tags": ["Sending"],
-				"description": "Sends real mail in live mode. Caller supplies recipient, subject and body, including quoted/forwarded content if desired. Replies retain the thread; forwards start a new one. Store one UUID per logical send and reuse it with identical content on retry. A reused key with different content or a pending/unknown delivery returns 409. A provider ambiguity returns 502: inspect delivery before attempting another send. sent means provider acceptance, not final delivery. Acceptance remains successful if subsequent draft deletion fails. Clients must retain the accepted receipt and retry only draft deletion, never create a new send intent for cleanup. Local mode returns simulated and sends nothing. API keys require mail:send and access to this mailbox. Sender precedence is explicit sender_identity_id, saved draft identity, reply recipient match, then workspace default. Ambiguous or unavailable senders return 409; unauthorized live senders return 403. API keys must have access to both the conversation and sender mailboxes. From and Reply-To use the selected public identity.",
+				"description": "Sends real mail in live mode. Caller supplies recipient, subject and body, including quoted/forwarded content if desired. Replies retain the thread; forwards start a new one. Store one UUID per logical send and reuse it with identical content on retry. A reused key with different content or a pending/unknown delivery returns 409. A provider ambiguity returns 502: inspect delivery before attempting another send. sent means provider acceptance, not final delivery. Acceptance remains successful if subsequent draft deletion fails. Clients must retain the accepted receipt and retry only draft deletion, never create a new send intent for cleanup. Local mode returns simulated and sends nothing. API keys require mail:send and access to this mailbox. Sender precedence is explicit sender_identity_id, saved draft identity, reply recipient match, then the API key's default sender or the workspace default. Ambiguous or unavailable senders return 409; unauthorized live senders return 403. API keys must have access to the conversation mailbox and to the sender, through its mailbox or a sender granted to the key. From and Reply-To use the selected public identity.",
 				"parameters": [
 					{
 						"$ref": "#/components/parameters/mailboxId"
@@ -2858,7 +2858,7 @@
 				"operationId": "postReplyToEmail",
 				"summary": "Reply to email",
 				"tags": ["Sending"],
-				"description": "Sends real mail in live mode. Caller supplies recipient, subject and body, including quoted/forwarded content if desired. Replies retain the thread; forwards start a new one. Store one UUID per logical send and reuse it with identical content on retry. A reused key with different content or a pending/unknown delivery returns 409. A provider ambiguity returns 502: inspect delivery before attempting another send. sent means provider acceptance, not final delivery. Acceptance remains successful if subsequent draft deletion fails. Clients must retain the accepted receipt and retry only draft deletion, never create a new send intent for cleanup. Local mode returns simulated and sends nothing. API keys require mail:send and access to this mailbox. Sender precedence is explicit sender_identity_id, saved draft identity, reply recipient match, then workspace default. Ambiguous or unavailable senders return 409; unauthorized live senders return 403. API keys must have access to both the conversation and sender mailboxes. From and Reply-To use the selected public identity.",
+				"description": "Sends real mail in live mode. Caller supplies recipient, subject and body, including quoted/forwarded content if desired. Replies retain the thread; forwards start a new one. Store one UUID per logical send and reuse it with identical content on retry. A reused key with different content or a pending/unknown delivery returns 409. A provider ambiguity returns 502: inspect delivery before attempting another send. sent means provider acceptance, not final delivery. Acceptance remains successful if subsequent draft deletion fails. Clients must retain the accepted receipt and retry only draft deletion, never create a new send intent for cleanup. Local mode returns simulated and sends nothing. API keys require mail:send and access to this mailbox. Sender precedence is explicit sender_identity_id, saved draft identity, reply recipient match, then the API key's default sender or the workspace default. Ambiguous or unavailable senders return 409; unauthorized live senders return 403. API keys must have access to the conversation mailbox and to the sender, through its mailbox or a sender granted to the key. From and Reply-To use the selected public identity.",
 				"parameters": [
 					{
 						"$ref": "#/components/parameters/mailboxId"
@@ -3036,7 +3036,7 @@
 				"operationId": "postForwardEmail",
 				"summary": "Forward email",
 				"tags": ["Sending"],
-				"description": "Sends real mail in live mode. Caller supplies recipient, subject and body, including quoted/forwarded content if desired. Replies retain the thread; forwards start a new one. Store one UUID per logical send and reuse it with identical content on retry. A reused key with different content or a pending/unknown delivery returns 409. A provider ambiguity returns 502: inspect delivery before attempting another send. sent means provider acceptance, not final delivery. Acceptance remains successful if subsequent draft deletion fails. Clients must retain the accepted receipt and retry only draft deletion, never create a new send intent for cleanup. Local mode returns simulated and sends nothing. API keys require mail:send and access to this mailbox. Sender precedence is explicit sender_identity_id, saved draft identity, reply recipient match, then workspace default. Ambiguous or unavailable senders return 409; unauthorized live senders return 403. API keys must have access to both the conversation and sender mailboxes. From and Reply-To use the selected public identity.",
+				"description": "Sends real mail in live mode. Caller supplies recipient, subject and body, including quoted/forwarded content if desired. Replies retain the thread; forwards start a new one. Store one UUID per logical send and reuse it with identical content on retry. A reused key with different content or a pending/unknown delivery returns 409. A provider ambiguity returns 502: inspect delivery before attempting another send. sent means provider acceptance, not final delivery. Acceptance remains successful if subsequent draft deletion fails. Clients must retain the accepted receipt and retry only draft deletion, never create a new send intent for cleanup. Local mode returns simulated and sends nothing. API keys require mail:send and access to this mailbox. Sender precedence is explicit sender_identity_id, saved draft identity, reply recipient match, then the API key's default sender or the workspace default. Ambiguous or unavailable senders return 409; unauthorized live senders return 403. API keys must have access to the conversation mailbox and to the sender, through its mailbox or a sender granted to the key. From and Reply-To use the selected public identity.",
 				"parameters": [
 					{
 						"$ref": "#/components/parameters/mailboxId"
@@ -6749,7 +6749,7 @@
 				"operationId": "startClassifierBackfill",
 				"tags": ["Classifiers"],
 				"summary": "Start classifier backfill",
-				"description": "Start a resumable classifier backfill.\n\nAdministrator only. Returns immediately after saving all selected tag runs atomically. The server snapshots matching conversations and admits at most 500 outstanding evaluations per classifier, in pages of 100. Archived mail is included by default. Missing/outdated mode preserves current evaluation keys and human decisions. All forces a fresh evaluation at this run\u2019s timestamp while sharing identical inputs within the run. An active selected classifier returns 409; no partial runs are created. Does not enable automatic assignment. Cancel through the existing classifier cancel endpoint.",
+				"description": "Start a resumable classifier backfill.\n\nAdministrator only. Returns immediately after saving all selected tag runs atomically. The server snapshots matching conversations and admits at most 500 outstanding evaluations per classifier, in pages of 100. Archived mail is included by default. Missing/outdated mode preserves current evaluation keys and human decisions. All forces a fresh evaluation at this run’s timestamp while sharing identical inputs within the run. An active selected classifier returns 409; no partial runs are created. Does not enable automatic assignment. Cancel through the existing classifier cancel endpoint.",
 				"requestBody": {
 					"required": true,
 					"content": {
@@ -7082,6 +7082,19 @@
 											"request_count": {
 												"type": "string",
 												"description": "Count of authenticated requests, including permission denials."
+											},
+											"sender_identity_ids": {
+												"type": "array",
+												"maxItems": 100,
+												"items": {
+													"type": "string"
+												},
+												"description": "Sender identities the key may use in addition to those of its mailboxes."
+											},
+											"default_sender_identity_id": {
+												"type": "string",
+												"nullable": true,
+												"description": "Sender used when a request names none and no saved draft or reply recipient decides it. Replaces the workspace default for this key. Must be a sender the key can use."
 											}
 										}
 									}
@@ -7150,6 +7163,19 @@
 										"type": "string",
 										"format": "date-time",
 										"nullable": true
+									},
+									"sender_identity_ids": {
+										"type": "array",
+										"maxItems": 100,
+										"items": {
+											"type": "string"
+										},
+										"description": "Sender identities the key may use in addition to those of its mailboxes."
+									},
+									"default_sender_identity_id": {
+										"type": "string",
+										"nullable": true,
+										"description": "Sender used when a request names none and no saved draft or reply recipient decides it. Replaces the workspace default for this key. Must be a sender the key can use."
 									}
 								}
 							}
@@ -7216,6 +7242,71 @@
 					},
 					"404": {
 						"description": "Not found"
+					}
+				}
+			},
+			"patch": {
+				"tags": ["API keys"],
+				"summary": "Set API key senders",
+				"description": "Replace the sender identities and default sender of an active API key (administrator only). Mailboxes and permissions cannot be changed. Takes effect on the key's next request.",
+				"security": [
+					{
+						"AccessSession": []
+					}
+				],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"format": "uuid"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"required": [
+									"sender_identity_ids",
+									"default_sender_identity_id"
+								],
+								"additionalProperties": false,
+								"properties": {
+									"sender_identity_ids": {
+										"type": "array",
+										"maxItems": 100,
+										"items": {
+											"type": "string"
+										},
+										"description": "Sender identities the key may use in addition to those of its mailboxes."
+									},
+									"default_sender_identity_id": {
+										"type": "string",
+										"nullable": true,
+										"description": "Sender used when a request names none and no saved draft or reply recipient decides it. Replaces the workspace default for this key. Must be a sender the key can use."
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Updated"
+					},
+					"400": {
+						"description": "Unknown sender, or a default the key cannot use"
+					},
+					"403": {
+						"description": "Administrator access required"
+					},
+					"404": {
+						"description": "Not found or revoked"
 					}
 				}
 			}
@@ -7337,7 +7428,7 @@
 				"operationId": "getSenderIdentities",
 				"summary": "List senders",
 				"tags": ["Sending"],
-				"description": "Available sender identities and workspace default. API keys see only identities in their mailbox scope. Requires mail:read, mail:send, drafts:manage or senders:manage. Inactive or disconnected identities cannot be selected for sending.",
+				"description": "Available sender identities and workspace default. API keys see the identities of their mailboxes plus those granted to the key, and the key's own default when one is set. Requires mail:read, mail:send, drafts:manage or senders:manage. Inactive or disconnected identities cannot be selected for sending.",
 				"responses": {
 					"200": {
 						"description": "Success",
@@ -9423,7 +9514,7 @@
 				"type": "http",
 				"scheme": "bearer",
 				"bearerFormat": "inbox_<64 hex characters>",
-				"description": "Created by an administrator in Settings \u2192 API keys. Scope and mailbox restrictions apply; revoked or expired keys return 401."
+				"description": "Created by an administrator in Settings → API keys. Scope and mailbox restrictions apply; revoked or expired keys return 401."
 			}
 		}
 	}

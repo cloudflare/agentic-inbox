@@ -21,6 +21,35 @@ export interface SenderContext {
 	};
 	mailboxId: string;
 }
+// What an API key may send from. Without mailboxIds the caller is unrestricted.
+export interface SenderAccess {
+	mailboxIds?: string[];
+	senderIds?: string[];
+	defaultSenderId?: string | null;
+}
+export const canUseSender = (
+	sender: Pick<SenderIdentity, "id" | "mailbox_id">,
+	access: SenderAccess,
+) =>
+	!access.mailboxIds ||
+	(!!sender.mailbox_id && access.mailboxIds.includes(sender.mailbox_id)) ||
+	!!access.senderIds?.includes(sender.id);
+// The senders and default a restricted caller sees. An unavailable key default
+// is reported as no default rather than replaced by the workspace default.
+export function scopeSenders(
+	config: SenderConfiguration,
+	access: SenderAccess,
+): SenderConfiguration {
+	if (!access.mailboxIds) return config;
+	const senders = config.senders.filter((s) => canUseSender(s, access));
+	const preferred = access.defaultSenderId ?? config.default_sender_identity_id;
+	return {
+		senders,
+		default_sender_identity_id: senders.some((s) => s.id === preferred)
+			? preferred
+			: null,
+	};
+}
 // Do not skip inactive matches: the caller must report an unavailable sender.
 export function resolveSenderId(
 	config: SenderConfiguration,

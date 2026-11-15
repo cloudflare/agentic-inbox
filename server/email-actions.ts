@@ -5,6 +5,7 @@ import {
 } from "../shared/mail";
 export { draftContentSchema, draftVersionSchema } from "../shared/mail";
 import { SenderStore } from "./senders";
+import type { SenderAccess } from "../shared/senders";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Database } from "./db";
@@ -44,7 +45,7 @@ export async function updateDraft(
 	id: string,
 	content: Partial<z.infer<typeof draftContentSchema>>,
 	version?: string,
-	senderAccess: { mailboxIds?: string[] } = {},
+	senderAccess: SenderAccess = {},
 ): Promise<SaveDraftResult> {
 	const input = draftContentSchema.partial().parse(content);
 	const [current] =

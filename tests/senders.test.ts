@@ -348,7 +348,7 @@ test("live send uses selected From and Reply-To, preserves threading and retry i
 			"test",
 			undefined,
 			false,
-			[all, infoBox],
+			{ mailboxIds: [all, infoBox] },
 		),
 		/does not permit/,
 	);
@@ -555,4 +555,131 @@ test("sender CRUD validates duplicates, permissions, live addresses, and preserv
 	const recreated = await call("sender-identities", "POST", input);
 	assert.equal(recreated.status, 201);
 	await senders.remove((await recreated.json()).id);
+});
+
+test("an API key can be granted senders outside its mailboxes and its own default", async () => {
+	await senders.setDefault(info);
+	const admin = (path: string, method = "GET", body?: unknown) =>
+		call(`api-keys${path}`, method, body);
+	const base = {
+		name: "Mako",
+		mailbox_ids: [all],
+		permissions: ["mail:send", "drafts:manage", "mail:read"],
+	};
+	// The default must be usable by the key, and granted senders must exist.
+	assert.equal(
+		(await admin("", "POST", { ...base, default_sender_identity_id: privacy }))
+			.status,
+		400,
+	);
+	assert.equal(
+		(await admin("", "POST", { ...base, sender_identity_ids: ["missing"] }))
+			.status,
+		400,
+	);
+	const created = await admin("", "POST", base);
+	assert.equal(created.status, 201);
+	const { id, key } = await created.json();
+	const visible = async () =>
+		(await call("sender-identities", "GET", undefined, key)).json();
+	assert.deepEqual(await visible(), {
+		senders: [],
+		default_sender_identity_id: null,
+	});
+	const draft = (body: Record<string, unknown> = {}) =>
+		call(`mailboxes/${all}/drafts`, "POST", { body: "Hello", ...body }, key);
+	assert.equal((await draft({ sender_identity_id: privacy })).status, 403);
+
+	const granted = await admin(`/${id}`, "PATCH", {
+		sender_identity_ids: [privacy],
+		default_sender_identity_id: privacy,
+	});
+	assert.equal(granted.status, 200, await granted.clone().text());
+	const config = await visible();
+	assert.deepEqual(
+		config.senders.map((s: { id: string }) => s.id),
+		[privacy],
+	);
+	assert.equal(config.default_sender_identity_id, privacy);
+	const scope = await (await call("config", "GET", undefined, key)).json();
+	assert.deepEqual(scope.sender_identity_ids, [privacy]);
+	assert.equal(scope.default_sender_identity_id, privacy);
+	const listed = (await (await admin("")).json()).find(
+		(k: { id: string }) => k.id === id,
+	);
+	assert.deepEqual(listed.sender_identity_ids, [privacy]);
+	assert.equal(listed.default_sender_identity_id, privacy);
+
+	// The key default replaces the workspace default (info); others stay denied.
+	const saved = await draft();
+	assert.equal(saved.status, 201, await saved.clone().text());
+	const [row] =
+		await db`SELECT sender_identity_id FROM emails WHERE id=${(await saved.json()).draft_id}`;
+	assert.equal(row.sender_identity_id, privacy);
+	assert.equal((await draft({ sender_identity_id: info })).status, 403);
+	const provider: MailSender = {
+		send: async () => ({ messageId: `<${crypto.randomUUID()}@test>` }),
+	};
+	const sent = await sendReal(
+		db,
+		provider,
+		all,
+		crypto.randomUUID(),
+		{ to: "customer@example.test", subject: "Hi", text: "Hi" },
+		"test",
+		undefined,
+		false,
+		{ mailboxIds: [all], senderIds: [privacy], defaultSenderId: privacy },
+	);
+	assert.equal(sent.sender_identity_id, privacy);
+
+	// Sender access cannot be edited by keys, widened past validation, or on revoked keys.
+	assert.equal(
+		(
+			await call(
+				`api-keys/${id}`,
+				"PATCH",
+				{ sender_identity_ids: [info] },
+				key,
+			)
+		).status,
+		403,
+	);
+	assert.equal(
+		(await admin(`/${id}`, "PATCH", { mailbox_ids: [infoBox] })).status,
+		400,
+	);
+	assert.equal(
+		(
+			await admin(`/${id}`, "PATCH", {
+				sender_identity_ids: [privacy],
+				default_sender_identity_id: info,
+			})
+		).status,
+		400,
+	);
+	// Removing the grant keeps an unavailable default from silently falling back.
+	await db`UPDATE inbox_api_keys SET sender_identity_ids='{}' WHERE id=${id}`;
+	assert.equal((await visible()).default_sender_identity_id, null);
+	assert.equal((await draft()).status, 403);
+	assert.equal(
+		(
+			await admin(`/${id}`, "PATCH", {
+				sender_identity_ids: [],
+				default_sender_identity_id: null,
+			})
+		).status,
+		200,
+	);
+	assert.equal((await draft()).status, 403); // workspace default info is outside the key
+	assert.equal((await admin(`/${id}`, "DELETE")).status, 204);
+	assert.equal(
+		(
+			await admin(`/${id}`, "PATCH", {
+				sender_identity_ids: [privacy],
+				default_sender_identity_id: null,
+			})
+		).status,
+		404,
+	);
 });

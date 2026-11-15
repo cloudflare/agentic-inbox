@@ -35,6 +35,13 @@ signature in the composer and are included in draft conflict detection.
 `POST /api/v1/sender-identities` creates a sender with `name`, `email`, and `mailbox_id`;
 `PUT /api/v1/sender-identities/:id` edits those fields and `DELETE` removes it.
 Removal preserves messages and requires replacing the default first.
+
+Settings → API keys selects the sender identities of each key and its default. A key
+can always use the senders of its mailboxes; other senders are granted individually,
+at creation or later with Senders on an active key (`PATCH /api/v1/api-keys/:id` with
+`sender_identity_ids` and `default_sender_identity_id`). A key's default replaces the
+workspace default for that key. Migration 047 adds both settings.
+
 Replies with unmatched recipients use the workspace default, initially Info, even inside another mailbox.
 `PATCH /api/v1/inbox-settings` accepts `default_sender_identity_id`.
 Draft, send, reply and forward requests accept `sender_identity_id`; send requests

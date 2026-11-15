@@ -15,6 +15,7 @@ import { z } from "zod";
 import type { Database } from "../db";
 import { InboxStore } from "../store";
 import { SenderStore } from "../senders";
+import type { SenderAccess } from "../../shared/senders";
 import { classificationTools } from "./classification-tools";
 import {
 	createActionTools,
@@ -94,6 +95,8 @@ export async function saveSettings(
 }
 export interface Run {
 	mailboxIds?: string[];
+	senderIds?: string[];
+	defaultSenderId?: string | null;
 	permissions?: string[];
 	id: string;
 	mailbox: string;
@@ -106,6 +109,11 @@ export interface Run {
 	classification?: { enabled: boolean; admin: boolean; kick?: () => void };
 }
 // The lease fences all tool mutations. A lost/expired run can never write later.
+const runSenderAccess = (run: Run): SenderAccess => ({
+	mailboxIds: run.mailboxIds ?? (run.permissions ? [run.mailbox] : undefined),
+	senderIds: run.senderIds,
+	defaultSenderId: run.defaultSenderId,
+});
 export async function claimRun(db: Database, run: Run) {
 	await new InboxStore(db).mailbox(run.mailbox);
 	return db.begin(async (tx) => {
@@ -440,11 +448,7 @@ export function createTools(
 								reply: original,
 								mailboxId: run.mailbox,
 							},
-							{
-								mailboxIds:
-									run.mailboxIds ??
-									(run.permissions ? [run.mailbox] : undefined),
-							},
+							runSenderAccess(run),
 						);
 						const draft = await scoped.insert(run.mailbox, {
 							sender: sender.email,
@@ -486,7 +490,7 @@ export function createTools(
 			run.actor,
 			mutate,
 			consumeText,
-			run.mailboxIds ?? (run.permissions ? [run.mailbox] : undefined),
+			runSenderAccess(run),
 		),
 		draft_email: tool({
 			description:
@@ -505,11 +509,7 @@ export function createTools(
 					async (tx) => {
 						const sender = await new SenderStore(tx).resolve(
 							{ explicit: sender_identity_id, mailboxId: run.mailbox },
-							{
-								mailboxIds:
-									run.mailboxIds ??
-									(run.permissions ? [run.mailbox] : undefined),
-							},
+							runSenderAccess(run),
 						);
 						const draft = await new InboxStore(tx).insert(run.mailbox, {
 							sender: sender.email,

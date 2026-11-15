@@ -5,6 +5,7 @@ import type { Database } from "./db";
 import { InboxStore } from "./store";
 import { mailboxConfig } from "./mailboxes";
 import { SenderStore } from "./senders";
+import type { SenderAccess } from "../shared/senders";
 export type OutgoingMail = ParsedSendEmail;
 export interface MailSender {
 	send(
@@ -24,7 +25,7 @@ export async function sendReal(
 	actor: string,
 	parentId?: string,
 	isReply = false,
-	mailboxIds?: string[],
+	senderAccess: SenderAccess = {},
 ): Promise<AcceptedSendResult> {
 	if (!(await mailboxConfig(db, mailbox)))
 		throw new HTTPException(403, {
@@ -93,7 +94,7 @@ export async function sendReal(
 				reply: isReply ? parent : undefined,
 				mailboxId: mailbox,
 			},
-			{ live: true, mailboxIds },
+			{ live: true, ...senderAccess },
 		);
 		const id = crypto.randomUUID();
 		const body =

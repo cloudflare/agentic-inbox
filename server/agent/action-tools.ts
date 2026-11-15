@@ -1,4 +1,5 @@
 import { SenderStore } from "../senders";
+import { scopeSenders, type SenderAccess } from "../../shared/senders";
 import { tool } from "ai";
 import { z } from "zod";
 import type { Database } from "../db";
@@ -40,7 +41,7 @@ export function createActionTools(
 	actor: string,
 	mutate: Mutate,
 	consumeText: (body: string) => { body: string; truncated: boolean },
-	mailboxIds?: string[],
+	senderAccess: SenderAccess = {},
 ) {
 	const uuid = z.string().uuid();
 
@@ -51,19 +52,10 @@ export function createActionTools(
 				"List available sender identities and the default. Use a returned sender_identity_id when drafting from a specific address. Never sends.",
 			inputSchema: z.object({}),
 			execute: async () => {
-				const config = await new SenderStore(db).configuration();
-				if (mailboxIds) {
-					config.senders = config.senders.filter(
-						(s) => s.mailbox_id && mailboxIds.includes(s.mailbox_id),
-					);
-					if (
-						!config.senders.some(
-							(s) => s.id === config.default_sender_identity_id,
-						)
-					)
-						config.default_sender_identity_id = null;
-				}
-				return config;
+				return scopeSenders(
+					await new SenderStore(db).configuration(),
+					senderAccess,
+				);
 			},
 		}),
 		get_draft: tool({
@@ -126,7 +118,7 @@ export function createActionTools(
 							body: body === undefined ? undefined : escapeDraftText(body),
 						},
 						draftVersion,
-						{ mailboxIds },
+						senderAccess,
 					),
 				),
 		}),

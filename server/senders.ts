@@ -2,7 +2,9 @@ import { HTTPException } from "hono/http-exception";
 import type { Database } from "./db";
 import { mailboxConfig } from "./mailboxes";
 import {
+	canUseSender,
 	resolveSenderId,
+	type SenderAccess,
 	type SenderConfiguration,
 	type SenderContext,
 	type SenderIdentity,
@@ -95,9 +97,12 @@ export class SenderStore {
 
 	async resolve(
 		context: SenderContext,
-		options: { live?: boolean; mailboxIds?: string[] } = {},
+		options: { live?: boolean } & SenderAccess = {},
 	) {
 		const config = await this.configuration();
+		// A key's own default replaces the workspace default; it never falls back.
+		if (options.mailboxIds && options.defaultSenderId)
+			config.default_sender_identity_id = options.defaultSenderId;
 		const id = resolveSenderId(config, context);
 		const sender = config.senders.find((s) => s.id === id);
 		if (!sender || !sender.active || !sender.mailbox_id)
@@ -105,9 +110,9 @@ export class SenderStore {
 				message:
 					"Choose an available sender; the default or matching sender is missing, unavailable, or ambiguous.",
 			});
-		if (options.mailboxIds && !options.mailboxIds.includes(sender.mailbox_id))
+		if (!canUseSender(sender, options))
 			throw new HTTPException(403, {
-				message: "API key does not permit this sender's mailbox",
+				message: "API key does not permit this sender",
 			});
 		if (
 			options.live &&

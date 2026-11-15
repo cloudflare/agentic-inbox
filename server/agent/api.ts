@@ -186,6 +186,8 @@ export function agentApi(db: Database, options: AgentOptions) {
 				: (options.actor ?? "local-synthetic-user"),
 			permissions: c.get("apiKey")?.permissions,
 			mailboxIds: c.get("apiKey")?.mailbox_ids,
+			senderIds: c.get("apiKey")?.sender_identity_ids,
+			defaultSenderId: c.get("apiKey")?.default_sender_identity_id,
 			classification: options.classification && {
 				...options.classification,
 				admin: c.get("apiKey")

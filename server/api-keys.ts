@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Database } from "./db";
+import type { SenderAccess } from "../shared/senders";
 
 export const apiKeyPermissions = [
 	"mail:read",
@@ -21,7 +22,17 @@ export type ApiKey = {
 	id: string;
 	mailbox_ids: string[];
 	permissions: string[];
+	sender_identity_ids: string[];
+	default_sender_identity_id: string | null;
 };
+export const keySenderAccess = (key?: ApiKey): SenderAccess =>
+	key
+		? {
+				mailboxIds: key.mailbox_ids,
+				senderIds: key.sender_identity_ids,
+				defaultSenderId: key.default_sender_identity_id,
+			}
+		: {};
 export type KeyVariables = { apiKey?: ApiKey };
 export async function hashApiKey(token: string) {
 	return Buffer.from(
@@ -38,14 +49,18 @@ export async function authenticateApiKey(
 	// Never cache authentication: revocation and expiry take effect on the next request.
 	const [key] = await db<
 		ApiKey[]
-	>`UPDATE inbox_api_keys SET last_used_at=now(),request_count=request_count+1 WHERE token_hash=${hash} AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now()) RETURNING id,to_json(mailbox_ids) AS mailbox_ids,to_json(permissions) AS permissions`;
+	>`UPDATE inbox_api_keys SET last_used_at=now(),request_count=request_count+1 WHERE token_hash=${hash} AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now()) RETURNING id,to_json(mailbox_ids) AS mailbox_ids,to_json(permissions) AS permissions,to_json(sender_identity_ids) AS sender_identity_ids,default_sender_identity_id`;
 	if (!key)
 		throw new HTTPException(401, { message: "Invalid or expired API key" });
 	return key;
 }
 
 // Explicit allowlist: new API routes are inaccessible to keys until reviewed here.
-export function keyCanRequest(key: ApiKey, method: string, path: string) {
+export function keyCanRequest(
+	key: Pick<ApiKey, "id" | "mailbox_ids" | "permissions">,
+	method: string,
+	path: string,
+) {
 	let segments: string[];
 	try {
 		segments = path.split("/").map(decodeURIComponent);
@@ -159,6 +174,37 @@ export function keyCanRequest(key: ApiKey, method: string, path: string) {
 	return false;
 }
 
+const senderFields = {
+	sender_identity_ids: z
+		.array(z.string().min(1).max(254))
+		.max(100)
+		.transform((v) => [...new Set(v)]),
+	default_sender_identity_id: z.string().min(1).max(254).nullable(),
+};
+// Granted senders must exist; the default must be one the key can use.
+async function checkSenders(
+	db: Database,
+	mailboxIds: string[],
+	senderIds: string[],
+	defaultId: string | null,
+) {
+	const ids = [...new Set([...senderIds, ...(defaultId ? [defaultId] : [])])];
+	if (!ids.length) return;
+	const rows = await db<
+		{ id: string; mailbox_id: string | null }[]
+	>`SELECT id,mailbox_id FROM sender_identities WHERE id IN ${db(ids)} AND archived_at IS NULL`;
+	if (rows.length !== ids.length)
+		throw new HTTPException(400, { message: "Choose existing senders" });
+	const chosen = rows.find((s) => s.id === defaultId);
+	if (
+		chosen &&
+		!senderIds.includes(chosen.id) &&
+		!(chosen.mailbox_id && mailboxIds.includes(chosen.mailbox_id))
+	)
+		throw new HTTPException(400, {
+			message: "The default sender must be one this key can use",
+		});
+}
 const input = z
 	.object({
 		name: z.string().trim().min(1).max(80),
@@ -173,6 +219,9 @@ const input = z
 			.max(apiKeyPermissions.length)
 			.transform((v) => [...new Set(v)]),
 		expires_at: z.string().datetime().nullable().optional(),
+		sender_identity_ids: senderFields.sender_identity_ids.default([]),
+		default_sender_identity_id:
+			senderFields.default_sender_identity_id.default(null),
 	})
 	.strict();
 export function apiKeysApi(
@@ -190,7 +239,7 @@ export function apiKeysApi(
 	});
 	app.get("/", async (c) =>
 		c.json(
-			await db`SELECT id,name,prefix,to_json(mailbox_ids) AS mailbox_ids,to_json(permissions) AS permissions,created_by,created_at,expires_at,last_used_at,request_count,revoked_at FROM inbox_api_keys ORDER BY created_at DESC`,
+			await db`SELECT id,name,prefix,to_json(mailbox_ids) AS mailbox_ids,to_json(permissions) AS permissions,to_json(sender_identity_ids) AS sender_identity_ids,default_sender_identity_id,created_by,created_at,expires_at,last_used_at,request_count,revoked_at FROM inbox_api_keys ORDER BY created_at DESC`,
 		),
 	);
 	app.post("/", async (c) => {
@@ -201,12 +250,38 @@ export function apiKeysApi(
 			await db`SELECT id FROM mailboxes WHERE id IN ${db(data.mailbox_ids)}`;
 		if (boxes.length !== data.mailbox_ids.length)
 			throw new HTTPException(400, { message: "Choose existing mailboxes" });
+		await checkSenders(
+			db,
+			data.mailbox_ids,
+			data.sender_identity_ids,
+			data.default_sender_identity_id,
+		);
 		const token =
 			"inbox_" +
 			Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex");
 		const [key] =
-			await db`INSERT INTO inbox_api_keys(name,token_hash,prefix,mailbox_ids,permissions,created_by,expires_at) VALUES(${data.name},${await hashApiKey(token)},${token.slice(0, 14)},ARRAY(SELECT jsonb_array_elements_text(${db.json(data.mailbox_ids)}::jsonb)),ARRAY(SELECT jsonb_array_elements_text(${db.json(data.permissions)}::jsonb)),${options.actor},${data.expires_at ?? null}) RETURNING id`;
+			await db`INSERT INTO inbox_api_keys(name,token_hash,prefix,mailbox_ids,permissions,sender_identity_ids,default_sender_identity_id,created_by,expires_at) VALUES(${data.name},${await hashApiKey(token)},${token.slice(0, 14)},ARRAY(SELECT jsonb_array_elements_text(${db.json(data.mailbox_ids)}::jsonb)),ARRAY(SELECT jsonb_array_elements_text(${db.json(data.permissions)}::jsonb)),ARRAY(SELECT jsonb_array_elements_text(${db.json(data.sender_identity_ids)}::jsonb)),${data.default_sender_identity_id},${options.actor},${data.expires_at ?? null}) RETURNING id`;
 		return c.json({ id: key.id, key: token }, 201);
+	});
+	// Replaces the key's sender access. Mailboxes and permissions stay fixed at creation.
+	app.patch("/:id", async (c) => {
+		const id = z.string().uuid().parse(c.req.param("id"));
+		const data = z
+			.object(senderFields)
+			.strict()
+			.parse(await c.req.json());
+		const [key] = await db<
+			{ mailbox_ids: string[] }[]
+		>`SELECT to_json(mailbox_ids) AS mailbox_ids FROM inbox_api_keys WHERE id=${id} AND revoked_at IS NULL`;
+		if (!key) throw new HTTPException(404, { message: "API key not found" });
+		await checkSenders(
+			db,
+			key.mailbox_ids,
+			data.sender_identity_ids,
+			data.default_sender_identity_id,
+		);
+		await db`UPDATE inbox_api_keys SET sender_identity_ids=ARRAY(SELECT jsonb_array_elements_text(${db.json(data.sender_identity_ids)}::jsonb)),default_sender_identity_id=${data.default_sender_identity_id} WHERE id=${id}`;
+		return c.json({ id, ...data });
 	});
 	app.delete("/:id", async (c) => {
 		const id = z.string().uuid().parse(c.req.param("id"));

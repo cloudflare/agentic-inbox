@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { KeyIcon, PlusIcon, CopyIcon, CheckIcon } from "@phosphor-icons/react";
 import { useMailboxes } from "~/queries/mailboxes";
+import { useSenders } from "~/queries/senders";
+import type { SenderIdentity } from "../../shared/senders";
 
 type Key = {
 	id: string;
@@ -10,6 +12,8 @@ type Key = {
 	prefix: string;
 	mailbox_ids: string[];
 	permissions: string[];
+	sender_identity_ids: string[];
+	default_sender_identity_id: string | null;
 	created_at: string;
 	expires_at: string | null;
 	last_used_at: string | null;
@@ -86,9 +90,108 @@ async function request(path = "", method = "GET", body?: unknown) {
 	if (!response.ok) throw new Error(data.error ?? "Could not update API keys");
 	return data;
 }
+// Senders of a key's mailboxes are always usable; others are granted one by one.
+function SenderAccessFields({
+	senders,
+	mailboxIds,
+	granted,
+	onGranted,
+	defaultId,
+	onDefault,
+	name,
+}: {
+	senders: SenderIdentity[];
+	mailboxIds: string[];
+	granted: string[];
+	onGranted: (ids: string[]) => void;
+	defaultId: string | null;
+	onDefault: (id: string | null) => void;
+	name: string;
+}) {
+	const implied = (s: SenderIdentity) =>
+		!!s.mailbox_id && mailboxIds.includes(s.mailbox_id);
+	if (!senders.length)
+		return <p className="text-sm text-kumo-subtle">No senders configured.</p>;
+	return (
+		<div className="divide-y divide-kumo-line overflow-hidden rounded-lg border border-kumo-line bg-kumo-base">
+			<label className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm">
+				<span className="text-kumo-subtle">
+					No key default — use the workspace default
+				</span>
+				<input
+					type="radio"
+					name={name}
+					aria-label="Use the workspace default"
+					checked={defaultId === null}
+					onChange={() => onDefault(null)}
+				/>
+			</label>
+			{senders.map((s) => {
+				const usable = implied(s) || granted.includes(s.id);
+				return (
+					<div
+						key={s.id}
+						className="flex items-center justify-between gap-3 px-3 py-2.5"
+					>
+						<label className="flex min-w-0 cursor-pointer items-center gap-3">
+							<Checkbox
+								className="shrink-0"
+								aria-label={`Allow ${s.email}`}
+								checked={usable}
+								disabled={implied(s)}
+								onCheckedChange={(value) => {
+									onGranted(
+										value
+											? [...granted, s.id]
+											: granted.filter((id) => id !== s.id),
+									);
+									if (!value && defaultId === s.id) onDefault(null);
+								}}
+							/>
+							<span className="min-w-0 break-all text-sm leading-5">
+								{s.email}
+								<span className="ml-2 text-xs text-kumo-subtle">
+									{implied(s) ? "Included with its mailbox" : s.name}
+								</span>
+							</span>
+						</label>
+						<label
+							className={`flex shrink-0 items-center gap-2 text-xs ${usable ? "cursor-pointer" : "text-kumo-subtle"}`}
+						>
+							Default
+							<input
+								type="radio"
+								name={name}
+								aria-label={`Make ${s.email} the default`}
+								disabled={!usable}
+								checked={defaultId === s.id}
+								onChange={() => onDefault(s.id)}
+							/>
+						</label>
+					</div>
+				);
+			})}
+		</div>
+	);
+}
 export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 	const qc = useQueryClient(),
-		mailboxes = useMailboxes();
+		mailboxes = useMailboxes(),
+		senderConfig = useSenders();
+	const senders = senderConfig.data?.senders ?? [];
+	const usable = (boxIds: string[], ids: string[]) =>
+		senders
+			.filter(
+				(s) =>
+					ids.includes(s.id) ||
+					(!!s.mailbox_id && boxIds.includes(s.mailbox_id)),
+			)
+			.map((s) => s.id);
+	const senderBody = (boxIds: string[], ids: string[], def: string | null) => ({
+		sender_identity_ids: ids.filter((id) => senders.some((s) => s.id === id)),
+		default_sender_identity_id:
+			def && usable(boxIds, ids).includes(def) ? def : null,
+	});
 	const list = useQuery<Key[]>({
 		queryKey: ["api-keys"],
 		queryFn: () => request(),
@@ -98,6 +201,9 @@ export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 		[name, setName] = useState(""),
 		[boxes, setBoxes] = useState<string[]>([mailboxId]),
 		[scopes, setScopes] = useState<string[]>(["mail:read"]),
+		[senderIds, setSenderIds] = useState<string[]>([]),
+		[defaultSender, setDefaultSender] = useState<string | null>(null),
+		[editing, setEditing] = useState(""),
 		[expiry, setExpiry] = useState(""),
 		[secret, setSecret] = useState(""),
 		[copied, setCopied] = useState(false),
@@ -116,7 +222,7 @@ export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 			if (data?.key) {
 				setSecret(data.key);
 				setAdding(false);
-			}
+			} else setEditing("");
 			await qc.invalidateQueries({ queryKey: ["api-keys"] });
 		},
 	});
@@ -148,6 +254,9 @@ export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 						setName("");
 						setBoxes([mailboxId]);
 						setScopes(["mail:read"]);
+						setSenderIds([]);
+						setDefaultSender(null);
+						setEditing("");
 						setExpiry("");
 						setCopied(false);
 						setCopyError("");
@@ -226,6 +335,7 @@ export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 									expires_at: expiry
 										? new Date(`${expiry}T23:59:59Z`).toISOString()
 										: null,
+									...senderBody(boxes, senderIds, defaultSender),
 								},
 							})
 							.catch(() => {});
@@ -377,6 +487,29 @@ export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 							))}
 						</div>
 					</fieldset>
+					<fieldset className="min-w-0">
+						<legend className="mb-1 text-sm font-medium">
+							Sender identities
+						</legend>
+						<p className="mb-2 text-xs text-kumo-subtle">
+							Addresses this key may send and draft from, and the one it uses
+							when a request names none.
+						</p>
+						<SenderAccessFields
+							name="new-key-default-sender"
+							senders={senders}
+							mailboxIds={boxes}
+							granted={senderIds}
+							onGranted={setSenderIds}
+							defaultId={
+								defaultSender &&
+								usable(boxes, senderIds).includes(defaultSender)
+									? defaultSender
+									: null
+							}
+							onDefault={setDefaultSender}
+						/>
+					</fieldset>
 
 					<div className="flex justify-end gap-2 border-t border-kumo-line pt-4">
 						<Button
@@ -468,6 +601,72 @@ export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 													))}
 											</div>
 										</div>
+
+										<p className="break-all text-xs text-kumo-subtle">
+											{usable(key.mailbox_ids, key.sender_identity_ids).length
+												? `Sends as ${senders
+														.filter((s) =>
+															usable(
+																key.mailbox_ids,
+																key.sender_identity_ids,
+															).includes(s.id),
+														)
+														.map(
+															(s) =>
+																s.email +
+																(s.id === key.default_sender_identity_id
+																	? " (default)"
+																	: ""),
+														)
+														.join(", ")}`
+												: "No sender identities"}
+										</p>
+										{editing === key.id && (
+											<form
+												className="space-y-3 pt-2"
+												onSubmit={(e) => {
+													e.preventDefault();
+													change.mutate({
+														path: `/${key.id}`,
+														method: "PATCH",
+														body: senderBody(
+															key.mailbox_ids,
+															senderIds,
+															defaultSender,
+														),
+													});
+												}}
+											>
+												<SenderAccessFields
+													name={`default-sender-${key.id}`}
+													senders={senders}
+													mailboxIds={key.mailbox_ids}
+													granted={senderIds}
+													onGranted={setSenderIds}
+													defaultId={defaultSender}
+													onDefault={setDefaultSender}
+												/>
+												<div className="flex justify-end gap-2">
+													<Button
+														type="button"
+														size="sm"
+														variant="ghost"
+														disabled={change.isPending}
+														onClick={() => setEditing("")}
+													>
+														Cancel
+													</Button>
+													<Button
+														type="submit"
+														size="sm"
+														variant="primary"
+														disabled={change.isPending}
+													>
+														{change.isPending ? "Saving…" : "Save senders"}
+													</Button>
+												</div>
+											</form>
+										)}
 									</div>
 									<div className="col-span-2 row-start-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-kumo-subtle [&>p+p]:before:content-['·'] [&>p+p]:before:mr-2">
 										<p className="text-kumo-default tabular-nums">
@@ -490,7 +689,22 @@ export default function ApiKeySettings({ mailboxId }: { mailboxId: string }) {
 												: "No expiry"}
 										</p>
 									</div>
-									<div className="col-start-2 row-start-1 justify-self-end">
+									<div className="col-start-2 row-start-1 flex gap-1 justify-self-end">
+										{!key.revoked_at && (
+											<Button
+												size="sm"
+												variant="ghost"
+												disabled={change.isPending || adding}
+												onClick={() => {
+													setSenderIds(key.sender_identity_ids);
+													setDefaultSender(key.default_sender_identity_id);
+													setEditing(editing === key.id ? "" : key.id);
+													change.reset();
+												}}
+											>
+												Senders
+											</Button>
+										)}
 										{!key.revoked_at && (
 											<Button
 												size="sm"

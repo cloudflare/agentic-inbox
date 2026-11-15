@@ -45,6 +45,7 @@ export async function migrate(db: Database) {
 		[44, "044_draft_intent.sql"],
 		[45, "045_inbound_recovery.sql"],
 		[46, "046_group_question_capacity.sql"],
+		[47, "047_api_key_senders.sql"],
 	] as const) {
 		const ddl = await readFile(
 			new URL(`../migrations/${filename}`, import.meta.url),

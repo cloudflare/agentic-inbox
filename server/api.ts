@@ -9,6 +9,7 @@ import { operationsApi, readiness } from "./operations";
 import type { ObjectStore } from "./inbound";
 import {
 	apiKeysApi,
+	keySenderAccess,
 	authenticateApiKey,
 	keyCanRequest,
 	type KeyVariables,
@@ -41,6 +42,7 @@ import type { Database } from "./db";
 import { InboxStore, type MessageRow } from "./store";
 
 import { SenderStore } from "./senders";
+import { scopeSenders } from "../shared/senders";
 import { sendReal, type MailSender } from "./outbound";
 import { liveSender, mailboxConfig } from "./mailboxes";
 
@@ -257,6 +259,9 @@ export function createApi(db: Database, options: ApiOptions) {
 						access: { role: "integration", managed: true },
 						mailbox_ids: c.get("apiKey")!.mailbox_ids,
 						permissions: c.get("apiKey")!.permissions,
+						sender_identity_ids: c.get("apiKey")!.sender_identity_ids,
+						default_sender_identity_id:
+							c.get("apiKey")!.default_sender_identity_id,
 						canManageWebhooks: c
 							.get("apiKey")!
 							.permissions.includes("webhooks:manage"),
@@ -290,17 +295,7 @@ export function createApi(db: Database, options: ApiOptions) {
 				active:
 					s.active && !!s.mailbox_id && liveSender(s.mailbox_id) === s.email,
 			}));
-		const key = c.get("apiKey");
-		if (key) {
-			config.senders = config.senders.filter(
-				(s) => s.mailbox_id && key.mailbox_ids.includes(s.mailbox_id),
-			);
-			if (
-				!config.senders.some((s) => s.id === config.default_sender_identity_id)
-			)
-				config.default_sender_identity_id = null;
-		}
-		return c.json(config);
+		return c.json(scopeSenders(config, keySenderAccess(c.get("apiKey"))));
 	});
 	const senderInput = z
 		.object({
@@ -722,7 +717,7 @@ export function createApi(db: Database, options: ApiOptions) {
 				reply: mode === "reply" || mode === "reply-all" ? parent : undefined,
 				mailboxId: mailbox.id,
 			},
-			{ live: isLive, mailboxIds: c.get("apiKey")?.mailbox_ids },
+			{ live: isLive, ...keySenderAccess(c.get("apiKey")) },
 		);
 		let threadId = input.thread_id;
 		if (parent) {
@@ -788,7 +783,7 @@ export function createApi(db: Database, options: ApiOptions) {
 						actor,
 						action ? c.req.param("id") : undefined,
 						action.endsWith("reply"),
-						c.get("apiKey")?.mailbox_ids,
+						keySenderAccess(c.get("apiKey")),
 					),
 					201,
 				);
@@ -815,7 +810,7 @@ export function createApi(db: Database, options: ApiOptions) {
 					reply: reply ? parent : undefined,
 					mailboxId: mailbox.id,
 				},
-				{ mailboxIds: c.get("apiKey")?.mailbox_ids },
+				keySenderAccess(c.get("apiKey")),
 			);
 			const message = await store.insert(mailbox.id, {
 				sender: sender.email,
