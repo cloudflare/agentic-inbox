@@ -785,37 +785,44 @@ export class MailboxDO extends DurableObject<Env> {
 
 	// ── Rate limiting (raw SQL) ────────────────────────────────────
 
-	/**
-	 * Check if the mailbox has exceeded the send rate limit.
-	 * Limits: 20 emails per hour, 100 per day per mailbox.
-	 * Returns null if under limit, or an error message string if exceeded.
-	 */
-	async checkSendRateLimit(): Promise<string | null> {
-		const hourRow = [...this.ctx.storage.sql.exec(
-			`SELECT COUNT(*) as cnt FROM emails
-			 WHERE folder_id = ?1
-			   AND date >= datetime('now', '-1 hour')`,
-			Folders.SENT,
-		)][0] as { cnt: number } | undefined;
+    /**
+     * Check if the mailbox has exceeded the send rate limit.
+     * Limits: 20 emails per hour, 1000 per day per mailbox.
+     * Returns null if under limit, or an error message string if exceeded.
+     */
+    async checkSendRateLimit(): Promise<string | null> {
+        // `date` is stored as an ISO string (e.g. 2026-11-19T22:00:00.000Z), so compare
+        // against ISO cutoffs rather than SQLite datetime() output ("YYYY-MM-DD HH:MM:SS"),
+        // which made every email sent on the current UTC day count as "within the last hour".
+        const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-		if ((hourRow?.cnt ?? 0) >= 20) {
-			return "Rate limit exceeded: max 20 emails per hour per mailbox";
-		}
+        const hourRow = [...this.ctx.storage.sql.exec(
+            `SELECT COUNT(*) as cnt FROM emails
+             WHERE folder_id = ?1
+               AND date >= ?2`,
+            Folders.SENT,
+            hourAgo,
+        )][0] as { cnt: number } | undefined;
 
-		const dayRow = [...this.ctx.storage.sql.exec(
-			`SELECT COUNT(*) as cnt FROM emails
-			 WHERE folder_id = ?1
-			   AND date >= datetime('now', '-1 day')`,
-			Folders.SENT,
-		)][0] as { cnt: number } | undefined;
+        if ((hourRow?.cnt ?? 0) >= 20) {
+            return "Rate limit exceeded: max 20 emails per hour per mailbox";
+        }
 
-		if ((dayRow?.cnt ?? 0) >= 100) {
-			return "Rate limit exceeded: max 100 emails per day per mailbox";
-		}
+        const dayRow = [...this.ctx.storage.sql.exec(
+            `SELECT COUNT(*) as cnt FROM emails
+             WHERE folder_id = ?1
+               AND date >= ?2`,
+            Folders.SENT,
+            dayAgo,
+        )][0] as { cnt: number } | undefined;
 
-		return null;
-	}
+        if ((dayRow?.cnt ?? 0) >= 1000) {
+            return "Rate limit exceeded: max 1000 emails per day per mailbox";
+        }
 
+        return null;
+    }
 	// ── Email creation (Drizzle) ───────────────────────────────────
 
 	async createEmail(
