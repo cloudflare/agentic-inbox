@@ -1,6 +1,7 @@
 import type { KeyVariables } from "../api-keys";
 import { reapplyApi } from "./reapply";
 import { providerStateApi } from "./provider-state-api";
+import { classifierHealth } from "./provider-state";
 import { backfillsApi } from "./backfills";
 import { inspectClassifications } from "./inspect";
 import { reviewInput, reviewClassification } from "./review";
@@ -97,6 +98,7 @@ export function classifierApi(
 			);
 		await next();
 	});
+	app.get("/health", async (c) => c.json(await classifierHealth(db)));
 	app.route("/reapply-rules", reapplyApi(db, options.actor));
 	app.get("/threads/:mailbox/:thread/classifications", async (c) =>
 		c.json(

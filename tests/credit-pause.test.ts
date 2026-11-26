@@ -373,3 +373,47 @@ test("a payment failure in an interactive classifier test also pauses both queue
 	assert.equal(await creditsPaused(db), true);
 	assert.equal(calls, 1);
 });
+test("health shows the pause and the last successful request, with no mail content, to non-admins", async () => {
+	const reader = classifierApi(db, {
+		enabled: true,
+		admin: false,
+		actor: "monitor",
+	});
+	const health = async () => {
+		const res = await reader.request("http://localhost/health");
+		assert.equal(res.status, 200);
+		return (await res.json()) as Record<string, unknown>;
+	};
+	await db`DELETE FROM classifier_provider_runs`;
+	assert.deepEqual(await health(), {
+		paused: false,
+		paused_at: null,
+		resume_error: null,
+		last_classified_at: null,
+	});
+	const job = await email();
+	await processJob(db, "test", job.token, yes);
+	const ok = await health();
+	assert.deepEqual(Object.keys(ok).sort(), [
+		"last_classified_at",
+		"paused",
+		"paused_at",
+		"resume_error",
+	]);
+	assert.equal(ok.paused, false);
+	assert.ok(ok.last_classified_at);
+	await pause();
+	const paused = await health();
+	assert.equal(paused.paused, true);
+	assert.ok(paused.paused_at);
+	assert.equal(paused.resume_error, "provider_http_402");
+	assert.equal(paused.last_classified_at, ok.last_classified_at);
+	const text = JSON.stringify(paused);
+	for (const secret of ["Help", "Please reply", "person@example.test", mailbox])
+		assert.ok(!text.includes(secret), secret);
+	assert.equal(
+		(await reader.request("http://localhost/health", { method: "POST" }))
+			.status,
+		403,
+	);
+});

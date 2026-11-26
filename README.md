@@ -113,6 +113,11 @@ an interrupted check can be retried after 60 seconds. Requests already in
 flight may finish. A later payment error takes precedence over a successful
 probe. Rate limits and transient server errors retain automatic backoff.
 
+Monitoring reads `GET /api/v1/classification/health` with any API key. It
+returns only `paused`, `paused_at`, `resume_error` and `last_classified_at`
+(when the newest successful Jev request finished): no mail content or
+addresses.
+
 Migration 035 adds the shared pause state and excluded credit-attempt counter.
 The migration does not pause work or retry past terminal failures automatically.
 

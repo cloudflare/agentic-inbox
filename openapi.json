@@ -6881,6 +6881,29 @@
 				}
 			}
 		},
+		"/api/v1/classification/health": {
+			"get": {
+				"tags": ["Classification"],
+				"summary": "Get classifier health",
+				"description": "Monitoring status of the shared Jev classifier. Any API key may read it. It returns only the credit pause flag and times: no mail content, addresses or subjects.",
+				"operationId": "getClassifierHealth",
+				"responses": {
+					"200": {
+						"description": "Classifier health",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ClassifierHealth"
+								}
+							}
+						}
+					},
+					"503": {
+						"description": "Classifiers are not enabled"
+					}
+				}
+			}
+		},
 		"/api/v1/classification/provider-state": {
 			"get": {
 				"tags": ["Classification"],
@@ -9183,6 +9206,38 @@
 					},
 					"request": {
 						"$ref": "#/components/schemas/BackfillInput"
+					}
+				}
+			},
+			"ClassifierHealth": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": [
+					"paused",
+					"paused_at",
+					"resume_error",
+					"last_classified_at"
+				],
+				"properties": {
+					"paused": {
+						"type": "boolean",
+						"description": "True after a Typesafe HTTP 402 until an administrator resumes."
+					},
+					"paused_at": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true
+					},
+					"resume_error": {
+						"type": "string",
+						"nullable": true,
+						"description": "Error code of the pause or of the last resume check, e.g. provider_http_402."
+					},
+					"last_classified_at": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true,
+						"description": "When the newest successful Jev request finished."
 					}
 				}
 			},

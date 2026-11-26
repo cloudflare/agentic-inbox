@@ -77,6 +77,8 @@ export function keyCanRequest(
 	if (api !== "api" || v1 !== "v1") return false;
 	const read = method === "GET" || method === "HEAD";
 	if (read && path === "/api/v1/config") return true;
+	// Monitoring: a pause flag and times only, the same for every mailbox.
+	if (read && path === "/api/v1/classification/health") return true;
 	if (read && path === "/api/v1/sender-identities")
 		return key.permissions.some((p) =>
 			["mail:read", "mail:send", "drafts:manage", "senders:manage"].includes(p),

@@ -247,6 +247,26 @@ test("webhook keys manage only their own endpoints; administrators retain contro
 		200,
 	);
 });
+test("any API key may read classifier health, and nothing else under it", () => {
+	const key = {
+		id: crypto.randomUUID(),
+		permissions: ["mail:read"],
+		mailbox_ids: [mailbox],
+	};
+	for (const k of [key, { ...key, permissions: [] }])
+		assert.equal(
+			keyCanRequest(k, "GET", "/api/v1/classification/health"),
+			true,
+		);
+	for (const [method, path] of [
+		["POST", "/api/v1/classification/health"],
+		["GET", "/api/v1/classification/health/x"],
+		["GET", "/api/v1/classification/provider-state"],
+		["POST", "/api/v1/classification/provider-state/resume"],
+		["GET", "/api/v1/classification/%68ealth"],
+	])
+		assert.equal(keyCanRequest(key, method, path), false, path);
+});
 test("path allowlist denies encoded separators and future routes", () => {
 	const key = {
 		id: crypto.randomUUID(),
