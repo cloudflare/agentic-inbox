@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -256,7 +257,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 			else if (mode === "forward" && originalId) await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
 			else await sendEmailMutation.mutateAsync({ mailboxId, email: emailData });
 			if (draftId) deleteEmailMutation.mutate({ mailboxId, id: draftId });
-			toastManager.add({ title: "Email sent!" });
+			toastManager.add({ title: "Submitted for delivery", description: "Check Email Service Activity for the delivery result." });
 			onClose();
 		} catch (err: unknown) { const message = (err instanceof Error ? err.message : null) || "Failed to send email."; setError(message); toastManager.add({ title: message, variant: "error" }); }
 		finally { setIsSending(false); }

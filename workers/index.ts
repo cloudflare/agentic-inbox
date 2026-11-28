@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -6,12 +7,12 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
-import { sendEmail } from "./email-sender";
+import { sendFromInbox } from "./email-sender";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
 import {
 	validateSender,
 	SenderValidationError,
-	generateMessageId,
+	providerMessageId,
 	buildThreadingHeaders,
 	listMailboxes,
 } from "./lib/email-helpers";
@@ -170,18 +171,24 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 	const body = SendEmailRequestSchema.parse(await c.req.json());
 	const { to, cc, bcc, from, subject, html, text, attachments, in_reply_to, references, thread_id } = body;
 
-	let toStr: string, fromEmail: string, fromDomain: string;
+	let toStr: string, fromEmail: string;
 	try {
-		({ toStr, fromEmail, fromDomain } = validateSender(to, from, mailboxId));
+		({ toStr, fromEmail } = validateSender(to, from, mailboxId));
 	} catch (e) {
 		if (e instanceof SenderValidationError) return c.json({ error: e.message }, 400);
 		throw e;
 	}
 
-	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
+	const messageId = crypto.randomUUID();
 	const stub = c.var.mailboxStub;
 	const rateLimitError = await (stub as any).checkSendRateLimit();
 	if (rateLimitError) return c.json({ error: rateLimitError }, 429);
+	const delivery = await sendFromInbox(c.env.EMAIL, {
+		to, cc, bcc, from, subject, html, text, attachments,
+		...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
+	});
+	if ("error" in delivery) return c.json({ error: delivery.error }, 502);
+	const outgoingMessageId = providerMessageId(delivery.messageId);
 	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
 	await stub.createEmail(Folders.SENT, {
@@ -197,18 +204,11 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 			...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
 			...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
 			{ key: "subject", value: subject }, { key: "date", value: new Date().toISOString() },
-			{ key: "message-id", value: `<${outgoingMessageId}>` },
+			...(outgoingMessageId ? [{ key: "message-id", value: `<${outgoingMessageId}>` }] : []),
 		]),
 	}, attachmentData);
 
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
-			to, cc, bcc, from, subject, html, text,
-			attachments: attachments?.map((att) => ({ content: att.content, filename: att.filename, type: att.type, disposition: att.disposition || "attachment", contentId: att.contentId })),
-			...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
-		}).catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
-	);
-	return c.json({ id: messageId, status: "sent" }, 202);
+	return c.json({ id: messageId, status: "sent", delivery_status: "submitted" }, 202);
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
@@ -383,9 +383,11 @@ async function receiveEmail(event: { raw: ReadableStream; rawSize: number }, env
 	const extractMsgId = (s: string) => { const m = s.match(/<([^>]+)>/); return m ? m[1] : s.trim().split(/\s+/)[0]; };
 	const inReplyTo = parsedEmail.inReplyTo ? extractMsgId(parsedEmail.inReplyTo) : null;
 	const emailReferences = parsedEmail.references ? parsedEmail.references.split(/\s+/).filter(Boolean).map(extractMsgId) : [];
+	const referencedIds = [...new Set([inReplyTo, ...emailReferences.slice().reverse()].filter((id): id is string => !!id))];
 	let threadId = emailReferences[0] || inReplyTo || messageId;
-
-	if (!inReplyTo && emailReferences.length === 0) {
+	if (referencedIds.length > 0) {
+		threadId = (await stub.findThreadByMessageIds(referencedIds)) ?? threadId;
+	} else {
 		const subjectThread = await (stub as any).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
 		if (subjectThread) threadId = subjectThread;
 	}

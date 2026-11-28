@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -129,7 +130,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 			};
 			if (originalEmail) await replyMut.mutateAsync({ mailboxId, emailId: originalEmail.id, email: emailData }); else await sendEmailMut.mutateAsync({ mailboxId, email: emailData });
 			await deleteEmailMut.mutateAsync({ mailboxId, id: target.id });
-			toastManager.add({ title: "Email sent!" });
+			toastManager.add({ title: "Submitted for delivery", description: "Check Email Service Activity for the delivery result." });
 			if (isDraftFolder) closePanel();
 		} catch (err) {
 			const message = (err instanceof Error ? err.message : null) || "Failed to send email.";
