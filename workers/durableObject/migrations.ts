@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -167,5 +168,9 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_date ON emails(date);
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
+	},
+	{
+		name: "9_add_message_id_index",
+		sql: "CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);",
 	},
 ];

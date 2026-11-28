@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -69,4 +70,16 @@ export async function sendEmail(
 
 	const result = await binding.send(message as any);
 	return { messageId: result.messageId };
+}
+
+export async function sendFromInbox(binding: SendEmail, params: SendEmailParams) {
+	try {
+		return await sendEmail(binding, params);
+	} catch (error) {
+		const code = (error as { code?: unknown } | null)?.code;
+		if (typeof code === "string" && /^E_[A-Z0-9_]+$/.test(code) && code !== "E_INTERNAL_SERVER_ERROR") {
+			return { error: `Cloudflare Email Sending rejected this message (${code}).` };
+		}
+		return { error: "Cloudflare Email Sending could not confirm the result. Check Email Sending Activity before retrying." };
+	}
 }

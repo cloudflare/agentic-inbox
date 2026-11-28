@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -92,4 +93,5 @@ export const SendEmailRequestSchema = z
 export const SendEmailResponseSchema = z.object({
 	id: z.string(),
 	status: z.string(),
+	delivery_status: z.literal("submitted"),
 });

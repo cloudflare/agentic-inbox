@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -91,17 +92,23 @@ export function generateMessageId(fromDomain: string): {
 	return { messageId, outgoingMessageId };
 }
 
+export function providerMessageId(value: string | undefined): string | null {
+	const id = value?.trim().replace(/^<(.*)>$/, "$1");
+	return id && /^[^<>\s@]+@[^<>\s@]+$/.test(id) ? id : null;
+}
+
 // ── Threading ──────────────────────────────────────────────────────
 
 /**
  * Build the References chain and In-Reply-To from an original email.
  */
 export function buildReferencesChain(original: EmailFull): {
-	originalMsgId: string;
+	originalMsgId: string | null;
 	references: string[];
 	threadId: string;
 } {
-	const originalMsgId = original.message_id || original.id;
+	const id = providerMessageId(original.message_id ?? undefined);
+	const originalMsgId = original.folder_id === Folders.SENT && id?.startsWith(`${original.id}@`) ? null : id;
 	let existingRefs: string[] = [];
 	if (original.email_references) {
 		try {
@@ -110,7 +117,7 @@ export function buildReferencesChain(original: EmailFull): {
 			// Malformed JSON in email_references — treat as empty
 		}
 	}
-	const references = [...existingRefs, originalMsgId].filter(Boolean);
+	const references = [...new Set([...existingRefs, originalMsgId].filter((ref): ref is string => !!ref))];
 	const threadId = original.thread_id || original.id;
 	return { originalMsgId, references, threadId };
 }
@@ -119,11 +126,11 @@ export function buildReferencesChain(original: EmailFull): {
  * Build threading headers (In-Reply-To + References) for the email binding.
  */
 export function buildThreadingHeaders(
-	originalMsgId: string,
+	originalMsgId: string | null,
 	references: string[],
 ): Record<string, string> {
 	return {
-		"In-Reply-To": `<${originalMsgId}>`,
+		...(originalMsgId ? { "In-Reply-To": `<${originalMsgId}>` } : {}),
 		...(references.length > 0
 			? { References: references.map((r) => `<${r}>`).join(" ") }
 			: {}),

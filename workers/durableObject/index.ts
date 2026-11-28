@@ -1,3 +1,4 @@
+// Modified from Cloudflare Agentic Inbox by the liudongbao fork.
 // Copyright (c) 2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -738,6 +739,23 @@ export class MailboxDO extends DurableObject<Env> {
 	}
 
 	// ── Threading helpers (raw SQL) ────────────────────────────────
+
+	async findThreadByMessageIds(ids: string[]): Promise<string | null> {
+		const candidates = [...new Set(ids)].slice(0, 100);
+		if (candidates.length === 0) return null;
+		const placeholders = candidates.map(() => "?").join(", ");
+		const matches = [...this.ctx.storage.sql.exec<{ message_id: string; thread_id: string }>(
+			`SELECT message_id, thread_id FROM emails
+			 WHERE message_id IN (${placeholders}) AND thread_id IS NOT NULL
+			 ORDER BY date DESC`,
+			...candidates,
+		)];
+		for (const id of candidates) {
+			const row = matches.find((entry) => entry.message_id === id);
+			if (row) return row.thread_id;
+		}
+		return null;
+	}
 
 	async findThreadBySubject(subject: string, senderAddress?: string): Promise<string | null> {
 		const normalized = subject
